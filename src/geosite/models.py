@@ -111,6 +111,9 @@ class Confluence(BaseModel):
 class WaterMouth(BaseModel):
     mountain: str
     closure_index: float
+    width_m: float | None = None
+    left_hill_m: float | None = None
+    right_hill_m: float | None = None
 
 
 class WaterObject(BaseModel):
@@ -127,6 +130,13 @@ class WaterObject(BaseModel):
     confluences: list[Confluence] = Field(default_factory=list)
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
+    curvature_radius_m: float | None = None
+    loop: dict | None = None
+    between_branches: bool | None = None
+    flow_ways_share: float | None = None
+    flow_dem_dir: str | None = None
+    flow_osm_dir: str | None = None
+    flow_agree: bool | None = None
     source: str | None = None
 
 

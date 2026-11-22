@@ -32,6 +32,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                 "mean_rel_elev_m": r["mean_rel_elev_m"],
                 "horizon_deg": r["horizon_deg"],
                 "hill_share": r.get("hill_share"),
+                "water_share": r.get("water_share"),
                 "peaks": r.get("peaks", []),
             })
         sectors.append({"mountain": s["mountain"], "from_deg": geo.mountain_bounds(s["mountain"])[0],

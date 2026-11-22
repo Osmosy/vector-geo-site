@@ -7,9 +7,11 @@ import json
 import math
 import os
 import sys
+
+import numpy as np
 from pathlib import Path
 
-from . import geo, terrain
+from . import geo, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -82,7 +84,7 @@ def cmd_fetch(args) -> int:
     return 0
 
 
-def _measure(args, r) -> dict:
+def _measure(args, r, *, with_water: bool = True) -> dict:
     epsg = geo.utm_epsg(r.lat, r.lon)
     macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
     facing = args.facing
@@ -90,7 +92,29 @@ def _measure(args, r) -> dict:
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
     out = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
                               meso_km=8.0, facing_deg=facing, point_smooth_m=point_smooth)
+    if with_water:
+        out.update(_measure_water(r, out, epsg))
     return out
+
+
+def _measure_water(r, measured: dict, epsg: int) -> dict:
+    """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш."""
+    site_xy = np.array([measured["x0"], measured["y0"]])
+    grid = measured["grid_macro"]
+    result: dict = {"water": [], "roads": []}
+    try:
+        payload = water.fetch_raw(r.lat, r.lon, 8000)
+    except Exception as exc:
+        result["water_error"] = str(exc)
+        return result
+    features = water.parse_features(payload)
+    metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy, radius_m=8000)
+    result["water"] = water_pack.to_objects(metrics)
+    # Долю воды по секторам пока не считаем: маска воды требует калибровки
+    # (полигоны OSM чинятся buffer(0), линии расширяются — площадь систематически завышается).
+    result["water_share_skipped"] = True
+    result["water_count"] = len(metrics)
+    return result
 
 
 def cmd_terrain(args) -> int:
@@ -120,7 +144,12 @@ def cmd_pack(args) -> int:
         orientation_source, confidence = "user_compass", "high"
     if args.year is None:
         notes.append("год постройки не указан: карта считается для текущего года")
-    warnings.append("водные слои не подключены (этап 3): water_share и water = null")
+    if m.get("water_share_skipped"):
+        warnings.append("доля воды по секторам не считается: маска воды не откалибрована по площади")
+    if not m.get("water"):
+        warnings.append("вода: слои OSM не получены, water и water_share пусты")
+    if m.get("water_error"):
+        warnings.append(f"вода: {m['water_error']}")
     warnings.append("склонение и ветер не рассчитаны (этап 4)")
     warnings.append("рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, "
                     "в плотной застройке возможны искажения")
@@ -162,6 +191,28 @@ def cmd_run(args) -> int:
     return rc
 
 
+def cmd_water(args) -> int:
+    r = _resolve(args.place)
+    epsg = geo.utm_epsg(r.lat, r.lon)
+    macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
+    point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
+    m = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
+                            meso_km=8.0, facing_deg=None, point_smooth_m=point_smooth)
+    w = _measure_water(r, m, epsg)
+    rows = [{"id": o.id, "name": o.name, "kind": o.kind, "nearest_m": o.nearest_m,
+             "in": o.in_mountain, "out": o.out_mountain, "bend": o.bend,
+             "curvature_km": None if o.curvature_radius_m is None else round(o.curvature_radius_m / 1000, 2),
+             "straight": o.straight_at_site, "flow_agree": o.flow_agree,
+             "mouth": None if not o.water_mouth else {"mountain": o.water_mouth.mountain,
+                                                      "closure": o.water_mouth.closure_index,
+                                                      "width_m": o.water_mouth.width_m},
+             "visible_out": o.outflow_visible, "confluences": len(o.confluences)}
+            for o in w.get("water", [])[:20]]
+    _print({"place": r.display_name or r.input, "features": w.get("water_count", 0),
+            "error": w.get("water_error"), "nearest": rows})
+    return 0
+
+
 def cmd_schema(args) -> int:
     _print(json_schema())
     return 0
@@ -201,6 +252,10 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="весь путь: место → пакет")
     common(p_run)
     p_run.set_defaults(func=cmd_run)
+
+    p_water = sub.add_parser("water", help="вода: реки, изгибы, слияния, врата")
+    p_water.add_argument("place")
+    p_water.set_defaults(func=cmd_water)
 
     p_schema = sub.add_parser("schema", help="JSON Schema пакета")
     p_schema.set_defaults(func=cmd_schema)
