@@ -260,3 +260,26 @@ def test_confluence_cap_per_line():
     river_key = [k for k in res if "R-" in k][0]
     assert len(res[river_key]) <= 5
     assert res[river_key][0]["dist_m"] <= res[river_key][-1]["dist_m"]
+
+
+def test_alias_names_merge():
+    """R2/E-010: «River X» и «The X» — один водоток, даже с разрывом 20 м."""
+    a = make("River Loddon", [(-0.10, 51.50), (-0.0995, 51.50)])
+    b = make("The Loddon", [(-0.0993, 51.50), (-0.0985, 51.50)], kind="stream")
+    merged = water.merge_by_name([a, b])
+    assert len(merged) == 1, [m.name for m in merged]
+    assert merged[0].ways == 2
+
+
+def test_hidden_share_hides_from_visible():
+    """R2: водоток, идущий в трубе на 90% длины, не считается видимым."""
+    covered = make("Culverted Brook", [(-0.10, 51.50), (-0.0982, 51.50)],
+                   tags={"tunnel": "culvert"})
+    open_part = make("Culverted Brook", [(-0.0981, 51.50), (-0.0979, 51.50)])
+    merged = water.merge_by_name([covered, open_part])
+    assert merged[0].hidden_share is not None
+    assert merged[0].hidden_share > 0.8
+    site = water.to_utm([(-0.099, 51.50)], 32630)[0]
+    metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.099,
+                                   epsg=32630, grid=None)
+    assert metric.visible is False
