@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import geo
+from . import geo, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
 ALGO_VERSION = "3.1.0"
@@ -276,7 +276,14 @@ class WaterMetrics:
     flow_dem_dir: str | None
     flow_osm_dir: str | None
     flow_agree: bool | None
+    flow_chosen: str | None
+    flow_rule: int | None
+    flow_confidence: str | None
+    dem_slope_m_per_km: float | None
+    dem_slope_snr: float | None
+    dem_reason: str | None
     tidal: bool | None
+    tidal_source: str | None
     source: str
     loop: dict | None = None
     between_branches: bool | None = None
@@ -295,17 +302,77 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     if nearest_m > meso_radius_m:
         return None
 
-    # вход и выход из круга 2 км → горы 來水 / 去水
+    tags = getattr(feature, "tags", {}) or {}
+    hidden = getattr(feature, "hidden", False) or is_hidden(tags)
+    kind = "culvert" if hidden else feature.kind
+
+    # --- приливность (W5): тег OSM, иначе таблица известных границ ---
+    from pyproj import Transformer
+    inv = Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
+    nearest_abs = pts[nearest_seg] + site_xy
+    n_lon, n_lat = inv.transform(nearest_abs[0], nearest_abs[1])
+    tide = tides.status(tags, feature.name, n_lon, n_lat)
+
+    # --- уклон по рельефу: регрессия высот по длине, а не две точки (W4) ---
+    dem_slope = dem_snr = None
+    dem_reason = "no_dem"
+    flow_dem = None
+    if grid is not None and len(pts) > 4:
+        seg = np.hypot(*np.diff(pts, axis=0).T)
+        cum = np.concatenate([[0.0], np.cumsum(seg)])
+        near_center = cum[nearest_seg]
+        window = (cum >= near_center - 2000.0) & (cum <= near_center + 2000.0)
+        idx = np.where(window)[0]
+        if len(idx) >= 6:
+            xs = cum[idx] / 1000.0                       # километры вдоль русла
+            zs = np.array([grid.point_value(*(pts[k] + site_xy)) for k in idx])
+            ok = ~np.isnan(zs)
+            if ok.sum() >= 6:
+                xs, zs = xs[ok], zs[ok]
+                slope, intercept = np.polyfit(xs, zs, 1)     # м на км
+                resid = zs - (slope * xs + intercept)
+                noise = float(np.nanstd(resid)) or 0.5
+                dem_slope = float(slope)
+                span_km = float(xs.max() - xs.min()) or 1.0
+                dem_snr = float(abs(slope) * span_km / max(noise, 0.5))
+                dem_reason = None
+                if abs(dem_slope) > 1e-9:
+                    flow_dem = "downstream_toward_end" if dem_slope < 0 else "downstream_toward_start"
+            else:
+                dem_reason = "no_dem_values"
+    elif grid is None:
+        dem_reason = "no_dem"
+
+    # --- выбор направления по правилам W4 (П4: пишем оба и причину) ---
+    flow_osm = "downstream_toward_end" if len(pts) > 1 else None
+    explicit_dir = (tags.get("direction") or "").lower()
+    flow_rule, flow_conf, flow_chosen = 5, "medium", None
+    if kind in {"canal", "culvert", "lake", "sea", "dock"}:
+        flow_rule, flow_conf = 0, "high"
+        flow_chosen = None                     # у канала и трубы течения нет
+    elif explicit_dir in {"up", "down", "forward", "backward"} or tags.get("oneway"):
+        flow_rule, flow_conf, flow_chosen = 1, "high", flow_osm
+    elif tide["tidal"] is True:
+        flow_rule, flow_conf, flow_chosen = 2, "medium", flow_osm
+    elif dem_snr is not None and dem_snr >= 3.0 and flow_dem == flow_osm:
+        flow_rule, flow_conf, flow_chosen = 3, "high", flow_dem
+    elif dem_snr is not None and dem_snr >= 3.0 and flow_dem != flow_osm:
+        flow_rule, flow_conf, flow_chosen = 4, "low", flow_osm
+    else:
+        flow_rule, flow_conf, flow_chosen = 5, "medium", flow_osm
+        if dem_reason is None:
+            dem_reason = "flat"
+        flow_dem = None
+
+    # --- 來水 / 去水 по выбранному направлению ---
     cross = _crossings_with_circle(pts, in_radius_m)
-    in_m = out_m = None
-    if len(cross) >= 1:
-        first, last = cross[0], cross[-1]
-        in_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(first[0], first[1]))))
-        out_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(last[0], last[1]))))
+    if len(cross) >= 2:
+        a, b = cross[0], cross[-1]
     else:
         a, b = pts[0], pts[-1]
-        in_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(a[0], a[1]))))
-        out_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(b[0], b[1]))))
+    upstream, downstream = (a, b) if flow_chosen != "downstream_toward_start" else (b, a)
+    in_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(upstream[0], upstream[1]))))
+    out_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(downstream[0], downstream[1]))))
 
     # изгиб: центр кривизны в точке nearest; участок внутри кривой = обнимает
     i = min(max(nearest_seg, 1), len(pts) - 2)
@@ -316,36 +383,19 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     bend, radius_m = None, None
     if center is not None:
         radius_m = float(np.hypot(*(center - pts[i])))
-        # вектор от русла к центру кривизны и от русла к участку (начало координат)
         to_center = center - pts[i]
         to_site = -pts[i]
         if np.hypot(*to_site) > 1.0 and np.hypot(*to_center) > 1.0:
             cos = float(np.dot(to_center, to_site) / (np.hypot(*to_center) * np.hypot(*to_site)))
-            # участок с той же стороны, что центр кривизны → русло обнимает участок
             bend = "inner" if cos > 0 else "outer"
     straight = radius_m is None or radius_m > 5000.0
 
-    # течение по DEM: сравнить высоты двух соседних точек русла
-    flow_dem = None
-    if grid is not None:
-        z_a = grid.point_value(*(pts[i - 1] + site_xy))
-        z_b = grid.point_value(*(pts[i + 1] + site_xy))
-        if not (math.isnan(z_a) or math.isnan(z_b)):
-            flow_dem = "downstream_toward_end" if z_b < z_a else "downstream_toward_start"
-
-    # течение по OSM: направление отрисовки линии (соглашение OSM — по течению)
-    flow_osm = "downstream_toward_end" if len(pts) > 1 else None
-
-    # водные врата: где линия покидает круг 8 км
+    # водные врата: где вода покидает круг 8 км — по выбранному направлению
     mouth = None
     outer = _crossings_with_circle(pts, meso_radius_m)
     if outer and grid is not None:
-        # из двух выходов воды берём тот, что ниже по рельефу: это и есть 去水
-        if len(outer) >= 2:
-            za = grid.point_value(*(outer[0] + site_xy))
-            zb = grid.point_value(*(outer[-1] + site_xy))
-            exit_pt = outer[0] if (not math.isnan(za) and (math.isnan(zb) or za < zb)) else outer[-1]
-        else:
+        exit_pt = outer[-1] if flow_chosen != "downstream_toward_start" else outer[0]
+        if len(outer) == 1:
             exit_pt = outer[0]
         mouth = _water_mouth(grid, exit_pt, pts[i], site_xy)
 
@@ -355,8 +405,6 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
 
     loop = _detect_loop(pts) if len(pts) > 20 else None
     between = site_between_branches(pts) if len(pts) > 2 else {"between_branches": False}
-    tags = getattr(feature, "tags", {}) or {}
-    kind = "culvert" if (getattr(feature, "hidden", False) or is_hidden(tags)) else feature.kind
 
     return WaterMetrics(
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
@@ -372,10 +420,17 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         confluences=[],
         water_mouth=mouth,
         outflow_visible=visible,
-        flow_dem_dir=flow_dem,
         flow_osm_dir=flow_osm,
+        flow_dem_dir=flow_dem,
+        flow_chosen=flow_chosen,
+        flow_rule=flow_rule,
+        flow_confidence=flow_conf,
         flow_agree=(flow_dem == flow_osm) if flow_dem and flow_osm else None,
-        tidal=None,
+        dem_slope_m_per_km=None if dem_slope is None else round(dem_slope, 3),
+        dem_slope_snr=None if dem_snr is None else round(dem_snr, 2),
+        dem_reason=dem_reason,
+        tidal=tide["tidal"],
+        tidal_source=tide["tidal_source"],
         source="openstreetmap",
         loop=loop,
         between_branches=between.get("between_branches"),
@@ -383,8 +438,77 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     )
 
 
+def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.ndarray) -> dict | None:
+    """Ширина долины и высоты бортов поперёк течения в точке выхода воды."""
+    flow_dir = exit_pt - flow_pt
+    norm = np.hypot(*flow_dir)
+    if norm < 1e-6:
+        return None
+    flow_dir = flow_dir / norm
+    perp = np.array([-flow_dir[1], flow_dir[0]])
+    x_abs, y_abs = exit_pt + site_xy
+    z0 = grid.point_value(x_abs, y_abs)
+    if math.isnan(z0):
+        return None
+    half_widths, hills = [], []
+    capped_sides = 0
+    for sign in (1, -1):
+        width = 0.0
+        top = 0.0
+        for step in range(1, 61):          # до 3 км в каждую сторону
+            d = step * 50.0
+            z = grid.point_value(*(site_xy + exit_pt + perp * sign * d))
+            if math.isnan(z):
+                capped_sides += 1
+                break
+            width = d
+            top = max(top, z - z0)
+            if z - z0 > 20.0:              # борт поднялся на 20 м — это склон долины
+                break
+        else:
+            capped_sides += 1              # упёрлись в предел шагов
+        half_widths.append(width)
+        hills.append(top)
+    width = half_widths[0] + half_widths[1]
+    hill_left, hill_right = hills[0], hills[1]
+    bearing = geo.normalize_deg(math.degrees(math.atan2(exit_pt[0], exit_pt[1])))
+    return {
+        "mountain": geo.mountain_name(bearing),
+        "width_m": round(width, 1),
+        "left_hill_m": round(hill_left, 1),
+        "right_hill_m": round(hill_right, 1),
+        "width_capped": capped_sides > 0,
+        "capped_sides": capped_sides,
+        "closure_index": round(max(0.0, 1.0 - min(width, 4000.0) / 4000.0), 2),
+        "_x": float(x_abs),
+        "_y": float(y_abs),
+    }
+
+
+def _line_of_sight(grid, start: np.ndarray, end: np.ndarray, *, eye_m: float = 2.0,
+                   step_m: float = 50.0) -> bool | None:
+    """Видна ли точка выхода воды из участка (прямая поверх рельефа)."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length < 1.0:
+        return True
+    z0 = grid.point_value(start[0], start[1])
+    z1 = grid.point_value(end[0], end[1])
+    if math.isnan(z0) or math.isnan(z1):
+        return None
+    h0, h1 = z0 + eye_m, z1 + 0.5
+    n = max(2, int(length / step_m))
+    for k in range(1, n):
+        t = k / n
+        z = grid.point_value(start[0] + dx * t, start[1] + dy * t)
+        if math.isnan(z):
+            continue
+        if z > h0 + (h1 - h0) * t + 1.0:
+            return False
+    return True
+
+
 def _point_in_poly(x: float, y: float, poly: np.ndarray) -> bool:
-    """Точка внутри замкнутого контура (правило чётности)."""
     inside = False
     n = len(poly)
     for i in range(n):
@@ -398,12 +522,7 @@ def _point_in_poly(x: float, y: float, poly: np.ndarray) -> bool:
 
 
 def _detect_loop(pts: np.ndarray, *, near_m: float = 1400.0, apart_m: float = 1500.0) -> dict | None:
-    """Излучина: русло возвращается к себе, и где относительно этой петли стоит участок.
-
-    Измеряется то, что видно на карте: минимальный разрыв между двумя частями русла,
-    разнесёнными по длине не меньше apart_m, и лежит ли участок внутри этой петли
-    (Айл-оф-Догс: участок на полуострове — внутри; Вестминстер и Сити — снаружи).
-    """
+    """Излучина: русло возвращается к себе. Отношение длины к разрыву пишется в ratio."""
     if len(pts) < 20:
         return None
     seg = np.hypot(*np.diff(pts, axis=0).T)
@@ -426,16 +545,12 @@ def _detect_loop(pts: np.ndarray, *, near_m: float = 1400.0, apart_m: float = 15
     mid = (pts[i] + pts[j]) / 2.0
     bearing = geo.normalize_deg(math.degrees(math.atan2(mid[0], mid[1])))
     return {"gap_m": round(gap, 1), "along_m": round(along, 1),
+            "ratio": round(along / max(gap, 1.0), 2),
             "site_inside": bool(inside), "mountain": geo.mountain_name(bearing)}
 
 
 def site_between_branches(pts: np.ndarray, *, near_m: float = 1500.0, tol_deg: float = 30.0) -> dict:
-    """Стоит ли участок между двумя ветвями русла (внутри излучины).
-
-    Для каждого из 24 секторов берётся ближайшая точка русла, попавшая в сектор. Если
-    есть две почти противоположные стороны (разница азимутов 180°±30°) с расстоянием
-    меньше near_m, участок лежит между ветвями — это и есть «внутри петли».
-    """
+    """Стоит ли участок между двумя ветвями русла (внутри излучины)."""
     if len(pts) < 3:
         return {"between_branches": False, "min_by_sector_deg": {}}
     dist = np.hypot(pts[:, 0], pts[:, 1])
@@ -446,10 +561,9 @@ def site_between_branches(pts: np.ndarray, *, near_m: float = 1500.0, tol_deg: f
         if d < best.get(idx, 1e18):
             best[idx] = float(d)
     sectors = sorted(best)
-    between = False
-    pair = None
+    between, pair = False, None
     for i in sectors:
-        for delta in (10, 11, 12, 13, 14):   # 150°…210°
+        for delta in (10, 11, 12, 13, 14):
             j = (i + delta) % 24
             if j in best and best[i] <= near_m and best[j] <= near_m:
                 between = True
@@ -462,81 +576,22 @@ def site_between_branches(pts: np.ndarray, *, near_m: float = 1500.0, tol_deg: f
             "nearest_by_sector_m": {str(k * 15): round(v) for k, v in sorted(best.items())}}
 
 
-def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.ndarray) -> dict:
-    """Ширина долины и высоты бортов поперёк течения в точке выхода воды."""
-    flow_dir = exit_pt - flow_pt
-    norm = np.hypot(*flow_dir)
-    if norm < 1e-6:
+def _seg_intersect(p, q, r, s_):
+    r_ = q - p
+    s2 = s_ - r
+    denom = r_[0] * s2[1] - r_[1] * s2[0]
+    if abs(denom) < 1e-12:
         return None
-    flow_dir = flow_dir / norm
-    perp = np.array([-flow_dir[1], flow_dir[0]])
-    x_abs, y_abs = exit_pt + site_xy
-    z0 = grid.point_value(x_abs, y_abs)
-    if math.isnan(z0):
-        return None
-    half_widths, sides = [], []
-    for sign in (1, -1):
-        prev = z0
-        width = 0.0
-        for step in range(1, 61):          # до 3 км в каждую сторону
-            d = step * 50.0
-            z = grid.point_value(*(site_xy + exit_pt + perp * sign * d))
-            if math.isnan(z):
-                break
-            width = d
-            if z - z0 > 20.0:              # борт поднялся на 20 м — это склон долины
-                break
-            prev = z
-        half_widths.append(width)
-        sides.append(max(0.0, prev - z0) if half_widths[-1] else 0.0)
-    width = half_widths[0] + half_widths[1]
-    hill_left = float(max(grid.point_value(*(site_xy + exit_pt + perp * d))
-                          for d in (half_widths[0],) if not math.isnan(grid.point_value(*(site_xy + exit_pt + perp * d))))
-                      - z0) if half_widths[0] else 0.0
-    hill_right = float(max(grid.point_value(*(site_xy + exit_pt - perp * d))
-                           for d in (half_widths[1],) if not math.isnan(grid.point_value(*(site_xy + exit_pt - perp * d))))
-                       - z0) if half_widths[1] else 0.0
-    bearing = geo.normalize_deg(math.degrees(math.atan2(exit_pt[0], exit_pt[1])))
-    return {
-        "mountain": geo.mountain_name(bearing),
-        "width_m": round(width, 1),
-        # эвристика «узости ворот»: 1 — узкие (ширина → 0), 0 — шире 4 км
-        "closure_index": round(max(0.0, 1.0 - min(width, 4000.0) / 4000.0), 2),
-        "left_hill_m": round(hill_left, 1),
-        "right_hill_m": round(hill_right, 1),
-        "_x": float(x_abs),
-        "_y": float(y_abs),
-    }
+    t = ((r[0] - p[0]) * s2[1] - (r[1] - p[1]) * s2[0]) / denom
+    u = ((r[0] - p[0]) * r_[1] - (r[1] - p[1]) * r_[0]) / denom
+    if 0 <= t <= 1 and 0 <= u <= 1:
+        return p + r_ * t
+    return None
 
 
-def _line_of_sight(grid, start: np.ndarray, end: np.ndarray, *, eye_m: float = 2.0,
-                   step_m: float = 50.0) -> bool:
-    """Видна ли точка выхода воды из участка (прямая поверх рельефа)."""
-    dx, dy = end[0] - start[0], end[1] - start[1]
-    length = math.hypot(dx, dy)
-    if length < 1.0:
-        return True
-    z0 = grid.point_value(start[0], start[1])
-    z1 = grid.point_value(end[0], end[1])
-    if math.isnan(z0) or math.isnan(z1):
-        return None
-    h0, h1 = z0 + eye_m, z1 + 0.5
-    n = int(length / step_m)
-    for k in range(1, n):
-        t = k / n
-        x, y = start[0] + dx * t, start[1] + dy * t
-        z = grid.point_value(x, y)
-        if math.isnan(z):
-            continue
-        line_h = h0 + (h1 - h0) * t
-        if z > line_h + 1.0:            # рельеф выше луча зрения
-            return False
-    return True
-
-
-def find_confluences(features: list[Feature], *, site_xy: np.ndarray, epsg: int,
+def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
                      radius_m: float = 8000.0) -> dict[str, list[dict]]:
-    """Слияния: пересечения линий разных водотоков (грубо, по отрезкам)."""
+    """Слияния: пересечения линий разных водотоков."""
     lines = {}
     for idx, f in enumerate(features):
         if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1:
@@ -548,8 +603,8 @@ def find_confluences(features: list[Feature], *, site_xy: np.ndarray, epsg: int,
         for j in range(i + 1, len(keys)):
             a, b = lines[keys[i]], lines[keys[j]]
             for p, q in zip(a[:-1], a[1:]):
-                for r, s in zip(b[:-1], b[1:]):
-                    hit = _seg_intersect(p, q, r, s)
+                for r, s_ in zip(b[:-1], b[1:]):
+                    hit = _seg_intersect(p, q, r, s_)
                     if hit is None:
                         continue
                     dist = float(np.hypot(*hit))
@@ -560,19 +615,6 @@ def find_confluences(features: list[Feature], *, site_xy: np.ndarray, epsg: int,
                     result[keys[i]].append({"with": keys[j], **entry})
                     result[keys[j]].append({"with": keys[i], **entry})
     return result
-
-
-def _seg_intersect(p, q, r, s):
-    r_ = q - p
-    s_ = s - r
-    denom = r_[0] * s_[1] - r_[1] * s_[0]
-    if abs(denom) < 1e-12:
-        return None
-    t = ((r[0] - p[0]) * s_[1] - (r[1] - p[1]) * s_[0]) / denom
-    u = ((r[0] - p[0]) * r_[1] - (r[1] - p[1]) * r_[0]) / denom
-    if 0 <= t <= 1 and 0 <= u <= 1:
-        return p + r_ * t
-    return None
 
 
 def flow_convention_share(features: list[Feature], grid, epsg: int, *,
@@ -587,7 +629,7 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
         return None
     agree = total = 0
     for f in features:
-        if f.kind not in {"river", "stream", "canal"} or len(f.coords) < 2:
+        if f.kind not in {"river", "stream"} or len(f.coords) < 2:
             continue
         pts = to_utm([f.coords[0], f.coords[-1]], epsg)
         z0 = grid.point_value(*pts[0])
@@ -602,9 +644,14 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
 
 def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.ndarray,
                   radius_m: int = 8000, allow_network: bool = True,
-                  max_features: int = 2000) -> list[WaterMetrics]:
-    """Вода в радиусе: линии склеены по имени, затем измерены."""
-    payload = fetch_raw(lat, lon, radius_m, allow_network=allow_network)
+                  max_features: int = 2000, payload: dict | None = None) -> list[WaterMetrics]:
+    """Вода в радиусе: линии склеены по имени, затем измерены.
+
+    `payload` позволяет подать заранее сохранённый ответ Overpass — так работают эталоны
+    в tests/golden без сети.
+    """
+    if payload is None:
+        payload = fetch_raw(lat, lon, radius_m, allow_network=allow_network)
     features = parse_features(payload)[:max_features]
     merged = merge_by_name(features)
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу

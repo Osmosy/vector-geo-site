@@ -1,0 +1,10 @@
+[
+  {
+    "river_name_contains": "Thames",
+    "limit_name": "Teddington Lock",
+    "limit_lat": 51.431,
+    "limit_lon": -0.308,
+    "tidal_side": "east",
+    "source": "Port of London Authority: приливная граница Темзы — шлюз Теддингтон"
+  }
+]

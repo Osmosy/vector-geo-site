@@ -238,19 +238,24 @@ def point_description(grid: DemGrid, x0: float, y0: float) -> dict:
 def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
                  macro_km: float = 20.0, meso_km: float = 8.0,
                  facing_deg: float | None = None, smooth_m: float = 300.0,
-                 point_smooth_m: float = 90.0):
+                 point_smooth_m: float = 90.0, dem_path=None):
     """Полный замер рельефа: макро- и мезо-охваты в UTM."""
     from pyproj import Transformer
 
-    from .dem import load_dem
+    from .dem import load_dem, load_dem_file
 
     tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
     x0, y0 = tr.transform(lon, lat)
 
-    macro = load_dem(lat, lon, macro_km, epsg=epsg, resolution_m=max(resolution_m, 90.0))
+    if dem_path is not None:
+        macro = load_dem_file(dem_path)
+        meso = macro
+    else:
+        macro = load_dem(lat, lon, macro_km, epsg=epsg, resolution_m=max(resolution_m, 90.0))
     macro_s = smooth(macro, smooth_m)
     z0 = macro_s.point_value(x0, y0)
-    meso = load_dem(lat, lon, meso_km, epsg=epsg, resolution_m=resolution_m)
+    if dem_path is None:
+        meso = load_dem(lat, lon, meso_km, epsg=epsg, resolution_m=resolution_m)
     meso_s = smooth(meso, min(smooth_m, 120.0))
     z0_meso = meso_s.point_value(x0, y0)
     if math.isnan(z0):

@@ -126,6 +126,16 @@ def load_dem(lat: float, lon: float, radius_km: float, *, epsg: int, resolution_
             d.close()
 
 
+def load_dem_file(path) -> DemGrid:
+    """DEM из подготовленного файла — для офлайн-эталонов tests/golden."""
+    with rasterio.open(path) as src:
+        data = src.read(1).astype("float32")
+        nodata = src.nodata
+        if nodata is not None:
+            data[data == nodata] = np.nan
+        return DemGrid(data, src.transform, str(src.crs), float(abs(src.transform.a)))
+
+
 def smooth(grid: DemGrid, window_m: float) -> DemGrid:
     """Сглаживание макроформы: убирает крыши и лес из модели поверхности.
 

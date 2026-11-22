@@ -113,6 +113,13 @@ def _measure_water(r, measured: dict, epsg: int) -> dict:
     # Долю воды по секторам пока не считаем: маска воды требует калибровки
     # (полигоны OSM чинятся buffer(0), линии расширяются — площадь систематически завышается).
     result["water_share_skipped"] = True
+    # П6/П4: расхождения источников и низкая уверенность должны звучать в warnings
+    conflicts = [m for m in metrics if m.flow_rule == 4]
+    lows = [m for m in metrics if m.flow_confidence == "low"]
+    if conflicts:
+        result["flow_conflict"] = [m.name or m.id for m in conflicts][:5]
+    if lows:
+        result["flow_low"] = [m.name or m.id for m in lows][:5]
     result["water_count"] = len(metrics)
     return result
 
@@ -144,6 +151,8 @@ def cmd_pack(args) -> int:
         orientation_source, confidence = "user_compass", "high"
     if args.year is None:
         notes.append("год постройки не указан: карта считается для текущего года")
+    if m.get("flow_conflict"):
+        warnings.append("water.flow: low — конфликт OSM и рельефа у " + ", ".join(m["flow_conflict"]))
     if m.get("water_share_skipped"):
         warnings.append("доля воды по секторам не считается: маска воды не откалибрована по площади")
     if not m.get("water"):
