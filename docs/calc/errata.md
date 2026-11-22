@@ -64,3 +64,17 @@
 - Нашёл: эталонный тест (проверка факта из expect.yaml). Статус: **не исправлено**, тест `xfail`.
 - Что нужно: достраивать русло по непрерывности (гидросеть HydroRIVERS) или считать слияние
   по совпадению узлов OSM (`node(w)`), а не по пересечению ломаных.
+
+## E-009 — уверенность и правило течения теряются при сборке пакета
+
+- Место: `water_pack.to_objects`, поля `water_mouth.closure_confidence`, `enclosure`,
+  `width_capped`, `capped_sides`, `closure_reason`, а также `flow_rule`, `flow_confidence`,
+  `flow_chosen` у водотока.
+- Было: в пакете нет ни `closure_confidence`, ни `flow_confidence`; `width_capped` = false и
+  `capped_sides` = 0 всегда, потому что это дефолты модели, а не измерение.
+  `landform` подставлял «medium» по умолчанию, и врата не попадали в оговорки.
+- Доказательство: `WaterMouth(...)` в `water_pack.py` собирается из пяти полей вручную,
+  остальные отбрасываются; то же с `WaterObject` — `flow_rule`/`flow_confidence` не передаются.
+- Нашёл: ревью ТЗ R1. Исправлено: см. коммит `water: уверенность врат + I-10`.
+- Тест: `tests/test_pack.py::test_mouth_confidence_reaches_pack`,
+  `tests/test_validate.py::test_i10_requires_confidence_pair`.

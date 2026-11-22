@@ -13,13 +13,8 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
     for m in metrics:
         mouth = None
         if m.water_mouth:
-            mouth = WaterMouth(
-                mountain=m.water_mouth["mountain"],
-                closure_index=m.water_mouth["closure_index"],
-                width_m=m.water_mouth.get("width_m"),
-                left_hill_m=m.water_mouth.get("left_hill_m"),
-                right_hill_m=m.water_mouth.get("right_hill_m"),
-            )
+            # передаём словарь целиком: выборочная сборка уже теряла уверенность и enclosure
+            mouth = WaterMouth(**{k: v for k, v in m.water_mouth.items() if not k.startswith("_")})
         out.append(WaterObject(
             id=m.id, name=m.name, kind=m.kind if m.kind in
             {"river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"} else "lake",
@@ -35,6 +30,7 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             crossings_2km=m.crossings_2km,
             crossing_angle_deg=m.crossing_angle_deg,
             flow_dem_dir=m.flow_dem_dir, flow_osm_dir=m.flow_osm_dir, flow_agree=m.flow_agree,
+            flow_chosen=m.flow_chosen, flow_rule=m.flow_rule, flow_confidence=m.flow_confidence,
             source=m.source,
         ))
     return out

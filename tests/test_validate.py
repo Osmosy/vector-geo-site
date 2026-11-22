@@ -180,3 +180,20 @@ def test_apply_to_pack_marks_invalid():
     V.apply_to_pack(pack, violations)
     assert pack["quality"]["valid"] is False
     assert pack["quality"]["violations"]
+
+
+def test_i10_requires_confidence_pair():
+    """R1: эвристическое поле без парного confidence — нарушение I-10."""
+    from geosite.validate import CONFIDENCE_PAIRS  # noqa: F401
+
+    pack = base_pack()
+    pack["water"][0]["water_mouth"] = {"mountain": "乙", "closure_index": 0.01,
+                                       "closure_confidence": "low", "width_m": 100.0}
+    assert "I-10" not in codes(pack), "с уверенностью нарушений быть не должно"
+
+    del pack["water"][0]["water_mouth"]["closure_confidence"]
+    assert "I-10" in codes(pack)
+
+    pack2 = base_pack()
+    del pack2["water"][0]["flow_confidence"]
+    assert "I-10" in codes(pack2)

@@ -32,6 +32,13 @@ CODES = {
 }
 
 MIN_ELEV, MAX_ELEV = -430.0, 8850.0
+
+# I-10: поля с эвристикой обязаны нести парную уверенность. Список пополняется на каждом этапе.
+CONFIDENCE_PAIRS = {
+    "flow_chosen": "flow_confidence",
+    "water_mouth.closure_index": "water_mouth.closure_confidence",
+    "water_mouth.enclosure": "water_mouth.closure_confidence",
+}
 LOOP_MIN_RATIO = 3.0
 
 
@@ -134,6 +141,20 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
         # I-08: выбор направления и правило
         if water.get("flow_chosen") and water.get("flow_rule") is None:
             out.append(_violation("I-08", f"{base}.flow_rule", "flow_chosen без flow_rule", id=wid))
+
+        # I-10 (R1): эвристическое поле без парного confidence — нарушение
+        for field, conf in CONFIDENCE_PAIRS.items():
+            if "." in field:
+                head, tail = field.split(".", 1)
+                block = water.get(head) or {}
+                present = tail in block
+                has_conf = conf.split(".", 1)[1] in block
+            else:
+                present = field in water
+                has_conf = conf in water
+            if present and not has_conf:
+                out.append(_violation("I-10", f"{base}.{field}",
+                                      f"нет парного поля уверенности {conf.split('.')[-1]}", id=wid))
 
         # I-10: низкая уверенность должна звучать в quality.warnings
         warnings = " ".join((pack.get("quality") or {}).get("warnings") or [])
