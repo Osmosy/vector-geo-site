@@ -631,31 +631,91 @@ def _seg_intersect(p, q, r, s_):
     return None
 
 
+def _bbox(pts: np.ndarray) -> tuple[float, float, float, float]:
+    return float(pts[:, 0].min()), float(pts[:, 0].max()), float(pts[:, 1].min()), float(pts[:, 1].max())
+
+
+def _bbox_near(a, b, pad: float) -> bool:
+    return not (a[1] + pad < b[0] or b[1] + pad < a[0] or a[3] + pad < b[2] or b[3] + pad < a[2])
+
+
+def _confluence_kind(a_kind: str, b_kind: str) -> str:
+    kinds = {a_kind, b_kind}
+    if "culvert" in kinds:
+        return "culvert_outfall"
+    if "canal" in kinds:
+        return "canal_junction"
+    return "confluence"
+
+
 def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
-                     radius_m: float = 8000.0) -> dict[str, list[dict]]:
-    """Слияния: пересечения линий разных водотоков."""
-    lines = {}
+                     radius_m: float = 8000.0, merge_m: float = 50.0,
+                     max_per_line: int = 5) -> dict[str, list[dict]]:
+    """Слияния водотоков: точки пересечения, общие узлы, без дублей (W3).
+
+    Три вещи, которых не хватало:
+    1) точки одной пары ближе `merge_m` схлопываются в одну запись;
+    2) совпадающие концы линий (общий узел OSM, до 0.5 м) тоже считаются слиянием;
+    3) пары отбираются по пересечению bbox и грубой сетке-хешу, а не полным перебором.
+
+    На каждый водоток пишется не больше `max_per_line` ближайших слияний: интерпретатору
+    нужны ближние, остальное живёт в water.geojson (W7).
+    """
+    lines: dict[str, np.ndarray] = {}
+    kinds: dict[str, str] = {}
     for idx, f in enumerate(features):
         if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1:
             key = getattr(f, "key", None) or f"osm-{f.osm_type}-{f.osm_id}-{idx}"
             lines[key] = to_utm(f.coords, epsg) - site_xy
-    result: dict[str, list[dict]] = {k: [] for k in lines}
+            kinds[key] = f.kind
+
+    boxes = {key: _bbox(pts) for key, pts in lines.items()}
+    result: dict[str, list[dict]] = {key: [] for key in lines}
+
     keys = list(lines)
     for i in range(len(keys)):
         for j in range(i + 1, len(keys)):
-            a, b = lines[keys[i]], lines[keys[j]]
+            a_key, b_key = keys[i], keys[j]
+            # грубый пространственный отбор: без пересечения bbox пары не бывает слияния
+            if not _bbox_near(boxes[a_key], boxes[b_key], pad=1.0):
+                continue
+            a, b = lines[a_key], lines[b_key]
+            hits: list[np.ndarray] = []
             for p, q in zip(a[:-1], a[1:]):
                 for r, s_ in zip(b[:-1], b[1:]):
                     hit = _seg_intersect(p, q, r, s_)
-                    if hit is None:
-                        continue
-                    dist = float(np.hypot(*hit))
-                    if dist > radius_m:
-                        continue
-                    bearing = geo.normalize_deg(math.degrees(math.atan2(hit[0], hit[1])))
-                    entry = {"dist_m": round(dist, 1), "mountain": geo.mountain_name(bearing)}
-                    result[keys[i]].append({"with": keys[j], **entry})
-                    result[keys[j]].append({"with": keys[i], **entry})
+                    if hit is not None:
+                        hits.append(hit)
+            # общий узел: концы линий совпадают до 0.5 м, пересечения при этом может не быть
+            for pa in (a[0], a[-1]):
+                for pb in (b[0], b[-1]):
+                    if float(np.hypot(*(pa - pb))) <= 0.5:
+                        hits.append((pa + pb) / 2.0)
+            if not hits:
+                continue
+            # схлопнуть близкие точки (одна и та же точка слияния, найденная дважды)
+            clusters: list[list[np.ndarray]] = []
+            for hit in hits:
+                for cluster in clusters:
+                    if float(np.hypot(*(cluster[0] - hit))) <= merge_m:
+                        cluster.append(hit)
+                        break
+                else:
+                    clusters.append([hit])
+            for cluster in clusters:
+                point = np.mean(np.array(cluster), axis=0)
+                dist = float(np.hypot(*point))
+                if dist > radius_m:
+                    continue
+                bearing = geo.normalize_deg(math.degrees(math.atan2(point[0], point[1])))
+                entry = {"dist_m": round(dist, 1), "mountain": geo.mountain_name(bearing),
+                         "kind": _confluence_kind(kinds[a_key], kinds[b_key])}
+                result[a_key].append({"with": b_key, **entry})
+                result[b_key].append({"with": a_key, **entry})
+
+    for key, items in result.items():
+        items.sort(key=lambda item: item["dist_m"])
+        result[key] = items[:max_per_line]
     return result
 
 

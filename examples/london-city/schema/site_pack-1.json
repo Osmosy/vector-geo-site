@@ -1,5 +1,60 @@
 {
   "$defs": {
+    "Algo": {
+      "description": "Версии алгоритмов, которые писали в пакет (П5).",
+      "properties": {
+        "water": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water"
+        },
+        "terrain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain"
+        },
+        "geocode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Geocode"
+        },
+        "pack": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack"
+        }
+      },
+      "title": "Algo",
+      "type": "object"
+    },
     "ChartYear": {
       "properties": {
         "value": {
@@ -140,6 +195,31 @@
         }
       },
       "title": "Exposure",
+      "type": "object"
+    },
+    "Files": {
+      "properties": {
+        "water_geojson": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Geojson"
+        },
+        "sha256": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Sha256",
+          "type": "object"
+        }
+      },
+      "title": "Files",
       "type": "object"
     },
     "FourSpirits": {
@@ -394,6 +474,31 @@
           },
           "title": "Notes",
           "type": "array"
+        },
+        "valid": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid"
+        },
+        "violations": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Violations",
+          "type": "array"
+        },
+        "partial": {
+          "default": false,
+          "title": "Partial",
+          "type": "boolean"
         }
       },
       "required": [
@@ -658,8 +763,57 @@
           "type": "string"
         },
         "closure_index": {
-          "title": "Closure Index",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Index"
+        },
+        "closure_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Reason"
+        },
+        "closure_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Confidence"
+        },
+        "enclosure": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enclosure"
         },
         "width_m": {
           "anyOf": [
@@ -696,11 +850,20 @@
           ],
           "default": null,
           "title": "Right Hill M"
+        },
+        "width_capped": {
+          "default": false,
+          "title": "Width Capped",
+          "type": "boolean"
+        },
+        "capped_sides": {
+          "default": 0,
+          "title": "Capped Sides",
+          "type": "integer"
         }
       },
       "required": [
-        "mountain",
-        "closure_index"
+        "mountain"
       ],
       "title": "WaterMouth",
       "type": "object"
@@ -868,6 +1031,23 @@
           "default": null,
           "title": "Curvature Radius M"
         },
+        "bend_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "bend",
+                "loop",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bend Kind"
+        },
         "loop": {
           "anyOf": [
             {
@@ -905,18 +1085,6 @@
           "default": null,
           "title": "Flow Ways Share"
         },
-        "flow_dem_dir": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Flow Dem Dir"
-        },
         "flow_osm_dir": {
           "anyOf": [
             {
@@ -929,6 +1097,59 @@
           "default": null,
           "title": "Flow Osm Dir"
         },
+        "flow_dem_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Dem Dir"
+        },
+        "flow_chosen": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Chosen"
+        },
+        "flow_rule": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Rule"
+        },
+        "flow_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Confidence"
+        },
         "flow_agree": {
           "anyOf": [
             {
@@ -940,6 +1161,54 @@
           ],
           "default": null,
           "title": "Flow Agree"
+        },
+        "dem_slope_m_per_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Slope M Per Km"
+        },
+        "dem_slope_snr": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Slope Snr"
+        },
+        "dem_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Reason"
+        },
+        "tidal_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal Source"
         },
         "source": {
           "anyOf": [
@@ -1058,6 +1327,25 @@
     },
     "quality": {
       "$ref": "#/$defs/Quality"
+    },
+    "algo": {
+      "$ref": "#/$defs/Algo"
+    },
+    "files": {
+      "$ref": "#/$defs/Files"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
     },
     "attribution": {
       "items": {

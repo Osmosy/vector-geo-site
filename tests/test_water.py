@@ -186,3 +186,77 @@ def test_loop_absent_on_gentle_sine():
 
 def test_loop_ratio_threshold_constant():
     assert water.LOOP_MIN_RATIO == 3.0
+
+
+# --- W3: слияния ---
+
+def test_y_junction_gives_single_confluence():
+    from pyproj import Transformer
+    from geosite.water import to_utm
+
+    main = make("Main", [(-0.100, 51.500), (-0.095, 51.500)], osm_id=1)
+    trib = make("Trib", [(-0.0975, 51.505), (-0.0975, 51.500)], osm_id=2)
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.0975, 51.50))
+    res = water.find_confluences([main, trib], site_xy=site, epsg=epsg)
+    main_key = [k for k in res if "Main" in k][0]
+    assert len(res[main_key]) == 1
+    assert res[main_key][0]["kind"] in {"confluence", "canal_junction", "culvert_outfall"}
+
+
+def test_double_crossing_gives_two_confluences():
+    from pyproj import Transformer
+
+    a = make("A", [(-0.11, 51.50), (-0.09, 51.50)], osm_id=11)
+    b = make("B", [(-0.105, 51.494), (-0.095, 51.506), (-0.093, 51.494)], osm_id=22)
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.10, 51.50))
+    res = water.find_confluences([a, b], site_xy=site, epsg=epsg)
+    a_key = [k for k in res if "A-" in k][0]
+    distances = sorted(item["dist_m"] for item in res[a_key])
+    assert len(distances) == 2
+    assert distances[0] != distances[1]
+
+
+def test_near_duplicate_intersections_are_merged():
+    from pyproj import Transformer
+
+    # две почти совпадающие точки пересечения (зигзаг в 20 м) — одно слияние
+    a = make("A", [(-0.110, 51.500), (-0.090, 51.500)], osm_id=31)
+    b = make("B", [(-0.1000, 51.495), (-0.1000, 51.505)], osm_id=32)
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.10, 51.50))
+    res = water.find_confluences([a, b], site_xy=site, epsg=epsg)
+    a_key = [k for k in res if "A-" in k][0]
+    assert len(res[a_key]) == 1
+
+
+def test_canal_junction_kind():
+    from pyproj import Transformer
+
+    river = make("R", [(-0.110, 51.500), (-0.090, 51.500)], osm_id=41)
+    canal = make("C", [(-0.0980, 51.496), (-0.0980, 51.504)], kind="canal", osm_id=42)
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.10, 51.50))
+    res = water.find_confluences([river, canal], site_xy=site, epsg=epsg)
+    kinds = {item["kind"] for items in res.values() for item in items}
+    assert "canal_junction" in kinds
+
+
+def test_confluence_cap_per_line():
+    from pyproj import Transformer
+
+    river = make("R", [(-0.12, 51.500), (-0.06, 51.500)], osm_id=51)
+    tribs = [make(f"T{i}", [(-0.115 + i * 0.01, 51.495), (-0.115 + i * 0.01, 51.505)], osm_id=60 + i)
+             for i in range(8)]
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.10, 51.50))
+    res = water.find_confluences([river] + tribs, site_xy=site, epsg=epsg)
+    river_key = [k for k in res if "R-" in k][0]
+    assert len(res[river_key]) <= 5
+    assert res[river_key][0]["dist_m"] <= res[river_key][-1]["dist_m"]
