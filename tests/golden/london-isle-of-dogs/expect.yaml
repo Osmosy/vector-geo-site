@@ -1,0 +1,15 @@
+# Факты для Айл-оф-Догс: участок на полуострове внутри излучины Темзы.
+water:
+  "River Thames":
+    nearest_m_range: [200, 1200]       # полуостров омывается Темзой с трёх сторон
+    loop: present                      # петля вокруг полуострова: карта OSM
+    site_inside: true                  # точка на полуострове — внутри контура петли
+    bend_kind: loop
+    tidal: true                        # ниже Теддингтона: PLA
+    flow_chosen: downstream_toward_end
+water_mouth:
+  width_capped: true
+source:
+  - "OSM: геометрия Темзы вокруг Isle of Dogs (петля, разрыв ~1.8 км)"
+  - "tidal_limits.json: Teddington Lock"
+  - "Copernicus GLO-30: рельеф полуострова и бортов долины"

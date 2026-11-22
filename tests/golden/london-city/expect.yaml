@@ -1,0 +1,18 @@
+# Факты для Лондона, Сити. Каждый — с источником; подгонять под код запрещено (ТЗ Б4).
+water:
+  "River Thames":
+    nearest_m_range: [150, 900]        # Темза в 0.5 км от Сити: карта OSM + прогулка по набережной
+    bend: outer                        # участок на внешнем берегу изгиба (反弓): карта
+    bend_kind: bend                    # петли-острова здесь нет
+    loop: absent
+    tidal: true                        # ниже шлюза Теддингтон: PLA, tidal_limits.json
+    flow_chosen: downstream_toward_end # Темза течёт на восток через Лондон
+    in_mountain_any: [坤, 申]           # вход воды с юго-запада (выше по течению)
+    out_mountain_any: [辰, 乙, 巽, 卯]  # выход на восток (ниже по течению)
+    confluences_min: 1                 # слияние с Флитом (устье у Блэкфрайерс)
+water_mouth:
+  width_capped: true                   # лондонская котловина: борт не поднимается на 20 м
+source:
+  - "OSM: теги waterway/natural на Темзе, слияние с River Fleet"
+  - "tidal_limits.json: граница прилива — Teddington Lock (Port of London Authority)"
+  - "Copernicus GLO-30 (DSM), профиль бортов долины в 8 км от Сити"

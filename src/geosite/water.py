@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "3.1.0"
+ALGO_VERSION = "4.0.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -413,10 +413,16 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     loop_raw = _detect_loop(pts) if len(pts) > 20 else None
     loop = None
     bend_kind = "straight" if (radius_m is None or radius_m > 5000.0) else "bend"
-    if loop_raw and (loop_raw.get("ratio") or 0.0) >= LOOP_MIN_RATIO:
-        # W2: петля — только если русло возвращается к себе, пройдя втрое больше разрыва
-        loop = loop_raw
-        bend_kind = "loop"
+    if loop_raw:
+        # W2: петля — русло возвращается к себе (ratio ≥ 3) И участок стоит внутри контура.
+        # Одного отношения мало: у Темзы в Сити тоже выходит ≈3, но участок снаружи,
+        # и по канону это изгиб, а не петля-остров.
+        ratio_ok = (loop_raw.get("ratio") or 0.0) >= LOOP_MIN_RATIO
+        if ratio_ok and loop_raw.get("site_inside"):
+            loop = loop_raw
+            bend_kind = "loop"
+        elif loop_raw.get("ratio", 0.0) >= 1.5:
+            bend_kind = "bend"
     between = site_between_branches(pts) if len(pts) > 2 else {"between_branches": False}
 
     return WaterMetrics(
@@ -570,31 +576,39 @@ def _point_in_poly(x: float, y: float, poly: np.ndarray) -> bool:
     return inside
 
 
-def _detect_loop(pts: np.ndarray, *, near_m: float = 1400.0, apart_m: float = 1500.0) -> dict | None:
-    """Излучина: русло возвращается к себе. Отношение длины к разрыву пишется в ratio."""
+def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 1500.0) -> dict | None:
+    """Излучина: ищем пару точек русла, которая даёт максимальное отношение along/gap.
+
+    Порог `near_m` — насколько близко русло возвращается к себе; `apart_m` — минимальный
+    разбег по длине. Возвращаем отношение (ratio), разрыв, длину и лежит ли участок внутри
+    замкнутого контура петли. Решение «петля или изгиб» принимает вызывающий код:
+    для острова (Айл-оф-Догс) нужен site_inside, иначе это просто большая излучина.
+    """
     if len(pts) < 20:
         return None
     seg = np.hypot(*np.diff(pts, axis=0).T)
     cum = np.concatenate([[0.0], np.cumsum(seg)])
-    stride = max(1, len(pts) // 500)
+    stride = max(1, len(pts) // 600)
     best = None
     for i in range(0, len(pts), stride):
         for j in range(i + 2, len(pts), stride):
             along = cum[j] - cum[i]
             if along < apart_m:
                 continue
-            d = float(np.hypot(*(pts[i] - pts[j])))
-            if d <= near_m and (best is None or d < best[0]):
-                best = (d, along, i, j)
-    if best is None:
-        return None
-    gap, along, i, j = best
+            gap = float(np.hypot(*(pts[i] - pts[j])))
+            if gap > near_m or gap < 1.0:
+                continue
+            ratio = along / gap
+            if best is None or ratio > best[0]:
+                best = (ratio, gap, along, i, j)
+    if best is None or best[0] < 1.5:
+        return None            # даже изгиба нет: отношение меньше 1.5
+    ratio, gap, along, i, j = best
     ring = np.vstack([pts[i:j + 1], pts[i:i + 1]])
     inside = _point_in_poly(0.0, 0.0, ring)
     mid = (pts[i] + pts[j]) / 2.0
     bearing = geo.normalize_deg(math.degrees(math.atan2(mid[0], mid[1])))
-    return {"gap_m": round(gap, 1), "along_m": round(along, 1),
-            "ratio": round(along / max(gap, 1.0), 2),
+    return {"gap_m": round(gap, 1), "along_m": round(along, 1), "ratio": round(ratio, 2),
             "site_inside": bool(inside), "mountain": geo.mountain_name(bearing)}
 
 
