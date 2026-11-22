@@ -132,6 +132,9 @@ python -m pytest -q          # 27 passed
 - © OpenStreetMap contributors (геокодер, позже — вода и застройка; ODbL)
 - produced using Copernicus WorldDEM-30 © DLR e.V. (рельеф)
 
+Разбор лицензий по слоям и требования к атрибуции — в [NOTICE.md](NOTICE.md). Строки
+атрибуции пишутся в каждый пакет в поле `attribution`.
+
 ## Лицензия
 
-MIT.
+MIT — см. [LICENSE](LICENSE). Логотип — знак экосистемы Vector.
