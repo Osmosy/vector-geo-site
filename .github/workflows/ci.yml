@@ -17,7 +17,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e . pytest
-      - name: Тесты (офлайн: без сети и без кеша DEM)
+      - name: "Тесты: офлайн, без сети и без кеша DEM"
         run: pytest -q -m "not network"
       - name: Инварианты пакетов примеров
         run: |
@@ -25,5 +25,5 @@ jobs:
             echo "→ $f"
             geosite validate "$f" || exit 1
           done
-      - name: Правка расчёта требует CHANGELOG-CALC
+      - name: "Правка расчёта требует CHANGELOG-CALC"
         run: bash scripts/ci_calc_changelog.sh
