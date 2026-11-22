@@ -47,6 +47,32 @@ def from_tag(tags: dict) -> tuple[bool | None, str | None]:
     return None, None
 
 
+def limit_entry(name: str | None) -> dict | None:
+    """Запись таблицы для реки (по вхождению имени), без решения о приливности."""
+    if not name:
+        return None
+    for entry in load_limits():
+        needle = entry.get("river_name_contains", "")
+        if needle and needle.lower() in name.lower():
+            return entry
+    return None
+
+
+def status_by_distance(entry: dict, along_site_m: float | None, along_limit_m: float | None,
+                       flow_toward_end: bool) -> dict:
+    """Приливность по положению вдоль русла относительно границы прилива.
+
+    Сравнение по долготе ошибается на изгибах (Кингстон западнее Теддингтона, но выше него).
+    Поэтому берём расстояние вдоль русла: ниже по течению от границы — прилив.
+    """
+    if along_site_m is None or along_limit_m is None:
+        return {"tidal": None, "tidal_source": None,
+                "note": "граница прилива известна, но точку не удалось поставить на русло"}
+    downstream = along_site_m > along_limit_m if flow_toward_end else along_site_m < along_limit_m
+    return {"tidal": bool(downstream), "tidal_source": "known_limit",
+            "note": f"граница прилива: {entry.get('limit_name')} ({entry.get('source', '')})".strip()}
+
+
 def from_limits(name: str | None, lon: float, lat: float) -> tuple[bool | None, str | None, str | None]:
     """Приливность по таблице: сравнение с известной границей по долготе/широте."""
     if not name:
@@ -75,7 +101,6 @@ def status(tags: dict, name: str | None, lon: float, lat: float) -> dict:
     tidal, source = from_tag(tags)
     if tidal is not None:
         return {"tidal": tidal, "tidal_source": source, "note": None}
-    tidal, source, note = from_limits(name, lon, lat)
-    if tidal is not None:
-        return {"tidal": tidal, "tidal_source": source, "note": note}
-    return {"tidal": None, "tidal_source": None, "note": "нет тега и нет записи в таблице"}
+    # положение относительно границы решается по руслу (water.py), а не по координате:
+    # сравнение долгот ошибается на изгибах (Кингстон западнее Теддингтона, но выше него)
+    return {"tidal": None, "tidal_source": None, "note": "нет тега, проверяем по таблице вдоль русла"}

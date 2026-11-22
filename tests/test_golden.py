@@ -22,13 +22,14 @@ GOLDEN = Path(__file__).parent / "golden"
 SITES = sorted(p.name for p in GOLDEN.iterdir() if (p / "site.yaml").exists()) if GOLDEN.exists() else []
 
 
-def load(name: str) -> tuple[dict, dict, Path]:
+def load(name: str) -> tuple[dict, dict | None, Path]:
     site = yaml.safe_load((GOLDEN / name / "site.yaml").read_text(encoding="utf-8"))
-    expect = yaml.safe_load((GOLDEN / name / "expect.yaml").read_text(encoding="utf-8"))
+    expect_file = GOLDEN / name / "expect.yaml"
+    expect = yaml.safe_load(expect_file.read_text(encoding="utf-8")) if expect_file.exists() else None
     return site, expect, GOLDEN / name / "fixtures"
 
 
-def measure(site: dict, fixtures: Path) -> dict:
+def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
     """Полный замер на фикстурах: рельеф из DEM-файла, вода из сохранённого ответа."""
     from pyproj import Transformer
 
@@ -37,17 +38,30 @@ def measure(site: dict, fixtures: Path) -> dict:
     tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
     site_xy = np.array(tr.transform(lon, lat))
 
-    grid_measured = terrain.measure_site(
-        lat, lon, epsg=epsg, resolution_m=90.0, macro_km=float(site.get("radius_km", 20.0)),
-        facing_deg=site.get("facing"), dem_path=fixtures / "dem.tif")
-    grid = grid_measured["grid_macro"]
+    if with_dem:
+        grid_measured = terrain.measure_site(
+            lat, lon, epsg=epsg, resolution_m=90.0, macro_km=float(site.get("radius_km", 20.0)),
+            facing_deg=site.get("facing"), dem_path=fixtures / "dem.tif")
+        grid = grid_measured["grid_macro"]
+    else:
+        # без DEM проверяем только воду: рельефные поля остаются None, а не выдуманными
+        grid_measured = {"grid_macro": None}
+        grid = None
 
     payload = yaml.safe_load("{}") or None
     import json
 
     payload = json.loads((fixtures / "osm-water.json").read_text(encoding="utf-8"))
+    import gzip
+
+    wide_file = fixtures / "osm-water-wide.json.gz"
+    wide = None
+    if wide_file.exists():
+        with gzip.open(wide_file, "rt", encoding="utf-8") as fh:
+            wide = json.load(fh)
     metrics = water.measure_water(lat, lon, epsg=epsg, grid=grid, site_xy=site_xy,
-                                  payload=payload, radius_m=8000)
+                                  payload=payload, radius_m=8000, wide_payload=wide,
+                                  allow_network=False)
     # одна и та же река бывает склеена в несколько линий: берём ближайшую к участку
     by_name: dict[str, object] = {}
     for metric in metrics:
@@ -63,10 +77,21 @@ def measure(site: dict, fixtures: Path) -> dict:
 @pytest.mark.parametrize("name", SITES)
 def test_golden_site(name: str):
     site, expect, fixtures = load(name)
-    if not (fixtures / "osm-water.json").exists() or not (fixtures / "dem.tif").exists():
-        pytest.skip(f"{name}: нет фикстур, соберите их scripts/make_golden.py")
+    if expect is None:
+        pytest.skip(f"{name}: нет expect.yaml — факты ещё не сверены")
+    if not (fixtures / "osm-water.json").exists():
+        pytest.skip(f"{name}: нет OSM-фикстуры, соберите её scripts/make_golden.py")
+    has_dem = (fixtures / "dem.tif").exists()
+    if not has_dem and (expect.get("water_mouth") or "closure_index_min" in str(expect)):
+        pytest.skip(f"{name}: нужен DEM для проверки врат, а фикстуры нет")
 
-    result = measure(site, fixtures)
+    if (expect.get("status") or "").lower() == "blocked":
+        pytest.skip(expect.get("reason") or "нет данных для эталона")
+    if (expect.get("status") or "").lower() == "xfail":
+        # факт верен, код пока не дотягивает; причина записана в expect.yaml и в errata
+        pytest.xfail(expect.get("reason") or "известный дефект")
+
+    result = measure(site, fixtures, with_dem=has_dem)
     facts = expect.get("water") or {}
     failures: list[str] = []
 

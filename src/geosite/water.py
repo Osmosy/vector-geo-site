@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "4.0.0"
+ALGO_VERSION = "4.1.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -86,9 +86,13 @@ def fetch_raw(lat: float, lon: float, radius_m: int = 8000, *, allow_network: bo
                 with urllib.request.urlopen(req, timeout=180) as resp:
                     payload = json.loads(resp.read().decode())
                 if "elements" in payload:
-                    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                    path.write_text(json.dumps(payload))
-                    return payload
+                    # пустой ответ бывает у зеркал с неполным покрытием (например, регион Швейцарии):
+                    # такой ответ не кешируем, а пробуем следующее зеркало
+                    if payload["elements"] or mirror == MIRRORS[-1]:
+                        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                        path.write_text(json.dumps(payload))
+                        return payload
+                    last_error = RuntimeError(f"зеркало {mirror} вернуло пустой ответ")
                 last_error = RuntimeError(f"неожиданный ответ: {str(payload)[:120]}")
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
                 last_error = exc
@@ -533,8 +537,10 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
         "enclosure": None if enclosure is None else round(enclosure, 3),
         "closure_index": closure_index,
         "closure_reason": reason,
-        "closure_confidence": ("low" if capped_sides > 0 else
-                               ("high" if (enclosure or 0.0) >= 0.2 else "medium")),
+        # П7: в застройке DSM даёт крыши вместо бортов; очень малая замкнутость означает,
+        # что настоящих бортов долины мы не нашли, — это low, а не «средне»
+        "closure_confidence": ("low" if (capped_sides > 0 or (enclosure is not None and enclosure < 0.05))
+                               else ("high" if (enclosure or 0.0) >= 0.2 else "medium")),
         "_x": float(x_abs),
         "_y": float(y_abs),
     }
@@ -767,7 +773,8 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
 
 def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.ndarray,
                   radius_m: int = 8000, allow_network: bool = True,
-                  max_features: int = 2000, payload: dict | None = None) -> list[WaterMetrics]:
+                  max_features: int = 2000, payload: dict | None = None,
+                  wide_payload: dict | None = None) -> list[WaterMetrics]:
     """Вода в радиусе: линии склеены по имени, затем измерены.
 
     `payload` позволяет подать заранее сохранённый ответ Overpass — так работают эталоны
@@ -797,4 +804,104 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             metrics.flow_ways_share = flow_share
         out.append(metrics)
     out.sort(key=lambda m: m.nearest_m)
+    _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
+    _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,
+                            wide_payload=wide_payload, allow_network=allow_network)
     return out
+
+
+def _resolve_tidal_by_tags(metrics: list[WaterMetrics], features: list[Feature], *,
+                           epsg: int, site_xy: np.ndarray) -> None:
+    """Приливность по тегу OSM ближайшего куска той же реки.
+
+    У склеенной линии теги могут расходиться (граница прилива проходит внутри): берём кусок,
+    который ближе всего к участку, — он и описывает воду рядом с точкой.
+    """
+    for metric in metrics:
+        if metric.tidal is not None or not metric.name:
+            continue
+        best = None
+        for feature in features:
+            if feature.name != metric.name or len(feature.coords) < 2:
+                continue
+            raw = (feature.tags.get("tidal") or "").lower()
+            if raw not in {"yes", "no"}:
+                continue
+            pts = to_utm(feature.coords, epsg) - site_xy
+            dist = float(np.hypot(*pts.T).min())
+            if best is None or dist < best[0]:
+                best = (dist, raw)
+        if best is not None:
+            metric.tidal = best[1] == "yes"
+            metric.tidal_source = "osm_tag"
+
+
+def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float, *,
+                            epsg: int, site_xy: np.ndarray, radius_m: int,
+                            wide_radius_m: int = 30000, wide_payload: dict | None = None,
+                            allow_network: bool = True) -> None:
+    """Приливность по положению вдоль русла: граница прилива может лежать дальше 8 км.
+
+    Для таких рек берётся более широкая выгрузка (кешируется), граница прилива ставится
+    на русло, и сравниваются расстояния вдоль него. Сравнение по координате ошибается на
+    изгибах: Кингстон западнее Теддингтона, но стоит выше него по течению.
+    """
+    pending = [m for m in metrics if m.tidal is None and m.name and tides.limit_entry(m.name)]
+    if not pending:
+        return
+    if wide_payload is not None:
+        wide = wide_payload
+    else:
+        try:
+            wide = fetch_raw(lat, lon, wide_radius_m, allow_network=allow_network)
+        except Exception:
+            return
+    # нужна линия, на которой лежат ОБА: участок и граница прилива.
+    # Из линий одной реки выбираем ту, где участок ближе 2 км, а граница — ближайшая.
+    wide_lines: dict[str, tuple[float, object]] = {}
+    limit_xy_cache: dict[str, np.ndarray] = {}
+    for line in merge_by_name(parse_features(wide)):
+        if not line.name:
+            continue
+        pts_line = to_utm(line.coords, epsg) - site_xy
+        if len(pts_line) < 2:
+            continue
+        dist_site = float(np.hypot(*pts_line.T).min())
+        if dist_site > 2000.0:
+            continue
+        entry_line = tides.limit_entry(line.name)
+        if entry_line is None:
+            continue
+        if line.name not in limit_xy_cache:
+            from pyproj import Transformer as _T
+            limit_xy_cache[line.name] = np.array(_T.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+                                                 .transform(float(entry_line["limit_lon"]),
+                                                            float(entry_line["limit_lat"]))) - site_xy
+        limit_pt = limit_xy_cache[line.name]
+        dist_limit = float(np.hypot(pts_line[:, 0] - limit_pt[0], pts_line[:, 1] - limit_pt[1]).min())
+        current = wide_lines.get(line.name)
+        if current is None or dist_limit < current[0]:
+            wide_lines[line.name] = (dist_limit, line)
+    from pyproj import Transformer
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    for metric in pending:
+        line = (wide_lines.get(metric.name) or (None, None))[1]
+        entry = tides.limit_entry(metric.name)
+        if line is None or entry is None:
+            continue
+        pts = to_utm(line.coords, epsg) - site_xy
+        if len(pts) < 3:
+            continue
+        seg = np.hypot(*np.diff(pts, axis=0).T)
+        cum = np.concatenate([[0.0], np.cumsum(seg)])
+        site_idx = int(np.argmin(np.hypot(pts[:, 0], pts[:, 1])))
+        limit_xy = np.array(tr.transform(float(entry["limit_lon"]), float(entry["limit_lat"]))) - site_xy
+        d_limit = np.hypot(pts[:, 0] - limit_xy[0], pts[:, 1] - limit_xy[1])
+        limit_idx = int(np.argmin(d_limit))
+        if float(d_limit[limit_idx]) > 5000.0:
+            continue
+        # downstream_toward_end: по течению индекс растёт
+        flow_end = (metric.flow_chosen or "downstream_toward_end") == "downstream_toward_end"
+        tide = tides.status_by_distance(entry, cum[site_idx], cum[limit_idx], flow_toward_end=flow_end)
+        metric.tidal = tide["tidal"]
+        metric.tidal_source = tide["tidal_source"]

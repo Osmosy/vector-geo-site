@@ -1,0 +1,12 @@
+# Кингстон-апон-Темс: выше границы прилива (шлюз Теддингтон ниже по течению).
+water:
+  "River Thames":
+    nearest_m_range: [50, 1200]        # город стоит на берегу, Темза в пределах ~1 км
+    tidal: false                       # выше Теддингтона: PLA, tidal_limits.json
+    flow_chosen: downstream_toward_end # Темза течёт на восток/север к Лондону
+water_mouth:
+  width_capped: true                   # долина Темзы здесь тоже шире 3 км по бортам
+source:
+  - "tidal_limits.json: Teddington Lock ниже Кингстона (Port of London Authority)"
+  - "OSM: геометрия Темзы у Кингстона"
+  - "Copernicus GLO-30: профиль долины в 8 км"

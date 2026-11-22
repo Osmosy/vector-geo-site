@@ -21,6 +21,10 @@ CACHE = Path.home() / ".cache" / "vector-geo-site"
 SITES = {
     "london-city": {"lat": 51.5138, "lon": -0.0984, "radius_km": 20.0, "facing": 180.0},
     "london-isle-of-dogs": {"lat": 51.4885, "lon": -0.0195, "radius_km": 20.0, "facing": None},
+    "kingston-upon-thames": {"lat": 51.4100, "lon": -0.3000, "radius_km": 20.0, "facing": None},
+    "moscow-kremlin": {"lat": 55.7520, "lon": 37.6175, "radius_km": 20.0, "facing": None},
+    "nizhny-novgorod-strelka": {"lat": 56.3300, "lon": 44.0100, "radius_km": 20.0, "facing": None},
+    "sankt-goar-rhine": {"lat": 50.1500, "lon": 7.7100, "radius_km": 20.0, "facing": None},
 }
 
 
@@ -66,7 +70,7 @@ def osm_payload(lat: float, lon: float, radius_m: int) -> dict:
     return water.fetch_raw(lat, lon, radius_m)
 
 
-def main(names: list[str] | None = None) -> int:
+def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
     for name in names or list(SITES):
         site = SITES[name]
         target = GOLDEN / name
@@ -74,7 +78,15 @@ def main(names: list[str] | None = None) -> int:
         payload = osm_payload(site["lat"], site["lon"], 8000)
         (target / "fixtures" / "osm-water.json").write_text(
             json.dumps(payload), encoding="utf-8")
-        dem_crop(site["lat"], site["lon"], site["radius_km"], target / "fixtures" / "dem.tif")
+        try:
+            wide = osm_payload(site["lat"], site["lon"], 30000)
+            import gzip
+            with gzip.open(target / "fixtures" / "osm-water-wide.json.gz", "wt", encoding="utf-8") as fh:
+                json.dump(wide, fh)
+        except Exception as exc:  # широкий запрос не обязателен для проверок без приливности
+            print(f"{name}: широкая выгрузка не получена ({exc})")
+        if not osm_only:
+            dem_crop(site["lat"], site["lon"], site["radius_km"], target / "fixtures" / "dem.tif")
         facing = "null" if site["facing"] is None else f"{site['facing']}"
         (target / "site.yaml").write_text(
             f"name: {name}\nlat: {site['lat']}\nlon: {site['lon']}\n"
@@ -85,4 +97,5 @@ def main(names: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:] or None))
+    args = [a for a in sys.argv[1:] if a != "--osm-only"]
+    raise SystemExit(main(args or None, osm_only="--osm-only" in sys.argv))
