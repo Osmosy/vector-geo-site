@@ -124,6 +124,9 @@ class WaterMouth(BaseModel):
 class WaterObject(BaseModel):
     id: str
     name: str | None = None
+    pieces: int = 1
+    hidden_share: float | None = None
+    visible: bool | None = None
     kind: Literal["river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"]
     order: int | None = None
     in_mountain: str | None = None

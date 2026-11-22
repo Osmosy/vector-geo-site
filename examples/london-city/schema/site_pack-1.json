@@ -886,6 +886,35 @@
           "default": null,
           "title": "Name"
         },
+        "pieces": {
+          "default": 1,
+          "title": "Pieces",
+          "type": "integer"
+        },
+        "hidden_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hidden Share"
+        },
+        "visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visible"
+        },
         "kind": {
           "enum": [
             "river",
