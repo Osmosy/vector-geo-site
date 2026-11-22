@@ -117,6 +117,10 @@ def test_golden_site(name: str):
                     failures.append(f"{river_name}: петля найдена, а её быть не должно")
                 if expected == "present" and not has_loop:
                     failures.append(f"{river_name}: петли нет, а она ожидалась")
+            elif key == "site_position":
+                if metric.site_position != expected:
+                    failures.append(f"{river_name}.site_position={metric.site_position!r}, "
+                                    f"ждали {expected!r}")
             elif key == "site_inside":
                 inside = bool((metric.loop or {}).get("site_inside"))
                 if inside is not expected:

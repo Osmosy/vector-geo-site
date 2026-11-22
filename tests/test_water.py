@@ -283,3 +283,30 @@ def test_hidden_share_hides_from_visible():
     metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.099,
                                    epsg=32630, grid=None)
     assert metric.visible is False
+
+
+def _circle_with_neck(radius_m=1200.0, neck_m=250.0, step_deg=6.0):
+    """Кольцо с перешейком: полный оборот и короткий вход. Возвращает точки в метрах."""
+    pts = []
+    angle = 0.0
+    while angle <= 360.0:
+        a = math.radians(angle)
+        pts.append((radius_m * math.sin(a), radius_m * (1 - math.cos(a))))
+        angle += step_deg
+    # перешеек: от конца кольца к началу
+    pts.append((neck_m / 2, -neck_m / 2))
+    return np.array(pts)
+
+
+def test_loop_circle_neck_positions():
+    """R4: петля одна и та же, положение участка — разное."""
+    ring = _circle_with_neck()
+    inside = water._detect_loop(ring - np.array([0.0, 1200.0]))    # точка в центре кольца
+    outside = water._detect_loop(ring - np.array([0.0, -600.0]))   # точка под перешейком
+    assert inside is not None and outside is not None
+    assert inside["is_loop"] is True, inside
+    assert outside["is_loop"] is True, outside
+    assert inside["site_position"] == "inside"
+    assert outside["site_position"].startswith("outside")
+    assert inside["turn_deg"] >= 180.0
+    assert inside["area_k"] >= 0.05

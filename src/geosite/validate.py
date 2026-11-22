@@ -40,6 +40,8 @@ CONFIDENCE_PAIRS = {
     "water_mouth.enclosure": "water_mouth.closure_confidence",
 }
 LOOP_MIN_RATIO = 3.0
+LOOP_MIN_TURN_DEG = 180.0
+LOOP_MIN_AREA_K = 0.05
 
 
 def _violation(code: str, path: str, message: str, **extra: Any) -> dict:
@@ -116,6 +118,11 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
             ratio = _num(loop.get("ratio"))
             if ratio is None:
                 out.append(_violation("I-05", f"{base}.loop.ratio", "петля без отношения", id=wid))
+            elif (loop.get("turn_deg") is not None and loop["turn_deg"] < LOOP_MIN_TURN_DEG
+                  and (loop.get("area_k") or 0) < LOOP_MIN_AREA_K):
+                out.append(_violation("I-05", f"{base}.loop",
+                                      f"петля без поворота {LOOP_MIN_TURN_DEG}° и площади "
+                                      f"{LOOP_MIN_AREA_K}·gap²", id=wid))
             elif ratio < LOOP_MIN_RATIO:
                 out.append(_violation("I-05", f"{base}.loop.ratio", f"отношение {ratio} < {LOOP_MIN_RATIO}", id=wid))
 
