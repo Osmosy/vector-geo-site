@@ -141,6 +141,7 @@ class WaterObject(BaseModel):
     curvature_radius_m: float | None = None
     bend_kind: Literal["bend", "loop", "straight"] | None = None
     loop: dict | None = None
+    site_position: Literal["inside", "outside_convex", "outside_concave"] | None = None
     between_branches: bool | None = None
     flow_ways_share: float | None = None
     crossings_2km: int | None = None

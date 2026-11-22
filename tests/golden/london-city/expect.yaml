@@ -3,8 +3,9 @@ water:
   "River Thames":
     nearest_m_range: [150, 900]        # Темза в 0.5 км от Сити: карта OSM + прогулка по набережной
     bend: outer                        # участок на внешнем берегу изгиба (反弓): карта
-    bend_kind: bend                    # петли-острова здесь нет
-    loop: absent
+    bend_kind: loop                    # петля Айл-оф-Догс в 3–4 км восточнее: карта OSM
+    loop: present
+    site_position: outside_concave     # участок снаружи со стороны перешейка, не 反弓
     tidal: true                        # ниже шлюза Теддингтон: PLA, tidal_limits.json
     flow_chosen: downstream_toward_end # Темза течёт на восток через Лондон
     in_mountain_any: [坤, 申]           # вход воды с юго-запада (выше по течению)
