@@ -32,6 +32,8 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             loop=m.loop,
             between_branches=m.between_branches,
             flow_ways_share=m.flow_ways_share,
+            crossings_2km=m.crossings_2km,
+            crossing_angle_deg=m.crossing_angle_deg,
             flow_dem_dir=m.flow_dem_dir, flow_osm_dir=m.flow_osm_dir, flow_agree=m.flow_agree,
             source=m.source,
         ))

@@ -26,7 +26,7 @@ def base_pack() -> dict:
                          "tiger": {"rel_elev_m": 2.0, "dist_km": 1.2, "continuity": 0.3},
                          "dragon_vs_tiger": 1.0},
         "water": [{"id": "osm-A-river", "name": "A", "kind": "river", "nearest_m": 500.0,
-                   "in_mountain": "坤", "out_mountain": "辰", "bend": "outer",
+                   "in_mountain": "坤", "out_mountain": "辰", "bend": "outer", "crossings_2km": 2, "crossing_angle_deg": 90.0,
                    "loop": None, "confluences": [], "flow_chosen": "downstream_toward_end",
                    "flow_rule": 1, "flow_confidence": "high", "water_mouth": None}],
         "quality": {"dem": "test", "warnings": [], "notes": []},

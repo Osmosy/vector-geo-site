@@ -140,6 +140,8 @@ class WaterObject(BaseModel):
     loop: dict | None = None
     between_branches: bool | None = None
     flow_ways_share: float | None = None
+    crossings_2km: int | None = None
+    crossing_angle_deg: float | None = None
     flow_osm_dir: str | None = None
     flow_dem_dir: str | None = None
     flow_chosen: str | None = None

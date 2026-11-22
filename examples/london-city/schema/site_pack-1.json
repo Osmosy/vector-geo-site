@@ -1085,6 +1085,30 @@
           "default": null,
           "title": "Flow Ways Share"
         },
+        "crossings_2km": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crossings 2Km"
+        },
+        "crossing_angle_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crossing Angle Deg"
+        },
         "flow_osm_dir": {
           "anyOf": [
             {

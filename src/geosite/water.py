@@ -290,6 +290,8 @@ class WaterMetrics:
     loop: dict | None = None
     between_branches: bool | None = None
     between_pair_deg: list[int] | None = None
+    crossings_2km: int = 0
+    crossing_angle_deg: float | None = None
     flow_ways_share: float | None = None
 
 
@@ -373,8 +375,11 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     else:
         a, b = pts[0], pts[-1]
     upstream, downstream = (a, b) if flow_chosen != "downstream_toward_start" else (b, a)
-    in_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(upstream[0], upstream[1]))))
-    out_m = geo.mountain_name(geo.normalize_deg(math.degrees(math.atan2(downstream[0], downstream[1]))))
+    in_bearing = geo.normalize_deg(math.degrees(math.atan2(upstream[0], upstream[1])))
+    out_bearing = geo.normalize_deg(math.degrees(math.atan2(downstream[0], downstream[1])))
+    in_m = geo.mountain_name(in_bearing)
+    out_m = geo.mountain_name(out_bearing)
+    crossing_angle = geo.angle_distance(in_bearing, out_bearing)
 
     # изгиб: центр кривизны в точке nearest; участок внутри кривой = обнимает
     i = min(max(nearest_seg, 1), len(pts) - 2)
@@ -444,6 +449,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         loop=loop,
         between_branches=between.get("between_branches"),
         between_pair_deg=between.get("pair_deg"),
+        crossings_2km=len(cross),
+        crossing_angle_deg=round(crossing_angle, 1),
     )
 
 

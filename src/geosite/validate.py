@@ -124,7 +124,9 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
             seen.append((other, dist))
 
         # I-07: река мимо участка не может входить и выходить из одной горы
-        if water.get("kind") == "river" and nearest is not None and nearest < 3000:
+        if (water.get("kind") == "river" and nearest is not None and nearest < 3000
+                and (water.get("crossings_2km") or 0) >= 2
+                and (water.get("crossing_angle_deg") or 0) >= 30.0):
             if water.get("in_mountain") and water.get("in_mountain") == water.get("out_mountain"):
                 out.append(_violation("I-07", f"{base}.in_mountain",
                                       "вход и выход в одной горе у проходящей реки", id=wid))
