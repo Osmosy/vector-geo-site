@@ -1161,6 +1161,29 @@
   "elev_m": 28.4,
   "lift_over_200m_m": -0.1
  },
+ "four_spirits": {
+  "tortoise": {
+   "rel_elev_m": 112.7,
+   "dist_km": 8.0,
+   "continuity": 1.0
+  },
+  "bird": {
+   "rel_elev_m": 62.1,
+   "dist_km": 7.97,
+   "continuity": 0.83
+  },
+  "dragon": {
+   "rel_elev_m": 14.7,
+   "dist_km": 4.83,
+   "continuity": 0.42
+  },
+  "tiger": {
+   "rel_elev_m": 34.7,
+   "dist_km": 7.99,
+   "continuity": 0.42
+  },
+  "dragon_vs_tiger": -20.0
+ },
  "dragon_vein": {
   "length_km": 12.0,
   "drop_m": 108.1,
