@@ -118,3 +118,71 @@ def test_london_thames_metrics():
     assert 150 < metric.nearest_m < 800
     assert metric.curvature_radius_m is not None
     assert metric.kind in {"river", "culvert"}
+
+
+# --- W1: водные врата ---
+
+def _valley_grid(slope_deg: float = 30.0, n: int = 141, res: float = 50.0):
+    from affine import Affine
+    from geosite.dem import DemGrid
+
+    xs = (np.arange(n) + 0.5) * res - n * res / 2
+    ys = (np.arange(n) + 0.5) * res
+    xx, yy = np.meshgrid(xs, ys)
+    z = 100.0 + np.abs(xx) * np.tan(np.radians(slope_deg))
+    return DemGrid(z.astype("float32"), Affine(res, 0, 0, 0, -res, n * res), "EPSG:32630", res)
+
+
+def test_mouth_v_valley_high_closure():
+    g = _valley_grid(30.0)
+    m = water._water_mouth(g, np.array([0.0, 0.0]), np.array([0.0, -100.0]), np.array([g.data.shape[1] * 25.0, g.data.shape[0] * 25.0]))
+    assert m["closure_index"] is not None and m["closure_index"] >= 0.7
+    assert m["width_capped"] is False
+
+
+def test_mouth_flat_plane_is_null():
+    from affine import Affine
+    from geosite.dem import DemGrid
+
+    res, n = 50.0, 141
+    flat = DemGrid(np.full((n, n), 100.0, dtype="float32"), Affine(res, 0, 0, 0, -res, n * res),
+                   "EPSG:32630", res)
+    m = water._water_mouth(flat, np.array([0.0, 0.0]), np.array([0.0, -100.0]),
+                           np.array([n * res / 2, n * res / 2]))
+    assert m["closure_index"] is None
+    assert m["closure_reason"] == "flat_valley"
+    assert m["width_capped"] is True and m["capped_sides"] == 2
+
+
+def test_mouth_one_side_capped_is_low_confidence():
+    g = _valley_grid(10.0)
+    m = water._water_mouth(g, np.array([0.0, 0.0]), np.array([0.0, -100.0]),
+                           np.array([g.data.shape[1] * 25.0, g.data.shape[0] * 25.0]))
+    if m["capped_sides"] > 0:
+        assert m["closure_confidence"] == "low"
+
+
+# --- W2: излучина ---
+
+def _circle_with_neck(radius: float = 1000.0, neck_gap: float = 300.0, steps: int = 240):
+    ang = np.linspace(0, 2 * np.pi, steps)
+    pts = np.column_stack([radius * np.cos(ang), radius * np.sin(ang)])
+    return pts
+
+
+def test_loop_detected_with_ratio():
+    pts = _circle_with_neck()
+    loop = water._detect_loop(pts)
+    assert loop is not None
+    assert loop["ratio"] >= 5.0
+
+
+def test_loop_absent_on_gentle_sine():
+    x = np.linspace(0, 20000, 400)
+    pts = np.column_stack([x - 10000, 300 * np.sin(x / 2000)])
+    loop = water._detect_loop(pts)
+    assert loop is None or loop["ratio"] < 3.0
+
+
+def test_loop_ratio_threshold_constant():
+    assert water.LOOP_MIN_RATIO == 3.0

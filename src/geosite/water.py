@@ -35,6 +35,7 @@ MIRRORS = [
 ]
 
 WATERWAY_KINDS = {"river", "stream", "canal", "drain", "ditch"}
+LOOP_MIN_RATIO = 3.0        # W2: петля — отношение длины русла к разрыву не меньше этого
 
 
 @dataclass
@@ -268,6 +269,7 @@ class WaterMetrics:
     in_mountain: str | None
     out_mountain: str | None
     bend: str | None
+    bend_kind: str | None
     curvature_radius_m: float | None
     straight_at_site: bool
     confluences: list[dict]
@@ -403,7 +405,13 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     if mouth is not None and grid is not None:
         visible = _line_of_sight(grid, np.zeros(2), np.array([mouth.pop("_x"), mouth.pop("_y")]))
 
-    loop = _detect_loop(pts) if len(pts) > 20 else None
+    loop_raw = _detect_loop(pts) if len(pts) > 20 else None
+    loop = None
+    bend_kind = "straight" if (radius_m is None or radius_m > 5000.0) else "bend"
+    if loop_raw and (loop_raw.get("ratio") or 0.0) >= LOOP_MIN_RATIO:
+        # W2: петля — только если русло возвращается к себе, пройдя втрое больше разрыва
+        loop = loop_raw
+        bend_kind = "loop"
     between = site_between_branches(pts) if len(pts) > 2 else {"between_branches": False}
 
     return WaterMetrics(
@@ -415,6 +423,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         in_mountain=in_m,
         out_mountain=out_m,
         bend=bend,
+        bend_kind=bend_kind,
         curvature_radius_m=None if radius_m is None else round(radius_m, 1),
         straight_at_site=bool(straight and nearest_m < in_radius_m),
         confluences=[],
@@ -438,8 +447,16 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     )
 
 
-def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.ndarray) -> dict | None:
-    """Ширина долины и высоты бортов поперёк течения в точке выхода воды."""
+def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.ndarray,
+                 *, max_steps: int = 60, step_m: float = 50.0) -> dict | None:
+    """Водные врата: ширина долины, высоты бортов и замкнутость (W1).
+
+    Ширина — до подъёма борта на 20 м. Если борт не поднялся за 3 км, сторона считается
+    «упёршейся в предел» (width_capped), а не нулевой. Замкнутость — не доля от 4 км,
+    а отношение высоты бортов к полуширине долины: enclosure = mean(hills) / (width/2),
+    затем монотонно в [0,1): closure_index = enclosure / (1 + enclosure).
+    Обе стороны упёрлись → closure_index null, причина flat_valley (П1, П2).
+    """
     flow_dir = exit_pt - flow_pt
     norm = np.hypot(*flow_dir)
     if norm < 1e-6:
@@ -450,27 +467,48 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
     z0 = grid.point_value(x_abs, y_abs)
     if math.isnan(z0):
         return None
-    half_widths, hills = [], []
-    capped_sides = 0
+
+    half_widths, hills, capped_sides = [], [], 0
     for sign in (1, -1):
-        width = 0.0
-        top = 0.0
-        for step in range(1, 61):          # до 3 км в каждую сторону
-            d = step * 50.0
+        half_width, top, stop_reason = 0.0, 0.0, "capped"
+        for step in range(1, max_steps + 1):
+            d = step * step_m
             z = grid.point_value(*(site_xy + exit_pt + perp * sign * d))
             if math.isnan(z):
-                capped_sides += 1
+                stop_reason = "grid_edge"
                 break
-            width = d
-            top = max(top, z - z0)
-            if z - z0 > 20.0:              # борт поднялся на 20 м — это склон долины
+            top = max(top, float(z) - z0)
+            if z - z0 > 20.0:
+                half_width = d
+                # дальше по профилю берём максимум до конца замера — борт бывает выше порога
+                for step2 in range(step + 1, max_steps + 1):
+                    z2 = grid.point_value(*(site_xy + exit_pt + perp * sign * step2 * step_m))
+                    if not math.isnan(z2):
+                        top = max(top, float(z2) - z0)
+                stop_reason = "slope"
                 break
-        else:
-            capped_sides += 1              # упёрлись в предел шагов
-        half_widths.append(width)
+            half_width = d
+        if stop_reason != "slope":
+            capped_sides += 1
+        half_widths.append(half_width)
         hills.append(top)
+
     width = half_widths[0] + half_widths[1]
     hill_left, hill_right = hills[0], hills[1]
+    mean_hill = (hill_left + hill_right) / 2.0
+    half = width / 2.0
+    enclosure = None
+    closure_index = None
+    reason = None
+    if capped_sides >= 2:
+        reason = "flat_valley"
+    elif half <= 1.0:
+        enclosure = 99.0
+        closure_index = 1.0
+    else:
+        enclosure = mean_hill / half
+        closure_index = round(enclosure / (1.0 + enclosure), 3)
+
     bearing = geo.normalize_deg(math.degrees(math.atan2(exit_pt[0], exit_pt[1])))
     return {
         "mountain": geo.mountain_name(bearing),
@@ -479,7 +517,11 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
         "right_hill_m": round(hill_right, 1),
         "width_capped": capped_sides > 0,
         "capped_sides": capped_sides,
-        "closure_index": round(max(0.0, 1.0 - min(width, 4000.0) / 4000.0), 2),
+        "enclosure": None if enclosure is None else round(enclosure, 3),
+        "closure_index": closure_index,
+        "closure_reason": reason,
+        "closure_confidence": ("low" if capped_sides > 0 else
+                               ("high" if (enclosure or 0.0) >= 0.2 else "medium")),
         "_x": float(x_abs),
         "_y": float(y_abs),
     }
