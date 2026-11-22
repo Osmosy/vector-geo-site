@@ -3,7 +3,7 @@ water:
   "River Thames":
     nearest_m_range: [200, 1200]       # полуостров омывается Темзой с трёх сторон
     loop: present                      # петля вокруг полуострова: карта OSM
-    site_inside: true                  # точка на полуострове — внутри контура петли
+    site_position: inside              # точка на полуострове — внутри контура петли
     bend_kind: loop
     tidal: true                        # ниже Теддингтона: PLA
     flow_chosen: downstream_toward_end

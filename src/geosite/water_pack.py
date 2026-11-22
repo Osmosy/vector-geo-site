@@ -24,7 +24,7 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
                                          "mountain": c["mountain"]} for c in m.confluences],
             water_mouth=mouth, outflow_visible=m.outflow_visible,
             curvature_radius_m=m.curvature_radius_m,
-            loop=m.loop,
+            loop=m.loop, site_position=m.site_position,
             between_branches=m.between_branches,
             flow_ways_share=m.flow_ways_share,
             crossings_2km=m.crossings_2km,

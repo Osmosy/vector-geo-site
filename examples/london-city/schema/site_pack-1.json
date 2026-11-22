@@ -1090,6 +1090,23 @@
           "default": null,
           "title": "Loop"
         },
+        "site_position": {
+          "anyOf": [
+            {
+              "enum": [
+                "inside",
+                "outside_convex",
+                "outside_concave"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Site Position"
+        },
         "between_branches": {
           "anyOf": [
             {
