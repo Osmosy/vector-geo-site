@@ -17,6 +17,8 @@ from pathlib import Path
 
 from . import geo
 
+ALGO_VERSION = "1.0.0"
+
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 NOMINATIM = "https://nominatim.openstreetmap.org"
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site"))

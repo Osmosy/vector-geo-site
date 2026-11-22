@@ -110,10 +110,15 @@ class Confluence(BaseModel):
 
 class WaterMouth(BaseModel):
     mountain: str
-    closure_index: float
+    closure_index: float | None = None
+    closure_reason: str | None = None
+    closure_confidence: Confidence | None = None
+    enclosure: float | None = None
     width_m: float | None = None
     left_hill_m: float | None = None
     right_hill_m: float | None = None
+    width_capped: bool = False
+    capped_sides: int = 0
 
 
 class WaterObject(BaseModel):
@@ -131,12 +136,20 @@ class WaterObject(BaseModel):
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
     curvature_radius_m: float | None = None
+    bend_kind: Literal["bend", "loop", "straight"] | None = None
     loop: dict | None = None
     between_branches: bool | None = None
     flow_ways_share: float | None = None
-    flow_dem_dir: str | None = None
     flow_osm_dir: str | None = None
+    flow_dem_dir: str | None = None
+    flow_chosen: str | None = None
+    flow_rule: int | None = None
+    flow_confidence: Confidence | None = None
     flow_agree: bool | None = None
+    dem_slope_m_per_km: float | None = None
+    dem_slope_snr: float | None = None
+    dem_reason: str | None = None
+    tidal_source: str | None = None
     source: str | None = None
 
 
@@ -159,6 +172,22 @@ class Quality(BaseModel):
     dem_resolution_m: float | None = None
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    valid: bool | None = None
+    violations: list[dict] = Field(default_factory=list)
+    partial: bool = False
+
+
+class Algo(BaseModel):
+    """Версии алгоритмов, которые писали в пакет (П5)."""
+    water: str | None = None
+    terrain: str | None = None
+    geocode: str | None = None
+    pack: str | None = None
+
+
+class Files(BaseModel):
+    water_geojson: str | None = None
+    sha256: dict[str, str] = Field(default_factory=dict)
 
 
 class SitePack(BaseModel):
@@ -176,6 +205,9 @@ class SitePack(BaseModel):
     exposure: Exposure | None = None
     land_cover: LandCover | None = None
     quality: Quality
+    algo: Algo = Field(default_factory=Algo)
+    files: Files = Field(default_factory=Files)
+    summary: dict | None = None
     attribution: list[str] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}

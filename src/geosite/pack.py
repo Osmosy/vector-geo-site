@@ -6,7 +6,12 @@ import json
 from pathlib import Path
 
 from . import figures, geo
+from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
+
+ALGO = {"water": "3.1.0", "terrain": "2.0.0", "geocode": "1.0.0", "pack": "1.1.0"}
+
+ALGO_VERSION = "1.1.0"
 
 ATTRIBUTION = [
     "© OpenStreetMap contributors",
@@ -64,9 +69,12 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                  "warnings": warnings, "notes": notes},
         attribution=ATTRIBUTION,
     )
+    payload = pack.model_dump(by_alias=True, exclude_none=False)
+    payload["algo"] = dict(ALGO)
+    violations = validate_mod.validate(payload)
+    validate_mod.apply_to_pack(payload, violations)
     (out_dir / "site_pack.json").write_text(
-        json.dumps(pack.model_dump(by_alias=True, exclude_none=False), ensure_ascii=False, indent=2),
-        encoding="utf-8")
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     schema_dir = out_dir / "schema"
     schema_dir.mkdir(exist_ok=True)
     (schema_dir / "site_pack-1.json").write_text(

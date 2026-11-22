@@ -29,3 +29,5 @@ packages = ["src/geosite"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["network: тесты, которым нужен интернет"]
+addopts = "-m \"not network\""

@@ -213,6 +213,27 @@ def cmd_water(args) -> int:
     return 0
 
 
+def cmd_validate(args) -> int:
+    from .validate import validate_file
+
+    violations = validate_file(args.pack)
+    if args.baseline:
+        # известные нарушения: новый код|путь — падение, исчезнувшие — сообщаем отдельно
+        import json as _json
+        known = set(_json.loads(Path(args.baseline).read_text(encoding="utf-8")))
+        current = {f"{v['code']}|{v['path']}" for v in violations}
+        fresh = sorted(current - known)
+        gone = sorted(known - current)
+        _print({"valid_not_worse": not fresh, "fresh": fresh, "fixed": gone,
+                "count": len(violations)})
+        return 1 if fresh else 0
+    if violations:
+        _print({"valid": False, "count": len(violations), "violations": violations})
+        return 1
+    _print({"valid": True, "count": 0, "violations": []})
+    return 0
+
+
 def cmd_schema(args) -> int:
     _print(json_schema())
     return 0
@@ -256,6 +277,11 @@ def main(argv: list[str] | None = None) -> int:
     p_water = sub.add_parser("water", help="вода: реки, изгибы, слияния, врата")
     p_water.add_argument("place")
     p_water.set_defaults(func=cmd_water)
+
+    p_val = sub.add_parser("validate", help="проверить site_pack.json на инварианты")
+    p_val.add_argument("pack", help="путь к site_pack.json")
+    p_val.add_argument("--baseline", default=None, help="файл с известными нарушениями")
+    p_val.set_defaults(func=cmd_validate)
 
     p_schema = sub.add_parser("schema", help="JSON Schema пакета")
     p_schema.set_defaults(func=cmd_schema)

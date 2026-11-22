@@ -23,6 +23,8 @@ import numpy as np
 from . import geo
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
+ALGO_VERSION = "3.1.0"
+
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
 # Зеркала Overpass: первое доступное. Каждое может быть перегружено — поэтому список и повторы.

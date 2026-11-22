@@ -13,6 +13,8 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
+ALGO_VERSION = "2.0.0"
+
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
 HILL_THRESHOLD_M = 5.0   # превышение над точкой, с которого считаем «возвышенность»
