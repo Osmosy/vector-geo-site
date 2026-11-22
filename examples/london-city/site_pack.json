@@ -1,0 +1,1461 @@
+{
+  "schema": "site_pack/1",
+  "query": {
+    "input": "51.5138, -0.0984",
+    "kind": "point",
+    "resolved_by": "input",
+    "alternatives": []
+  },
+  "site": {
+    "lat": 51.5138,
+    "lon": -0.0984,
+    "elev_m": 28.4,
+    "precision": "point",
+    "utm_epsg": 32630,
+    "boundary": null
+  },
+  "orientation": {
+    "facing_true_deg": 180.0,
+    "declination_deg": null,
+    "facing_mag_deg": null,
+    "facing_mountain": "午",
+    "sitting_mountain": "子",
+    "source": "user_compass",
+    "confidence": "high",
+    "near_boundary": false
+  },
+  "chart_year": {
+    "value": 2018,
+    "source": "user"
+  },
+  "sectors": [
+    {
+      "mountain": "子",
+      "from_deg": 352.5,
+      "to_deg": 7.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 9.6,
+          "mean_rel_elev_m": 7.2,
+          "horizon_deg": 2.1,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 2.2,
+          "mean_rel_elev_m": -3.9,
+          "horizon_deg": 0.02,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 31.5,
+          "mean_rel_elev_m": 2.8,
+          "horizon_deg": 0.26,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 52.5,
+          "mean_rel_elev_m": 11.0,
+          "horizon_deg": 0.18,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "癸",
+      "from_deg": 7.5,
+      "to_deg": 22.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 7.9,
+          "mean_rel_elev_m": 7.2,
+          "horizon_deg": 1.25,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 2.2,
+          "mean_rel_elev_m": -4.7,
+          "horizon_deg": 0.02,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 7.3,
+          "mean_rel_elev_m": -5.2,
+          "horizon_deg": 0.05,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 49.9,
+          "mean_rel_elev_m": -9.3,
+          "horizon_deg": 0.16,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "丑",
+      "from_deg": 22.5,
+      "to_deg": 37.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 7.5,
+          "mean_rel_elev_m": 5.9,
+          "horizon_deg": 1.17,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 7.2,
+          "mean_rel_elev_m": -4.0,
+          "horizon_deg": 0.31,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 3.0,
+          "mean_rel_elev_m": -12.7,
+          "horizon_deg": 0.01,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 92.2,
+          "mean_rel_elev_m": 20.9,
+          "horizon_deg": 0.27,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "艮",
+      "from_deg": 37.5,
+      "to_deg": 52.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 5.8,
+          "mean_rel_elev_m": 5.2,
+          "horizon_deg": 0.84,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 12.9,
+          "mean_rel_elev_m": -2.2,
+          "horizon_deg": 0.66,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": -4.4,
+          "mean_rel_elev_m": -14.9,
+          "horizon_deg": -0.09,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 70.2,
+          "mean_rel_elev_m": 9.1,
+          "horizon_deg": 0.2,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "寅",
+      "from_deg": 52.5,
+      "to_deg": 67.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 5.0,
+          "mean_rel_elev_m": 3.9,
+          "horizon_deg": 0.54,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 4.8,
+          "mean_rel_elev_m": -4.5,
+          "horizon_deg": 0.19,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": -3.0,
+          "mean_rel_elev_m": -16.0,
+          "horizon_deg": -0.04,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 57.9,
+          "mean_rel_elev_m": -5.7,
+          "horizon_deg": 0.16,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "甲",
+      "from_deg": 67.5,
+      "to_deg": 82.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 3.5,
+          "mean_rel_elev_m": 2.2,
+          "horizon_deg": 0.31,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 8.0,
+          "mean_rel_elev_m": -4.1,
+          "horizon_deg": 0.38,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": -3.6,
+          "mean_rel_elev_m": -18.7,
+          "horizon_deg": -0.1,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": -7.9,
+          "mean_rel_elev_m": -19.4,
+          "horizon_deg": -0.03,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "卯",
+      "from_deg": 82.5,
+      "to_deg": 97.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -0.1,
+          "mean_rel_elev_m": -2.1,
+          "horizon_deg": -0.43,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 9.7,
+          "mean_rel_elev_m": -1.9,
+          "horizon_deg": 0.49,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 5.0,
+          "mean_rel_elev_m": -21.2,
+          "horizon_deg": 0.03,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 19.5,
+          "mean_rel_elev_m": -24.4,
+          "horizon_deg": 0.06,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "乙",
+      "from_deg": 97.5,
+      "to_deg": 112.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -2.2,
+          "mean_rel_elev_m": -4.8,
+          "horizon_deg": -1.0,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 5.9,
+          "mean_rel_elev_m": -6.7,
+          "horizon_deg": 0.26,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 13.8,
+          "mean_rel_elev_m": -22.7,
+          "horizon_deg": 0.12,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 99.6,
+          "mean_rel_elev_m": 11.9,
+          "horizon_deg": 0.44,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "辰",
+      "from_deg": 112.5,
+      "to_deg": 127.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -2.9,
+          "mean_rel_elev_m": -7.2,
+          "horizon_deg": -0.94,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -2.5,
+          "mean_rel_elev_m": -20.2,
+          "horizon_deg": -0.26,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 20.2,
+          "mean_rel_elev_m": -19.5,
+          "horizon_deg": 0.13,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 98.3,
+          "mean_rel_elev_m": 16.5,
+          "horizon_deg": 0.45,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "巽",
+      "from_deg": 127.5,
+      "to_deg": 142.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -5.4,
+          "mean_rel_elev_m": -9.2,
+          "horizon_deg": -1.64,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -10.1,
+          "mean_rel_elev_m": -19.0,
+          "horizon_deg": -0.43,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 21.7,
+          "mean_rel_elev_m": -13.6,
+          "horizon_deg": 0.16,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 78.3,
+          "mean_rel_elev_m": 34.5,
+          "horizon_deg": 0.27,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "巳",
+      "from_deg": 142.5,
+      "to_deg": 157.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -9.1,
+          "mean_rel_elev_m": -15.6,
+          "horizon_deg": -2.51,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -14.7,
+          "mean_rel_elev_m": -20.4,
+          "horizon_deg": -0.66,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 62.1,
+          "mean_rel_elev_m": -5.7,
+          "horizon_deg": 0.43,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 130.3,
+          "mean_rel_elev_m": 35.8,
+          "horizon_deg": 0.5,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "丙",
+      "from_deg": 157.5,
+      "to_deg": 172.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -15.8,
+          "mean_rel_elev_m": -21.8,
+          "horizon_deg": -3.28,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -18.7,
+          "mean_rel_elev_m": -20.4,
+          "horizon_deg": -0.68,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 52.8,
+          "mean_rel_elev_m": -3.6,
+          "horizon_deg": 0.36,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 148.1,
+          "mean_rel_elev_m": 54.6,
+          "horizon_deg": 0.51,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "午",
+      "from_deg": 172.5,
+      "to_deg": 187.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 0.0,
+          "mean_rel_elev_m": -12.8,
+          "horizon_deg": -2.47,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -16.8,
+          "mean_rel_elev_m": -19.8,
+          "horizon_deg": -0.66,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 34.7,
+          "mean_rel_elev_m": -6.4,
+          "horizon_deg": 0.23,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 147.1,
+          "mean_rel_elev_m": 39.3,
+          "horizon_deg": 0.44,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "丁",
+      "from_deg": 187.5,
+      "to_deg": 202.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -17.4,
+          "mean_rel_elev_m": -23.1,
+          "horizon_deg": -3.47,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -18.9,
+          "mean_rel_elev_m": -21.4,
+          "horizon_deg": -0.67,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 31.2,
+          "mean_rel_elev_m": -7.9,
+          "horizon_deg": 0.21,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 86.1,
+          "mean_rel_elev_m": 17.4,
+          "horizon_deg": 0.25,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "未",
+      "from_deg": 202.5,
+      "to_deg": 217.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -1.4,
+          "mean_rel_elev_m": -15.6,
+          "horizon_deg": -1.35,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -11.9,
+          "mean_rel_elev_m": -20.2,
+          "horizon_deg": -0.49,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 4.9,
+          "mean_rel_elev_m": -14.3,
+          "horizon_deg": 0.02,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 34.8,
+          "mean_rel_elev_m": -1.5,
+          "horizon_deg": 0.12,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "坤",
+      "from_deg": 217.5,
+      "to_deg": 232.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -9.4,
+          "mean_rel_elev_m": -15.2,
+          "horizon_deg": -2.4,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -13.6,
+          "mean_rel_elev_m": -21.1,
+          "horizon_deg": -0.51,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": -7.1,
+          "mean_rel_elev_m": -20.8,
+          "horizon_deg": -0.07,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 36.1,
+          "mean_rel_elev_m": -2.0,
+          "horizon_deg": 0.17,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "申",
+      "from_deg": 232.5,
+      "to_deg": 247.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -3.0,
+          "mean_rel_elev_m": -8.1,
+          "horizon_deg": -1.33,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": -8.8,
+          "mean_rel_elev_m": -22.6,
+          "horizon_deg": -0.31,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": -6.5,
+          "mean_rel_elev_m": -16.9,
+          "horizon_deg": -0.07,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 33.0,
+          "mean_rel_elev_m": -13.8,
+          "horizon_deg": 0.12,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "庚",
+      "from_deg": 247.5,
+      "to_deg": 262.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 1.6,
+          "mean_rel_elev_m": -3.2,
+          "horizon_deg": -0.26,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 2.8,
+          "mean_rel_elev_m": -7.2,
+          "horizon_deg": 0.03,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 12.8,
+          "mean_rel_elev_m": -6.7,
+          "horizon_deg": 0.19,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 3.9,
+          "mean_rel_elev_m": -13.5,
+          "horizon_deg": 0.01,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "酉",
+      "from_deg": 262.5,
+      "to_deg": 277.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": -3.3,
+          "mean_rel_elev_m": -4.7,
+          "horizon_deg": -0.67,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 7.1,
+          "mean_rel_elev_m": 2.7,
+          "horizon_deg": 0.28,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 14.4,
+          "mean_rel_elev_m": 1.4,
+          "horizon_deg": 0.24,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 38.2,
+          "mean_rel_elev_m": -0.6,
+          "horizon_deg": 0.15,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "辛",
+      "from_deg": 277.5,
+      "to_deg": 292.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 2.9,
+          "mean_rel_elev_m": 0.6,
+          "horizon_deg": 0.26,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 11.8,
+          "mean_rel_elev_m": 4.9,
+          "horizon_deg": 0.74,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 24.9,
+          "mean_rel_elev_m": 8.1,
+          "horizon_deg": 0.22,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 90.1,
+          "mean_rel_elev_m": 18.7,
+          "horizon_deg": 0.29,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "戌",
+      "from_deg": 292.5,
+      "to_deg": 307.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 4.3,
+          "mean_rel_elev_m": 2.4,
+          "horizon_deg": 1.24,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 10.7,
+          "mean_rel_elev_m": 1.9,
+          "horizon_deg": 0.63,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 91.4,
+          "mean_rel_elev_m": 22.5,
+          "horizon_deg": 0.67,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 123.1,
+          "mean_rel_elev_m": 30.0,
+          "horizon_deg": 0.58,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "乾",
+      "from_deg": 307.5,
+      "to_deg": 322.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 6.0,
+          "mean_rel_elev_m": 1.9,
+          "horizon_deg": 0.98,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 1.9,
+          "mean_rel_elev_m": -3.9,
+          "horizon_deg": -0.0,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 112.7,
+          "mean_rel_elev_m": 33.7,
+          "horizon_deg": 0.79,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 127.5,
+          "mean_rel_elev_m": 55.6,
+          "horizon_deg": 0.79,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "亥",
+      "from_deg": 322.5,
+      "to_deg": 337.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 7.4,
+          "mean_rel_elev_m": 4.8,
+          "horizon_deg": 1.63,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 9.6,
+          "mean_rel_elev_m": -2.4,
+          "horizon_deg": 0.22,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 102.2,
+          "mean_rel_elev_m": 36.4,
+          "horizon_deg": 0.79,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 116.3,
+          "mean_rel_elev_m": 67.5,
+          "horizon_deg": 0.61,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    },
+    {
+      "mountain": "壬",
+      "from_deg": 337.5,
+      "to_deg": 352.5,
+      "rings": [
+        {
+          "r_km": [
+            0.0,
+            0.5
+          ],
+          "max_rel_elev_m": 8.6,
+          "mean_rel_elev_m": 6.6,
+          "horizon_deg": 1.47,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            0.5,
+            2.0
+          ],
+          "max_rel_elev_m": 10.4,
+          "mean_rel_elev_m": -0.9,
+          "horizon_deg": 0.24,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            2.0,
+            8.0
+          ],
+          "max_rel_elev_m": 57.6,
+          "mean_rel_elev_m": 16.0,
+          "horizon_deg": 0.46,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        },
+        {
+          "r_km": [
+            8.0,
+            50.0
+          ],
+          "max_rel_elev_m": 106.2,
+          "mean_rel_elev_m": 43.8,
+          "horizon_deg": 0.48,
+          "water_share": null,
+          "built_share": null,
+          "peaks": []
+        }
+      ],
+      "water": [],
+      "wind_share": null
+    }
+  ],
+  "point": {
+    "slope_deg": 2.8,
+    "aspect_deg": 135.9,
+    "shape": "склон",
+    "elev_m": 28.4,
+    "lift_over_200m_m": -0.1
+  },
+  "four_spirits": {
+    "tortoise": {
+      "rel_elev_m": 109.4,
+      "dist_km": 8.0,
+      "continuity": 0.79,
+      "note": null
+    },
+    "bird": {
+      "rel_elev_m": 62.1,
+      "dist_km": 7.97,
+      "continuity": 0.71,
+      "note": null
+    },
+    "dragon": {
+      "rel_elev_m": 20.2,
+      "dist_km": 7.86,
+      "continuity": 0.46,
+      "note": null
+    },
+    "tiger": {
+      "rel_elev_m": 112.7,
+      "dist_km": 8.0,
+      "continuity": 0.71,
+      "note": null
+    },
+    "dragon_vs_tiger": -92.5
+  },
+  "dragon_vein": {
+    "to_peak": null,
+    "length_km": 12.0,
+    "drop_m": 108.1,
+    "bends": 6,
+    "saddles": 0,
+    "alive": true
+  },
+  "water": [],
+  "roads": [],
+  "exposure": null,
+  "land_cover": null,
+  "quality": {
+    "dem": "Copernicus DEM GLO-30 (DSM)",
+    "dem_resolution_m": 30.0,
+    "warnings": [
+      "водные слои не подключены (этап 3): water_share и water = null",
+      "склонение и ветер не рассчитаны (этап 4)",
+      "рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, в плотной застройке возможны искажения"
+    ],
+    "notes": []
+  },
+  "attribution": [
+    "© OpenStreetMap contributors",
+    "produced using Copernicus WorldDEM-30 © DLR e.V."
+  ]
+}

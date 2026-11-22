@@ -1,0 +1,958 @@
+{
+  "$defs": {
+    "ChartYear": {
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "ChartYear",
+      "type": "object"
+    },
+    "Confluence": {
+      "properties": {
+        "with": {
+          "title": "With",
+          "type": "string"
+        },
+        "dist_m": {
+          "title": "Dist M",
+          "type": "number"
+        },
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        }
+      },
+      "required": [
+        "with",
+        "dist_m",
+        "mountain"
+      ],
+      "title": "Confluence",
+      "type": "object"
+    },
+    "DragonVein": {
+      "properties": {
+        "to_peak": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To Peak"
+        },
+        "length_km": {
+          "title": "Length Km",
+          "type": "number"
+        },
+        "drop_m": {
+          "title": "Drop M",
+          "type": "number"
+        },
+        "bends": {
+          "title": "Bends",
+          "type": "integer"
+        },
+        "saddles": {
+          "title": "Saddles",
+          "type": "integer"
+        },
+        "alive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alive"
+        }
+      },
+      "required": [
+        "length_km",
+        "drop_m",
+        "bends",
+        "saddles"
+      ],
+      "title": "DragonVein",
+      "type": "object"
+    },
+    "Exposure": {
+      "properties": {
+        "enclosure_index": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enclosure Index"
+        },
+        "windy_mountains": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Windy Mountains",
+          "type": "array"
+        },
+        "sky_view_factor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sky View Factor"
+        },
+        "winter_sun_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Winter Sun Hours"
+        }
+      },
+      "title": "Exposure",
+      "type": "object"
+    },
+    "FourSpirits": {
+      "properties": {
+        "tortoise": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "bird": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "dragon": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "tiger": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "dragon_vs_tiger": {
+          "title": "Dragon Vs Tiger",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tortoise",
+        "bird",
+        "dragon",
+        "tiger",
+        "dragon_vs_tiger"
+      ],
+      "title": "FourSpirits",
+      "type": "object"
+    },
+    "LandCover": {
+      "properties": {
+        "built": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Built"
+        },
+        "tree": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tree"
+        },
+        "water": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water"
+        },
+        "open": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Open"
+        }
+      },
+      "title": "LandCover",
+      "type": "object"
+    },
+    "Orientation": {
+      "properties": {
+        "facing_true_deg": {
+          "title": "Facing True Deg",
+          "type": "number"
+        },
+        "declination_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Deg"
+        },
+        "facing_mag_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Facing Mag Deg"
+        },
+        "facing_mountain": {
+          "title": "Facing Mountain",
+          "type": "string"
+        },
+        "sitting_mountain": {
+          "title": "Sitting Mountain",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_compass",
+            "osm_building",
+            "model"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "near_boundary": {
+          "default": false,
+          "title": "Near Boundary",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "facing_true_deg",
+        "facing_mountain",
+        "sitting_mountain",
+        "source",
+        "confidence"
+      ],
+      "title": "Orientation",
+      "type": "object"
+    },
+    "PointMetrics": {
+      "properties": {
+        "slope_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slope Deg"
+        },
+        "aspect_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aspect Deg"
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shape"
+        },
+        "elev_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elev M"
+        },
+        "lift_over_200m_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lift Over 200M M"
+        }
+      },
+      "title": "PointMetrics",
+      "type": "object"
+    },
+    "Quality": {
+      "properties": {
+        "dem": {
+          "title": "Dem",
+          "type": "string"
+        },
+        "dem_resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Resolution M"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "dem"
+      ],
+      "title": "Quality",
+      "type": "object"
+    },
+    "Query": {
+      "properties": {
+        "input": {
+          "title": "Input",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "point",
+            "address",
+            "settlement",
+            "district"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolved_by": {
+          "title": "Resolved By",
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "input",
+        "kind",
+        "resolved_by"
+      ],
+      "title": "Query",
+      "type": "object"
+    },
+    "Ring": {
+      "properties": {
+        "r_km": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "R Km",
+          "type": "array"
+        },
+        "max_rel_elev_m": {
+          "title": "Max Rel Elev M",
+          "type": "number"
+        },
+        "mean_rel_elev_m": {
+          "title": "Mean Rel Elev M",
+          "type": "number"
+        },
+        "horizon_deg": {
+          "title": "Horizon Deg",
+          "type": "number"
+        },
+        "water_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share"
+        },
+        "built_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Built Share"
+        },
+        "peaks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Peaks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "r_km",
+        "max_rel_elev_m",
+        "mean_rel_elev_m",
+        "horizon_deg"
+      ],
+      "title": "Ring",
+      "type": "object"
+    },
+    "Sector": {
+      "properties": {
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "from_deg": {
+          "title": "From Deg",
+          "type": "number"
+        },
+        "to_deg": {
+          "title": "To Deg",
+          "type": "number"
+        },
+        "rings": {
+          "items": {
+            "$ref": "#/$defs/Ring"
+          },
+          "title": "Rings",
+          "type": "array"
+        },
+        "water": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Water",
+          "type": "array"
+        },
+        "wind_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Share"
+        }
+      },
+      "required": [
+        "mountain",
+        "from_deg",
+        "to_deg",
+        "rings"
+      ],
+      "title": "Sector",
+      "type": "object"
+    },
+    "Site": {
+      "properties": {
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "title": "Lon",
+          "type": "number"
+        },
+        "elev_m": {
+          "title": "Elev M",
+          "type": "number"
+        },
+        "precision": {
+          "enum": [
+            "point",
+            "building",
+            "district",
+            "settlement"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "utm_epsg": {
+          "title": "Utm Epsg",
+          "type": "integer"
+        },
+        "boundary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Boundary"
+        }
+      },
+      "required": [
+        "lat",
+        "lon",
+        "elev_m",
+        "precision",
+        "utm_epsg"
+      ],
+      "title": "Site",
+      "type": "object"
+    },
+    "Spirit": {
+      "properties": {
+        "rel_elev_m": {
+          "title": "Rel Elev M",
+          "type": "number"
+        },
+        "dist_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dist Km"
+        },
+        "continuity": {
+          "title": "Continuity",
+          "type": "number"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "rel_elev_m",
+        "continuity"
+      ],
+      "title": "Spirit",
+      "type": "object"
+    },
+    "WaterMouth": {
+      "properties": {
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "closure_index": {
+          "title": "Closure Index",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mountain",
+        "closure_index"
+      ],
+      "title": "WaterMouth",
+      "type": "object"
+    },
+    "WaterObject": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "kind": {
+          "enum": [
+            "river",
+            "stream",
+            "canal",
+            "lake",
+            "sea",
+            "dock",
+            "culvert",
+            "road"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order"
+        },
+        "in_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Mountain"
+        },
+        "out_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Mountain"
+        },
+        "nearest_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nearest M"
+        },
+        "bend": {
+          "anyOf": [
+            {
+              "enum": [
+                "outer",
+                "inner",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bend"
+        },
+        "straight_at_site": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Straight At Site"
+        },
+        "tidal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal"
+        },
+        "confluences": {
+          "items": {
+            "$ref": "#/$defs/Confluence"
+          },
+          "title": "Confluences",
+          "type": "array"
+        },
+        "water_mouth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterMouth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "outflow_visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outflow Visible"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "WaterObject",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema": {
+      "default": "site_pack/1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "query": {
+      "$ref": "#/$defs/Query"
+    },
+    "site": {
+      "$ref": "#/$defs/Site"
+    },
+    "orientation": {
+      "$ref": "#/$defs/Orientation"
+    },
+    "chart_year": {
+      "$ref": "#/$defs/ChartYear"
+    },
+    "sectors": {
+      "items": {
+        "$ref": "#/$defs/Sector"
+      },
+      "title": "Sectors",
+      "type": "array"
+    },
+    "point": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PointMetrics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "four_spirits": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FourSpirits"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "dragon_vein": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DragonVein"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "water": {
+      "items": {
+        "$ref": "#/$defs/WaterObject"
+      },
+      "title": "Water",
+      "type": "array"
+    },
+    "roads": {
+      "items": {
+        "$ref": "#/$defs/WaterObject"
+      },
+      "title": "Roads",
+      "type": "array"
+    },
+    "exposure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Exposure"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "land_cover": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LandCover"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "quality": {
+      "$ref": "#/$defs/Quality"
+    },
+    "attribution": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attribution",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query",
+    "site",
+    "orientation",
+    "chart_year",
+    "quality"
+  ],
+  "title": "SitePack",
+  "type": "object"
+}
