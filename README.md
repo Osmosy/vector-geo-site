@@ -1,4 +1,23 @@
+<div align="center">
+
+<img src="assets/vector-logo.png" alt="Vector geo-site" width="200"/>
+
 # Vector geo-site
+
+[![Ecosystem: Vector](https://img.shields.io/badge/Ecosystem-Vector-blue.svg)](https://osmosy.github.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests: 27/27](https://img.shields.io/badge/Tests-27%2F27-green.svg)](#тесты)
+[![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-4f8ff7.svg)](#установка)
+[![Schema: site_pack/1](https://img.shields.io/badge/Schema-site__pack%2F1-blueviolet.svg)](schema/site_pack-1.json)
+[![Data: DEM + OSM](https://img.shields.io/badge/Data-Copernicus%20DEM%20%2B%20OSM-orange.svg)](#атрибуция)
+
+**Геоданные местности для фэншуй-интерпретации: рельеф, вода, ориентация — измерение без оценок**
+
+**Документы:** [Состояние этапа](PLAN-STATUS.md) · [Схема пакета](schema/site_pack-1.json) · [Пример: Лондон](examples/london-city/) · [Навык](https://github.com/Osmosy/vector-fengshui-bazi)
+
+</div>
+
+---
 
 Геоданные местности для фэншуй-интерпретации: рельеф, вода, ориентация. **Модуль только
 измеряет** — он не выносит суждений «благо / неблаго». Чтение форм по канонам и карта
@@ -83,6 +102,21 @@ geosite schema  > schema/site_pack-1.json
   перепад, число изгибов (смена направления больше 45°), сёдла (провалы на пути).
 - **Точка** — уклон, экспозиция, форма (гребень / низина / склон / уступ), превышение над
   окрестностью в радиусе 200 м.
+
+## Тесты
+
+```bash
+python -m pytest -q          # 27 passed
+```
+
+Покрыто: 24 горы и границы секторов, азимуты и UTM, разбор координат (десятичные и DMS),
+переход к неоднозначности, уклон и экспозиция на синтетических сетках, выбор горы с одиноким
+холмом, четыре духа от оси (а не от сторон света), жила на конусе и на плоской равнине,
+воспроизводимость секторов на реальном DEM Лондона, контрольные высоты (Сити / Темза /
+Хампстед), валидация `site_pack/1` и сборка схем.
+
+Интеграционные тесты используют кеш тайлов Copernicus DEM и пропускаются, если его нет —
+обычный прогон не тянет 60 МБ.
 
 ## Ловушки, уже учтённые
 
