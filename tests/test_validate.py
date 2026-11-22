@@ -197,3 +197,15 @@ def test_i10_requires_confidence_pair():
     pack2 = base_pack()
     del pack2["water"][0]["flow_confidence"]
     assert "I-10" in codes(pack2)
+
+
+def test_i07_same_mountains():
+    """R2: видимая вода с одинаковыми горами входа и выхода — I-07."""
+    pack = base_pack()
+    pack["water"][0]["visible"] = True
+    pack["water"][0]["out_mountain"] = pack["water"][0]["in_mountain"]
+    pack["water"][0]["crossings_2km"] = 2
+    assert "I-07" in codes(pack)
+
+    pack["water"][0]["visible"] = False      # подземная вода — исключение
+    assert "I-07" not in codes(pack)

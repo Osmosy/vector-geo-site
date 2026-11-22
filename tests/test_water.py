@@ -260,3 +260,53 @@ def test_confluence_cap_per_line():
     river_key = [k for k in res if "R-" in k][0]
     assert len(res[river_key]) <= 5
     assert res[river_key][0]["dist_m"] <= res[river_key][-1]["dist_m"]
+
+
+def test_alias_names_merge():
+    """R2/E-010: «River X» и «The X» — один водоток, даже с разрывом 20 м."""
+    a = make("River Loddon", [(-0.10, 51.50), (-0.0995, 51.50)])
+    b = make("The Loddon", [(-0.0993, 51.50), (-0.0985, 51.50)], kind="stream")
+    merged = water.merge_by_name([a, b])
+    assert len(merged) == 1, [m.name for m in merged]
+    assert merged[0].ways == 2
+
+
+def test_hidden_share_hides_from_visible():
+    """R2: водоток, идущий в трубе на 90% длины, не считается видимым."""
+    covered = make("Culverted Brook", [(-0.10, 51.50), (-0.0982, 51.50)],
+                   tags={"tunnel": "culvert"})
+    open_part = make("Culverted Brook", [(-0.0981, 51.50), (-0.0979, 51.50)])
+    merged = water.merge_by_name([covered, open_part])
+    assert merged[0].hidden_share is not None
+    assert merged[0].hidden_share > 0.8
+    site = water.to_utm([(-0.099, 51.50)], 32630)[0]
+    metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.099,
+                                   epsg=32630, grid=None)
+    assert metric.visible is False
+
+
+def _circle_with_neck(radius_m=1200.0, neck_m=250.0, step_deg=6.0):
+    """Кольцо с перешейком: полный оборот и короткий вход. Возвращает точки в метрах."""
+    pts = []
+    angle = 0.0
+    while angle <= 360.0:
+        a = math.radians(angle)
+        pts.append((radius_m * math.sin(a), radius_m * (1 - math.cos(a))))
+        angle += step_deg
+    # перешеек: от конца кольца к началу
+    pts.append((neck_m / 2, -neck_m / 2))
+    return np.array(pts)
+
+
+def test_loop_circle_neck_positions():
+    """R4: петля одна и та же, положение участка — разное."""
+    ring = _circle_with_neck()
+    inside = water._detect_loop(ring - np.array([0.0, 1200.0]))    # точка в центре кольца
+    outside = water._detect_loop(ring - np.array([0.0, -600.0]))   # точка под перешейком
+    assert inside is not None and outside is not None
+    assert inside["is_loop"] is True, inside
+    assert outside["is_loop"] is True, outside
+    assert inside["site_position"] == "inside"
+    assert outside["site_position"].startswith("outside")
+    assert inside["turn_deg"] >= 180.0
+    assert inside["area_k"] >= 0.05

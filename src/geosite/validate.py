@@ -40,6 +40,8 @@ CONFIDENCE_PAIRS = {
     "water_mouth.enclosure": "water_mouth.closure_confidence",
 }
 LOOP_MIN_RATIO = 3.0
+LOOP_MIN_TURN_DEG = 180.0
+LOOP_MIN_AREA_K = 0.05
 
 
 def _violation(code: str, path: str, message: str, **extra: Any) -> dict:
@@ -116,6 +118,11 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
             ratio = _num(loop.get("ratio"))
             if ratio is None:
                 out.append(_violation("I-05", f"{base}.loop.ratio", "петля без отношения", id=wid))
+            elif (loop.get("turn_deg") is not None and loop["turn_deg"] < LOOP_MIN_TURN_DEG
+                  and (loop.get("area_k") or 0) < LOOP_MIN_AREA_K):
+                out.append(_violation("I-05", f"{base}.loop",
+                                      f"петля без поворота {LOOP_MIN_TURN_DEG}° и площади "
+                                      f"{LOOP_MIN_AREA_K}·gap²", id=wid))
             elif ratio < LOOP_MIN_RATIO:
                 out.append(_violation("I-05", f"{base}.loop.ratio", f"отношение {ratio} < {LOOP_MIN_RATIO}", id=wid))
 
@@ -130,13 +137,17 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
                                           f"дубль слияния с {other} на {dist} м", id=wid))
             seen.append((other, dist))
 
-        # I-07: река мимо участка не может входить и выходить из одной горы
-        if (water.get("kind") == "river" and nearest is not None and nearest < 3000
+        # I-07: видимая проходящая река не может входить и выходить из одной горы.
+        # Исключения (docs/calc/invariants.md): скрытая вода, петля, меньше двух пересечений.
+        if (nearest is not None and nearest < 3000
+                and water.get("visible") is not False
+                and not water.get("hidden_share")
+                and not water.get("loop")
                 and (water.get("crossings_2km") or 0) >= 2
                 and (water.get("crossing_angle_deg") or 0) >= 30.0):
             if water.get("in_mountain") and water.get("in_mountain") == water.get("out_mountain"):
                 out.append(_violation("I-07", f"{base}.in_mountain",
-                                      "вход и выход в одной горе у проходящей реки", id=wid))
+                                      "вход и выход в одной горе у видимой проходящей реки", id=wid))
 
         # I-08: выбор направления и правило
         if water.get("flow_chosen") and water.get("flow_rule") is None:

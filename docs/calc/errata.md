@@ -78,3 +78,14 @@
 - Нашёл: ревью ТЗ R1. Исправлено: см. коммит `water: уверенность врат + I-10`.
 - Тест: `tests/test_pack.py::test_mouth_confidence_reaches_pack`,
   `tests/test_validate.py::test_i10_requires_confidence_pair`.
+
+## E-010 — подземная вода в отчёте выглядит как открытая, одна река дублируется
+
+- Место: `water[]`, отчёт `landform` по Лондону.
+- Было: River Fleet и Walbrook (обе в трубе) стояли в 來水/去水 как видимые реки; Fleet был
+  записан дважды — «River Fleet» и «The Fleet»; Walbrook тоже дважды; у The Fleet вход и выход
+  совпадали в 坤.
+- Доказательство: склейка шла по точному имени и типу, тег `tunnel=culvert` учитывался только
+  как `hidden` у всей линии; одинаковые имена в разном регистре и с артиклем считались разными.
+- Нашёл: ревью ТЗ R2. Исправлено: см. коммит `water: склейка имён и скрытая вода`.
+- Тест: `test_alias_names_merge`, `test_hidden_share_hides_from_visible`, `test_i07_same_mountains`.

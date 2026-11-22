@@ -1,0 +1,18 @@
+{
+  "comment": "Нормализация имён водотоков: артикли и родовые слова отбрасываются, чтобы River Fleet и The Fleet оказались одним водотоком",
+  "articles": ["the", "der", "die", "das", "la", "le", "les", "il", "el"],
+  "generic_leading": ["river", "brook", "stream", "creek", "water", "fleuve",
+                      "fluss", "bach", "reka", "река", "ручей", "рио", "rio"],
+  "aliases": {
+    "fleet": "fleet",
+    "river fleet": "fleet",
+    "the fleet": "fleet",
+    "walbrook": "walbrook",
+    "river walbrook": "walbrook"
+  },
+  "hidden_tags": {
+    "tunnel": ["culvert", "yes"],
+    "covered": ["yes"],
+    "location": ["underground"]
+  }
+}

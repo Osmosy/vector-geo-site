@@ -124,6 +124,9 @@ class WaterMouth(BaseModel):
 class WaterObject(BaseModel):
     id: str
     name: str | None = None
+    pieces: int = 1
+    hidden_share: float | None = None
+    visible: bool | None = None
     kind: Literal["river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"]
     order: int | None = None
     in_mountain: str | None = None
@@ -138,6 +141,7 @@ class WaterObject(BaseModel):
     curvature_radius_m: float | None = None
     bend_kind: Literal["bend", "loop", "straight"] | None = None
     loop: dict | None = None
+    site_position: Literal["inside", "outside_convex", "outside_concave"] | None = None
     between_branches: bool | None = None
     flow_ways_share: float | None = None
     crossings_2km: int | None = None

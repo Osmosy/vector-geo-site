@@ -20,10 +20,10 @@ from pathlib import Path
 
 import numpy as np
 
-from . import geo, tides
+from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "4.1.0"
+ALGO_VERSION = "6.0.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -131,6 +131,15 @@ def _kind_of(tags: dict) -> str:
     return "other"
 
 
+def _name_of(tags: dict) -> str | None:
+    """Имя водотока: основное, иначе английское, иначе альтернативное."""
+    for key in ("name", "name:en", "alt_name", "name:ru"):
+        value = (tags.get(key) or "").strip()
+        if value:
+            return value.split(";")[0].strip() or None
+    return None
+
+
 def parse_features(payload: dict) -> list[Feature]:
     out: list[Feature] = []
     for el in payload.get("elements", []):
@@ -141,14 +150,14 @@ def parse_features(payload: dict) -> list[Feature]:
             if not coords or kind == "other":
                 continue
             closed = len(coords) > 3 and abs(coords[0][0] - coords[-1][0]) < 1e-9 and abs(coords[0][1] - coords[-1][1]) < 1e-9
-            out.append(Feature(el.get("id", 0), "way", tags.get("name"), kind, tags, coords, closed))
+            out.append(Feature(el.get("id", 0), "way", _name_of(tags), kind, tags, coords, closed))
         elif el.get("type") == "relation" and el.get("members"):
             # члены отношения не склеиваем в один контур: иначе между ними появляются
             # хорды через полгорода и доля воды раздувается
             for idx, member in enumerate(el["members"]):
                 geom = [(g["lon"], g["lat"]) for g in member.get("geometry") or [] if g]
                 if len(geom) >= 2:
-                    out.append(Feature(el.get("id", 0) * 1000 + idx, "relation", tags.get("name"),
+                    out.append(Feature(el.get("id", 0) * 1000 + idx, "relation", _name_of(tags),
                                        _kind_of(tags), tags, geom, True))
     return out
 
@@ -213,6 +222,7 @@ class MergedLine:
     coords: list[tuple[float, float]]
     ways: int
     hidden: bool
+    hidden_share: float | None = None
 
 
 def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[MergedLine]:
@@ -225,13 +235,21 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[
     for f in features:
         if f.kind not in {"river", "stream", "canal", "lake", "sea", "dock"}:
             continue
-        key = (f.name or f"#{f.osm_id}", f.kind)
+        # ключ склейки — нормализованное имя: «River Fleet» и «The Fleet» — один водоток
+        # тип в ключ не входит: одна река в OSM бывает и river, и stream на разных участках
+        key = (hydronym.normalize_name(f.name) or f"#{f.osm_id}", "")
         groups.setdefault(key, []).append(f)
 
     merged: list[MergedLine] = []
     for (name, kind), items in groups.items():
-        pieces = [to_utm(f.coords, 4326) if False else f.coords for f in items]
+        longest = max(items, key=lambda f: len(f.coords))
+        display = longest.name or name
+        kind = longest.kind
+        pieces = [f.coords for f in items]
         hidden = all(is_hidden(f.tags) for f in items)
+        total_len = sum(_line_len(f.coords) for f in items)
+        hidden_len = sum(_line_len(f.coords) for f in items if hydronym.is_hidden(f.tags))
+        hidden_share = None if total_len <= 0 else round(hidden_len / total_len, 2)
         # жадная сшивка: начинаем с самого длинного куска
         pieces = sorted(pieces, key=len, reverse=True)
         chain = list(pieces[0])
@@ -250,12 +268,19 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[
                 chain.extend(cand)
                 rest.pop(idx)
             else:
-                merged.append(MergedLine(f"osm-{(name or '').strip()}-{kind}", name, kind, chain,
-                                         len(items) - len(rest), hidden))
+                merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
+                                         len(items) - len(rest), hidden, hidden_share))
                 chain = list(rest.pop(0))
-        merged.append(MergedLine(f"osm-{(name or '').strip()}-{kind}", name, kind, chain,
-                                 len(items) - len(rest), hidden))
+        merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
+                                 len(items) - len(rest), hidden, hidden_share))
     return merged
+
+
+def _line_len(coords: list[tuple[float, float]]) -> float:
+    total = 0.0
+    for (lon1, lat1), (lon2, lat2) in zip(coords, coords[1:]):
+        total += geo.haversine_m(lat1, lon1, lat2, lon2)
+    return total
 
 
 def _haversine_deg(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -292,6 +317,10 @@ class WaterMetrics:
     tidal_source: str | None
     source: str
     loop: dict | None = None
+    site_position: str | None = None
+    hidden_share: float | None = None
+    visible: bool | None = None
+    pieces: int = 1
     between_branches: bool | None = None
     between_pair_deg: list[int] | None = None
     crossings_2km: int = 0
@@ -416,14 +445,14 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
 
     loop_raw = _detect_loop(pts) if len(pts) > 20 else None
     loop = None
+    site_position = None
     bend_kind = "straight" if (radius_m is None or radius_m > 5000.0) else "bend"
     if loop_raw:
-        # W2: петля — русло возвращается к себе (ratio ≥ 3) И участок стоит внутри контура.
-        # Одного отношения мало: у Темзы в Сити тоже выходит ≈3, но участок снаружи,
-        # и по канону это изгиб, а не петля-остров.
-        ratio_ok = (loop_raw.get("ratio") or 0.0) >= LOOP_MIN_RATIO
-        if ratio_ok and loop_raw.get("site_inside"):
-            loop = loop_raw
+        # R4: петля — свойство русла (ratio, поворот ≥ 180°, площадь кольца), а не участка.
+        # Положение участка пишется отдельно, чтобы интерпретатор знал и про 反弓.
+        site_position = loop_raw.get("site_position")
+        if loop_raw.get("is_loop"):
+            loop = {k: v for k, v in loop_raw.items() if k != "is_loop"}
             bend_kind = "loop"
         elif loop_raw.get("ratio", 0.0) >= 1.5:
             bend_kind = "bend"
@@ -443,6 +472,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         straight_at_site=bool(straight and nearest_m < in_radius_m),
         confluences=[],
         water_mouth=mouth,
+        hidden_share=feature.hidden_share,
+        visible=(feature.hidden_share or 0.0) < 0.8,
         outflow_visible=visible,
         flow_osm_dir=flow_osm,
         flow_dem_dir=flow_dem,
@@ -457,6 +488,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         tidal_source=tide["tidal_source"],
         source="openstreetmap",
         loop=loop,
+        site_position=site_position,
         between_branches=between.get("between_branches"),
         between_pair_deg=between.get("pair_deg"),
         crossings_2km=len(cross),
@@ -582,20 +614,54 @@ def _point_in_poly(x: float, y: float, poly: np.ndarray) -> bool:
     return inside
 
 
-def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 1500.0) -> dict | None:
-    """Излучина: ищем пару точек русла, которая даёт максимальное отношение along/gap.
+def _polyline_area(ring: np.ndarray) -> float:
+    """Площадь замкнутой ломаной (формула шнурков), м²."""
+    x, y = ring[:, 0], ring[:, 1]
+    return float(abs(np.dot(x[:-1], y[1:]) - np.dot(y[:-1], x[1:])) / 2.0)
 
-    Порог `near_m` — насколько близко русло возвращается к себе; `apart_m` — минимальный
-    разбег по длине. Возвращаем отношение (ratio), разрыв, длину и лежит ли участок внутри
-    замкнутого контура петли. Решение «петля или изгиб» принимает вызывающий код:
-    для острова (Айл-оф-Догс) нужен site_inside, иначе это просто большая излучина.
+
+def _turn_deg(pts: np.ndarray) -> float:
+    """Суммарный поворот русла по азимуту, градусы (накопленный модуль со знаком)."""
+    if len(pts) < 3:
+        return 0.0
+    d = np.diff(pts, axis=0)
+    angles = np.arctan2(d[:, 0], d[:, 1])
+    steps = np.diff(angles)
+    steps = (steps + np.pi) % (2 * np.pi) - np.pi          # нормализуем в (-π, π]
+    return float(abs(np.degrees(steps).sum()))
+
+
+def _site_position(ring: np.ndarray, mid: np.ndarray, far: np.ndarray) -> str:
+    """Где стоит участок относительно петли: внутри, снаружи выпукло или вогнуто.
+
+    反弓 (вода выгибается от участка) — это `outside_convex`: участок снаружи, на стороне
+    выпуклости. Если участок снаружи, но с противоположной стороны — он «обнимает» изгиб
+    снаружи (`outside_concave`).
+    """
+    if _point_in_poly(0.0, 0.0, ring):
+        return "inside"
+    bulge = far - mid
+    if float(np.dot(-mid, bulge)) > 0:      # участок в начале координат, относительно хорды
+        return "outside_convex"
+    return "outside_concave"
+
+
+def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 1500.0,
+                 min_ratio: float = 3.0, min_turn_deg: float = 180.0,
+                 area_k: float = 0.05) -> dict | None:
+    """Петля русла: возврат к себе, поворот не меньше 180° и площадь кольца.
+
+    Петля — свойство реки, а не участка (R4). Положение участка пишется отдельно
+    (`site_position`: inside / outside_convex / outside_concave). Пороги: ratio = along/gap,
+    накопленный поворот русла на участке i…j и площадь кольца в долях gap².
+    Возвращается `None`, если даже изгиба нет (ratio < 1.5).
     """
     if len(pts) < 20:
         return None
     seg = np.hypot(*np.diff(pts, axis=0).T)
     cum = np.concatenate([[0.0], np.cumsum(seg)])
     stride = max(1, len(pts) // 600)
-    best = None
+    candidates = []
     for i in range(0, len(pts), stride):
         for j in range(i + 2, len(pts), stride):
             along = cum[j] - cum[i]
@@ -604,18 +670,47 @@ def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 15
             gap = float(np.hypot(*(pts[i] - pts[j])))
             if gap > near_m or gap < 1.0:
                 continue
-            ratio = along / gap
-            if best is None or ratio > best[0]:
-                best = (ratio, gap, along, i, j)
-    if best is None or best[0] < 1.5:
-        return None            # даже изгиба нет: отношение меньше 1.5
-    ratio, gap, along, i, j = best
-    ring = np.vstack([pts[i:j + 1], pts[i:i + 1]])
-    inside = _point_in_poly(0.0, 0.0, ring)
+            candidates.append((along / gap, gap, along, i, j))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: -c[0])
+    if candidates[0][0] < 1.5:
+        return None
+
+    # петля — не максимальное отношение: из лучших пар берём ту, где русло реально
+    # завернулось (поворот ≥ 180°) и кольцо имеет площадь; иначе остаётся изгиб
+    chosen = None
+    for cand in candidates[:120]:
+        ratio_c, gap_c, along_c, i_c, j_c = cand
+        turn_c = _turn_deg(pts[i_c:j_c + 1])
+        ring_c = np.vstack([pts[i_c:j_c + 1], pts[i_c:i_c + 1]])
+        area_c = _polyline_area(ring_c)
+        if turn_c >= min_turn_deg and area_c >= area_k * gap_c * gap_c:
+            chosen = (ratio_c, gap_c, along_c, i_c, j_c, turn_c, area_c, ring_c)
+            break
+    if chosen is None:
+        ratio_f, gap_f, along_f, i_f, j_f = candidates[0]
+        turn_f = _turn_deg(pts[i_f:j_f + 1])
+        ring_f = np.vstack([pts[i_f:j_f + 1], pts[i_f:i_f + 1]])
+        chosen = (ratio_f, gap_f, along_f, i_f, j_f, turn_f, _polyline_area(ring_f), ring_f)
+
+    ratio, gap, along, i, j, turn, area, ring = chosen
     mid = (pts[i] + pts[j]) / 2.0
+    chord_line = pts[j] - pts[i]
+    norm = np.hypot(*chord_line) or 1.0
+    normal = np.array([-chord_line[1], chord_line[0]]) / norm
+    offsets = np.abs((ring[:-1] - pts[i]) @ normal)
+    far = ring[int(np.argmax(offsets))]
     bearing = geo.normalize_deg(math.degrees(math.atan2(mid[0], mid[1])))
-    return {"gap_m": round(gap, 1), "along_m": round(along, 1), "ratio": round(ratio, 2),
-            "site_inside": bool(inside), "mountain": geo.mountain_name(bearing)}
+
+    is_loop = (ratio >= min_ratio and turn >= min_turn_deg and area >= area_k * gap * gap)
+    return {
+        "gap_m": round(gap, 1), "along_m": round(along, 1), "ratio": round(ratio, 2),
+        "turn_deg": round(turn, 1), "area_m2": round(area), "area_k": round(area / (gap * gap), 3),
+        "mountain": geo.mountain_name(bearing),
+        "is_loop": bool(is_loop),
+        "site_position": _site_position(ring, mid, far),
+    }
 
 
 def site_between_branches(pts: np.ndarray, *, near_m: float = 1500.0, tol_deg: float = 30.0) -> dict:
@@ -803,10 +898,37 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             metrics.flow_agree = flow_share >= 0.6
             metrics.flow_ways_share = flow_share
         out.append(metrics)
+    out = _one_entry_per_name(out)
     out.sort(key=lambda m: m.nearest_m)
     _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
     _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,
                             wide_payload=wide_payload, allow_network=allow_network)
+    return out
+
+
+def _one_entry_per_name(metrics: list[WaterMetrics]) -> list[WaterMetrics]:
+    """Одна река — одна запись, даже если русло в OSM разбито на несоприкасающиеся куски.
+
+    Записи группируются по нормализованному имени и типу. Остаётся кусок, ближайший к участку;
+    доля подземного участка берётся максимальной по кускам (если часть реки в трубе — это
+    важно сказать), а число кусков пишется в `pieces`.
+    """
+    groups: dict[str, list[WaterMetrics]] = {}
+    for metric in metrics:
+        key = hydronym.normalize_name(metric.name) or metric.id
+        groups.setdefault(key, []).append(metric)
+
+    out: list[WaterMetrics] = []
+    for items in groups.values():
+        items.sort(key=lambda m: m.nearest_m)
+        keep = items[0]
+        if len(items) > 1:
+            keep.pieces = len(items)
+            shares = [m.hidden_share for m in items if m.hidden_share is not None]
+            if shares:
+                keep.hidden_share = max(shares)
+                keep.visible = keep.hidden_share < 0.8
+        out.append(keep)
     return out
 
 

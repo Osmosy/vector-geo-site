@@ -886,6 +886,35 @@
           "default": null,
           "title": "Name"
         },
+        "pieces": {
+          "default": 1,
+          "title": "Pieces",
+          "type": "integer"
+        },
+        "hidden_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hidden Share"
+        },
+        "visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visible"
+        },
         "kind": {
           "enum": [
             "river",
@@ -1060,6 +1089,23 @@
           ],
           "default": null,
           "title": "Loop"
+        },
+        "site_position": {
+          "anyOf": [
+            {
+              "enum": [
+                "inside",
+                "outside_convex",
+                "outside_concave"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Site Position"
         },
         "between_branches": {
           "anyOf": [
