@@ -152,6 +152,12 @@ def cmd_pack(args) -> int:
         facing, why = _model_facing(m)
         orientation_source, confidence = "model", "low"
         notes.append(why)
+        # ось получена по модели — четыре духа надо посчитать от неё же,
+        # иначе в пакете не окажется сравнения «спина / фасад» (R3)
+        if not m.get("four_spirits") and m.get("grid_macro") is not None:
+            from .terrain import four_spirits
+            m["four_spirits"] = four_spirits(m["grid_macro"], m["frame"], m["elev_m"],
+                                             facing, meso_km=8.0)
     else:
         orientation_source, confidence = "user_compass", "high"
     if args.year is None:
