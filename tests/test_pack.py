@@ -99,3 +99,34 @@ def test_london_vein_goes_uphill():
     vein = m["dragon_vein"]
     assert vein["length_km"] > 2
     assert vein["drop_m"] > 20
+
+
+def test_mouth_confidence_reaches_pack():
+    """R1/E-009: уверенность врат и правило течения обязаны попадать в пакет."""
+    from geosite.water import WaterMetrics
+    from geosite.water_pack import to_objects
+
+    metric = WaterMetrics(
+        id="osm-A-river", name="A", kind="river", order=None, nearest_m=500.0,
+        in_mountain="坤", out_mountain="辰", bend="outer", bend_kind="bend",
+        curvature_radius_m=2000.0, straight_at_site=False, confluences=[],
+        water_mouth={"mountain": "乙", "closure_index": 0.01, "closure_reason": None,
+                     "closure_confidence": "low", "enclosure": 0.01, "width_m": 4850.0,
+                     "left_hill_m": 5.7, "right_hill_m": 44.5, "width_capped": True,
+                     "capped_sides": 1, "_x": 0.0, "_y": 0.0},
+        outflow_visible=True, flow_osm_dir="downstream_toward_end",
+        flow_dem_dir="downstream_toward_end", flow_chosen="downstream_toward_end",
+        flow_rule=2, flow_confidence="medium", flow_agree=True, flow_ways_share=0.5,
+        dem_slope_m_per_km=-0.083, dem_slope_snr=0.39, dem_reason=None,
+        tidal=True, tidal_source="osm_tag", source="osm",
+        loop=None, between_branches=False,
+        crossings_2km=2, crossing_angle_deg=90.0,
+    )
+    obj = to_objects([metric])[0]
+    assert obj.water_mouth is not None
+    assert obj.water_mouth.closure_confidence == "low"
+    assert obj.water_mouth.width_capped is True
+    assert obj.water_mouth.capped_sides == 1
+    assert obj.water_mouth.enclosure == 0.01
+    assert obj.flow_rule == 2 and obj.flow_confidence == "medium"
+    assert obj.flow_chosen == "downstream_toward_end"
