@@ -11,7 +11,7 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.2.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0"}
+ALGO = {"water": "6.3.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0"}
 
 ALGO_VERSION = "1.1.0"
 
@@ -119,6 +119,18 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
+    shares = measured.get("water_share") or {}
+
+    def _share(ring: list, block: str, mountain: str) -> float | None:
+        data = shares.get(block) or {}
+        values = data.get("by_mountain") or {}
+        return values.get(mountain)
+
+    def _km(mountain: str) -> float | None:
+        data = (shares.get("inner") or {}).get("linear_km") or {}
+        value = data.get(mountain)
+        return value if value else None
+
     sectors = []
     for s in measured["sectors"]:
         rings = []
@@ -129,11 +141,16 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                 "mean_rel_elev_m": r["mean_rel_elev_m"],
                 "horizon_deg": r["horizon_deg"],
                 "hill_share": r.get("hill_share"),
-                "water_share": r.get("water_share"),
+                "water_share": r.get("water_share") if r.get("water_share") is not None else
+                (_share(r, "inner", s["mountain"]) if tuple(r.get("r_km") or ()) == (0.5, 2.0)
+                 else _share(r, "middle", s["mountain"])
+                 if tuple(r.get("r_km") or ()) == (2.0, 8.0) else None),
                 "peaks": r.get("peaks", []),
             })
         sectors.append({"mountain": s["mountain"], "from_deg": geo.mountain_bounds(s["mountain"])[0],
-                        "to_deg": geo.mountain_bounds(s["mountain"])[1], "rings": rings})
+                        "to_deg": geo.mountain_bounds(s["mountain"])[1], "rings": rings,
+                        "water": (measured.get("water_names") or {}).get(s["mountain"], []),
+                        "water_km": _km(s["mountain"])})
 
     # Схемы: роза, профиль горизонта, отмывка макро-охвата
     label = site_label or query.get("input", "")

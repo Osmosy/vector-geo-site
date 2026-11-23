@@ -66,6 +66,7 @@ class Sector(BaseModel):
     to_deg: float
     rings: list[Ring]
     water: list[str] = Field(default_factory=list)
+    water_km: float | None = None
     wind_share: float | None = None
 
 

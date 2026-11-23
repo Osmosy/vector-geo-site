@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from .models import WaterMouth, WaterObject
@@ -88,3 +90,116 @@ def sector_water_share(mask: np.ndarray, frame, *, ring_km: tuple[float, float])
         total = int(sel.sum())
         out[name] = round(float(mask[sel].mean()), 3) if total else 0.0
     return out
+
+
+def polygon_features(features) -> list:
+    """Только замкнутые полигоны воды: линии русла площади не имеют, и расширять их нельзя."""
+    out = []
+    for f in features:
+        coords = getattr(f, "coords", None) or []
+        if len(coords) < 4:
+            continue
+        if abs(coords[0][0] - coords[-1][0]) > 1e-9 or abs(coords[0][1] - coords[-1][1]) > 1e-9:
+            continue
+        out.append(f)
+    return out
+
+
+def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tuple[float, float],
+                       min_area_m2: float = 2000.0) -> dict:
+    """Доля площади воды в каждом из 24 секторов кольца — по полигонам OSM, без растяжения.
+
+    Считается аналитически в UTM: полигон пересекается с сектором-клином, площадь делится на
+    площадь клина. Раньше маска воды растрировалась на сетке 90 м и расширялась на пиксель —
+    и доля выходила 40–60 % там, где воды несколько процентов: у маленьких прудов периметр
+    больше площади, и один пиксель расширения утраивал «воду».
+
+    Возвращает `{"by_mountain": {...}, "area_km2": ..., "ring_km2": ..., "polygons": n,
+    "skipped_invalid": n}`; `share` — доля воды в секторе, 0.0 — вода есть, но не в нём.
+    """
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    from . import geo
+
+    r0, r1 = float(ring_m[0]), float(ring_m[1])
+    polys = []
+    invalid = 0
+    for f in polygon_features(features):
+        pts = to_utm([(lon, lat) for lon, lat in f.coords], epsg) - site_xy
+        poly = Polygon(pts)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+            invalid += 1
+        if poly.is_empty or poly.area < min_area_m2:
+            continue
+        polys.append(poly)
+    shares: dict[str, float] = {name: 0.0 for name in geo.MOUNTAINS}
+    linear = linear_water_by_sector(features, epsg=epsg, site_xy=site_xy, ring_m=(r0, r1))
+    basis = ("polygons: water=*, natural=water, landuse=reservoir/basin; "
+             "осевые линии — в linear_km")
+    if not polys:
+        return {"by_mountain": shares, "area_km2": 0.0,
+                "ring_km2": round(_ring_polygon(r0, r1).area / 1e6, 3), "polygons": 0,
+                "skipped_invalid": invalid, "linear_km": linear, "basis": basis}
+    water = unary_union(polys)
+    ring_area = 0.0
+    for idx, name in enumerate(geo.MOUNTAINS):
+        lo = idx * 15.0 - 7.5
+        arc = [math.radians(lo + 15.0 * k / 6.0) for k in range(7)]
+        outer = [(r1 * math.sin(a), r1 * math.cos(a)) for a in arc]
+        if r0 > 0:
+            inner = [(r0 * math.sin(a), r0 * math.cos(a)) for a in reversed(arc)]
+            wedge = Polygon(outer + inner)
+        else:
+            wedge = Polygon([(0.0, 0.0)] + outer)
+        if not wedge.is_valid:
+            wedge = wedge.buffer(0)
+        piece = water.intersection(wedge)
+        wedge_area = wedge.area
+        ring_area += wedge_area
+        if wedge_area > 0 and not piece.is_empty:
+            shares[name] = round(min(1.0, piece.area / wedge_area), 4)
+    return {"by_mountain": shares,
+            "area_km2": round(water.intersection(_ring_polygon(r0, r1)).area / 1e6, 3),
+            "ring_km2": round(ring_area / 1e6, 3), "polygons": len(polys),
+            "skipped_invalid": invalid, "linear_km": linear, "basis": basis}
+
+
+def linear_water_by_sector(features, *, epsg: int, site_xy: np.ndarray,
+                           ring_m: tuple[float, float]) -> dict[str, float]:
+    """Длина линейной воды (река осевой, ручей) в каждом секторе кольца, км.
+
+    Площади такие линии не дают — OSM не хранит ширину, — но их наличие в секторе важно:
+    в Лондоне Темза нарисована осевой, и доля полигональной воды в её секторах выглядит
+    нулевой. Поэтому рядом с долей публикуется длина.
+    """
+    from . import geo
+
+    r0, r1 = float(ring_m[0]), float(ring_m[1])
+    out: dict[str, float] = {name: 0.0 for name in geo.MOUNTAINS}
+    for f in features:
+        coords = getattr(f, "coords", None) or []
+        if len(coords) < 2 or f in polygon_features([f]):
+            continue
+        pts = to_utm(coords, epsg) - site_xy
+        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+            seg = math.hypot(x1 - x0, y1 - y0)
+            if seg <= 0:
+                continue
+            mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+            dist = math.hypot(mx, my)
+            if not (r0 <= dist < r1):
+                continue
+            bearing = (math.degrees(math.atan2(mx, my))) % 360.0
+            out[geo.mountain_name(bearing)] += seg / 1000.0
+    return {k: round(v, 3) for k, v in out.items()}
+
+
+def _ring_polygon(r0: float, r1: float):
+    from shapely.geometry import Point
+
+    ring = Point(0.0, 0.0).buffer(r1, resolution=64)
+    if r0 > 0:
+        ring = ring.difference(Point(0.0, 0.0).buffer(r0, resolution=64))
+    return ring

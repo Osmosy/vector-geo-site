@@ -57,7 +57,7 @@
      "max_rel_elev_m": 2.2,
      "mean_rel_elev_m": -3.9,
      "horizon_deg": 0.02,
-     "water_share": null
+     "water_share": 0.0167
     },
     {
      "r_km": [
@@ -67,7 +67,7 @@
      "max_rel_elev_m": 31.5,
      "mean_rel_elev_m": 2.8,
      "horizon_deg": 0.26,
-     "water_share": null
+     "water_share": 0.0236
     },
     {
      "r_km": [
@@ -79,6 +79,12 @@
      "horizon_deg": 0.18,
      "water_share": null
     }
+   ],
+   "water": [
+    "#1187869366",
+    "#1187869365",
+    "City Road Basin",
+    "Wenlock Basin"
    ]
   },
   {
@@ -104,7 +110,7 @@
      "max_rel_elev_m": 2.2,
      "mean_rel_elev_m": -4.7,
      "horizon_deg": 0.02,
-     "water_share": null
+     "water_share": 0.0027
     },
     {
      "r_km": [
@@ -114,7 +120,7 @@
      "max_rel_elev_m": 7.3,
      "mean_rel_elev_m": -5.2,
      "horizon_deg": 0.05,
-     "water_share": null
+     "water_share": 0.0074
     },
     {
      "r_km": [
@@ -126,6 +132,11 @@
      "horizon_deg": 0.16,
      "water_share": null
     }
+   ],
+   "water": [
+    "#34040012",
+    "#1468573932",
+    "#192954297"
    ]
   },
   {
@@ -151,7 +162,7 @@
      "max_rel_elev_m": 7.2,
      "mean_rel_elev_m": -4.0,
      "horizon_deg": 0.31,
-     "water_share": null
+     "water_share": 0.0025
     },
     {
      "r_km": [
@@ -161,7 +172,7 @@
      "max_rel_elev_m": 3.0,
      "mean_rel_elev_m": -12.7,
      "horizon_deg": 0.01,
-     "water_share": null
+     "water_share": 0.0261
     },
     {
      "r_km": [
@@ -198,7 +209,7 @@
      "max_rel_elev_m": 12.9,
      "mean_rel_elev_m": -2.2,
      "horizon_deg": 0.66,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -208,7 +219,7 @@
      "max_rel_elev_m": -4.4,
      "mean_rel_elev_m": -14.9,
      "horizon_deg": -0.09,
-     "water_share": null
+     "water_share": 0.0161
     },
     {
      "r_km": [
@@ -220,6 +231,9 @@
      "horizon_deg": 0.2,
      "water_share": null
     }
+   ],
+   "water": [
+    "Waterfall"
    ]
   },
   {
@@ -245,7 +259,7 @@
      "max_rel_elev_m": 4.8,
      "mean_rel_elev_m": -4.5,
      "horizon_deg": 0.19,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -255,7 +269,7 @@
      "max_rel_elev_m": -3.0,
      "mean_rel_elev_m": -16.0,
      "horizon_deg": -0.04,
-     "water_share": null
+     "water_share": 0.0218
     },
     {
      "r_km": [
@@ -267,7 +281,12 @@
      "horizon_deg": 0.16,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#892252520",
+    "#836249109"
+   ],
+   "water_km": 0.678
   },
   {
    "mountain": "甲",
@@ -292,7 +311,7 @@
      "max_rel_elev_m": 8.0,
      "mean_rel_elev_m": -4.1,
      "horizon_deg": 0.38,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -302,7 +321,7 @@
      "max_rel_elev_m": -3.6,
      "mean_rel_elev_m": -18.7,
      "horizon_deg": -0.1,
-     "water_share": null
+     "water_share": 0.0224
     },
     {
      "r_km": [
@@ -314,7 +333,8 @@
      "horizon_deg": -0.03,
      "water_share": null
     }
-   ]
+   ],
+   "water_km": 0.343
   },
   {
    "mountain": "卯",
@@ -339,7 +359,7 @@
      "max_rel_elev_m": 9.7,
      "mean_rel_elev_m": -1.9,
      "horizon_deg": 0.49,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -349,7 +369,7 @@
      "max_rel_elev_m": 5.0,
      "mean_rel_elev_m": -21.2,
      "horizon_deg": 0.03,
-     "water_share": null
+     "water_share": 0.0752
     },
     {
      "r_km": [
@@ -361,7 +381,12 @@
      "horizon_deg": 0.06,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#1422123333",
+    "#1422123334"
+   ],
+   "water_km": 0.208
   },
   {
    "mountain": "乙",
@@ -386,7 +411,7 @@
      "max_rel_elev_m": 5.9,
      "mean_rel_elev_m": -6.7,
      "horizon_deg": 0.26,
-     "water_share": null
+     "water_share": 0.0355
     },
     {
      "r_km": [
@@ -396,7 +421,7 @@
      "max_rel_elev_m": 13.8,
      "mean_rel_elev_m": -22.7,
      "horizon_deg": 0.12,
-     "water_share": null
+     "water_share": 0.1199
     },
     {
      "r_km": [
@@ -408,7 +433,14 @@
      "horizon_deg": 0.44,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "Reflection pool",
+    "Walbrook",
+    "West Dock",
+    "Central Basin"
+   ],
+   "water_km": 0.38
   },
   {
    "mountain": "辰",
@@ -433,7 +465,7 @@
      "max_rel_elev_m": -2.5,
      "mean_rel_elev_m": -20.2,
      "horizon_deg": -0.26,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -443,7 +475,7 @@
      "max_rel_elev_m": 20.2,
      "mean_rel_elev_m": -19.5,
      "horizon_deg": 0.13,
-     "water_share": null
+     "water_share": 0.1201
     },
     {
      "r_km": [
@@ -455,7 +487,14 @@
      "horizon_deg": 0.45,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "Wall Fountain",
+    "#583955117",
+    "Tower Dock",
+    "#436220356"
+   ],
+   "water_km": 1.264
   },
   {
    "mountain": "巽",
@@ -480,7 +519,7 @@
      "max_rel_elev_m": -10.1,
      "mean_rel_elev_m": -19.0,
      "horizon_deg": -0.43,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -490,7 +529,7 @@
      "max_rel_elev_m": 21.7,
      "mean_rel_elev_m": -13.6,
      "horizon_deg": 0.16,
-     "water_share": null
+     "water_share": 0.001
     },
     {
      "r_km": [
@@ -502,7 +541,8 @@
      "horizon_deg": 0.27,
      "water_share": null
     }
-   ]
+   ],
+   "water_km": 0.619
   },
   {
    "mountain": "巳",
@@ -527,7 +567,7 @@
      "max_rel_elev_m": -14.7,
      "mean_rel_elev_m": -20.4,
      "horizon_deg": -0.66,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -537,7 +577,7 @@
      "max_rel_elev_m": 62.1,
      "mean_rel_elev_m": -5.7,
      "horizon_deg": 0.43,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -549,7 +589,11 @@
      "horizon_deg": 0.5,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "Queenhithe"
+   ],
+   "water_km": 0.252
   },
   {
    "mountain": "丙",
@@ -574,7 +618,7 @@
      "max_rel_elev_m": -18.7,
      "mean_rel_elev_m": -20.4,
      "horizon_deg": -0.68,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -584,7 +628,7 @@
      "max_rel_elev_m": 52.8,
      "mean_rel_elev_m": -3.6,
      "horizon_deg": 0.36,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -596,7 +640,11 @@
      "horizon_deg": 0.51,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#1080219125"
+   ],
+   "water_km": 0.08
   },
   {
    "mountain": "午",
@@ -621,7 +669,7 @@
      "max_rel_elev_m": -16.8,
      "mean_rel_elev_m": -19.8,
      "horizon_deg": -0.66,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -631,7 +679,7 @@
      "max_rel_elev_m": 34.7,
      "mean_rel_elev_m": -6.4,
      "horizon_deg": 0.23,
-     "water_share": null
+     "water_share": 0.0004
     },
     {
      "r_km": [
@@ -643,6 +691,10 @@
      "horizon_deg": 0.44,
      "water_share": null
     }
+   ],
+   "water": [
+    "River Thames",
+    "#451796441"
    ]
   },
   {
@@ -668,7 +720,7 @@
      "max_rel_elev_m": -18.9,
      "mean_rel_elev_m": -21.4,
      "horizon_deg": -0.67,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -678,7 +730,7 @@
      "max_rel_elev_m": 31.2,
      "mean_rel_elev_m": -7.9,
      "horizon_deg": 0.21,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -715,7 +767,7 @@
      "max_rel_elev_m": -11.9,
      "mean_rel_elev_m": -20.2,
      "horizon_deg": -0.49,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -725,7 +777,7 @@
      "max_rel_elev_m": 4.9,
      "mean_rel_elev_m": -14.3,
      "horizon_deg": 0.02,
-     "water_share": null
+     "water_share": 0.001
     },
     {
      "r_km": [
@@ -737,7 +789,11 @@
      "horizon_deg": 0.12,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#1183751616"
+   ],
+   "water_km": 0.141
   },
   {
    "mountain": "坤",
@@ -762,7 +818,7 @@
      "max_rel_elev_m": -13.6,
      "mean_rel_elev_m": -21.1,
      "horizon_deg": -0.51,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -772,7 +828,7 @@
      "max_rel_elev_m": -7.1,
      "mean_rel_elev_m": -20.8,
      "horizon_deg": -0.07,
-     "water_share": null
+     "water_share": 0.0013
     },
     {
      "r_km": [
@@ -784,7 +840,11 @@
      "horizon_deg": 0.17,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#583416272"
+   ],
+   "water_km": 0.472
   },
   {
    "mountain": "申",
@@ -809,7 +869,7 @@
      "max_rel_elev_m": -8.8,
      "mean_rel_elev_m": -22.6,
      "horizon_deg": -0.31,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -819,7 +879,7 @@
      "max_rel_elev_m": -6.5,
      "mean_rel_elev_m": -16.9,
      "horizon_deg": -0.07,
-     "water_share": null
+     "water_share": 0.0015
     },
     {
      "r_km": [
@@ -831,7 +891,8 @@
      "horizon_deg": 0.12,
      "water_share": null
     }
-   ]
+   ],
+   "water_km": 1.355
   },
   {
    "mountain": "庚",
@@ -856,7 +917,7 @@
      "max_rel_elev_m": 2.8,
      "mean_rel_elev_m": -7.2,
      "horizon_deg": 0.03,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -866,7 +927,7 @@
      "max_rel_elev_m": 12.8,
      "mean_rel_elev_m": -6.7,
      "horizon_deg": 0.19,
-     "water_share": null
+     "water_share": 0.0083
     },
     {
      "r_km": [
@@ -878,6 +939,12 @@
      "horizon_deg": 0.01,
      "water_share": null
     }
+   ],
+   "water": [
+    "River Fleet",
+    "Fountain Court Fountain",
+    "#559178841",
+    "#583930364"
    ]
   },
   {
@@ -903,7 +970,7 @@
      "max_rel_elev_m": 7.1,
      "mean_rel_elev_m": 2.7,
      "horizon_deg": 0.28,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -913,7 +980,7 @@
      "max_rel_elev_m": 14.4,
      "mean_rel_elev_m": 1.4,
      "horizon_deg": 0.24,
-     "water_share": null
+     "water_share": 0.0051
     },
     {
      "r_km": [
@@ -950,7 +1017,7 @@
      "max_rel_elev_m": 11.8,
      "mean_rel_elev_m": 4.9,
      "horizon_deg": 0.74,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -960,7 +1027,7 @@
      "max_rel_elev_m": 24.9,
      "mean_rel_elev_m": 8.1,
      "horizon_deg": 0.22,
-     "water_share": null
+     "water_share": 0.0035
     },
     {
      "r_km": [
@@ -972,6 +1039,11 @@
      "horizon_deg": 0.29,
      "water_share": null
     }
+   ],
+   "water": [
+    "#1303532135",
+    "#376650111",
+    "#376650105"
    ]
   },
   {
@@ -997,7 +1069,7 @@
      "max_rel_elev_m": 10.7,
      "mean_rel_elev_m": 1.9,
      "horizon_deg": 0.63,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -1007,7 +1079,7 @@
      "max_rel_elev_m": 91.4,
      "mean_rel_elev_m": 22.5,
      "horizon_deg": 0.67,
-     "water_share": null
+     "water_share": 0.0019
     },
     {
      "r_km": [
@@ -1019,7 +1091,12 @@
      "horizon_deg": 0.58,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#1202299504",
+    "#1055909236"
+   ],
+   "water_km": 0.171
   },
   {
    "mountain": "乾",
@@ -1044,7 +1121,7 @@
      "max_rel_elev_m": 1.9,
      "mean_rel_elev_m": -3.9,
      "horizon_deg": -0.0,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -1054,7 +1131,7 @@
      "max_rel_elev_m": 112.7,
      "mean_rel_elev_m": 33.7,
      "horizon_deg": 0.79,
-     "water_share": null
+     "water_share": 0.0134
     },
     {
      "r_km": [
@@ -1066,7 +1143,11 @@
      "horizon_deg": 0.79,
      "water_share": null
     }
-   ]
+   ],
+   "water": [
+    "#996071739"
+   ],
+   "water_km": 1.147
   },
   {
    "mountain": "亥",
@@ -1091,7 +1172,7 @@
      "max_rel_elev_m": 9.6,
      "mean_rel_elev_m": -2.4,
      "horizon_deg": 0.22,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -1101,7 +1182,7 @@
      "max_rel_elev_m": 102.2,
      "mean_rel_elev_m": 36.4,
      "horizon_deg": 0.79,
-     "water_share": null
+     "water_share": 0.0015
     },
     {
      "r_km": [
@@ -1113,7 +1194,8 @@
      "horizon_deg": 0.61,
      "water_share": null
     }
-   ]
+   ],
+   "water_km": 0.378
   },
   {
    "mountain": "壬",
@@ -1138,7 +1220,7 @@
      "max_rel_elev_m": 10.4,
      "mean_rel_elev_m": -0.9,
      "horizon_deg": 0.24,
-     "water_share": null
+     "water_share": 0.0
     },
     {
      "r_km": [
@@ -1148,7 +1230,7 @@
      "max_rel_elev_m": 57.6,
      "mean_rel_elev_m": 16.0,
      "horizon_deg": 0.46,
-     "water_share": null
+     "water_share": 0.0002
     },
     {
      "r_km": [
@@ -1160,6 +1242,9 @@
      "horizon_deg": 0.48,
      "water_share": null
     }
+   ],
+   "water": [
+    "#705413315"
    ]
   }
  ],
@@ -1244,12 +1329,15 @@
    {"id":"osm-#5122307-canal","name":"#5122307","pieces":1,"hidden_share":0.0,"visible":true,"kind":"canal","in_mountain":"丑","out_mountain":"丑","nearest_m":2904.2,"bend":"outer","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-regent's canal-canal","dist_m":2904.2,"mountain":"丑"},{"with":"osm-#373395041-river","dist_m":2914.5,"mountain":"丑"}],"outflow_visible":null,"curvature_radius_m":596011.7,"between_branches":false,"flow_ways_share":0.25,"crossings_2km":0,"crossing_angle_deg":1.5,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#5926768-canal","name":"#5926768","pieces":1,"hidden_share":1.0,"visible":false,"kind":"culvert","in_mountain":"乙","out_mountain":"乙","nearest_m":2966.2,"bend":"inner","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-#5724255-canal","dist_m":2966.2,"mountain":"乙"}],"outflow_visible":null,"curvature_radius_m":120.6,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":1.2,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","dem_reason":null,"source":"openstreetmap"}
   ],
+ "land_cover": {
+  "water": 0.0024
+ },
  "quality": {
   "dem": "Copernicus DEM GLO-30 (DSM)",
   "dem_resolution_m": 30.0,
   "warnings": [
    "water.flow: low — конфликт OSM и рельефа у #7833362, River Lea, #59041927, #446582987",
-   "доля воды по секторам не считается: маска воды не откалибрована по площади",
+   "water_share — по полигонам OSM (water=*, natural=water); река, нарисованная осевой, в долю не входит, её длина — sector.water_km",
    "склонение и ветер не рассчитаны (этап 4)",
    "рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, в плотной застройке возможны искажения"
   ],
@@ -1258,7 +1346,7 @@
   "violations": []
  },
  "algo": {
-  "water": "6.2.0",
+  "water": "6.3.0",
   "terrain": "2.0.1",
   "geocode": "1.0.0",
   "pack": "1.2.0"
