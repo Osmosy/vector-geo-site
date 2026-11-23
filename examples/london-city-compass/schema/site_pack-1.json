@@ -641,6 +641,18 @@
           "title": "Water",
           "type": "array"
         },
+        "water_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Km"
+        },
         "wind_share": {
           "anyOf": [
             {

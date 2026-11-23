@@ -97,6 +97,15 @@ def _measure(args, r, *, with_water: bool = True) -> dict:
     return out
 
 
+def _xy(point: tuple[float, float], epsg: int) -> np.ndarray:
+    """lon/lat → UTM: одна точка, без батча."""
+    from pyproj import Transformer
+
+    transformer = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    x, y = transformer.transform(point[0], point[1])
+    return np.array([x, y])
+
+
 def _measure_water(r, measured: dict, epsg: int) -> dict:
     """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш."""
     site_xy = np.array([measured["x0"], measured["y0"]])
@@ -121,9 +130,42 @@ def _measure_water(r, measured: dict, epsg: int) -> dict:
     # геометрия для water.geojson: берём её у самих метрик, а не сопоставляем два разных списка
     # по порядку — они фильтруются независимо (одна река = одна запись), и zip давал чужую линию
     result["water_geometry"] = {item.id: item.coords for item in metrics if item.coords}
-    # Долю воды по секторам пока не считаем: маска воды требует калибровки
-    # (полигоны OSM чинятся buffer(0), линии расширяются — площадь систематически завышается).
-    result["water_share_skipped"] = True
+    # Доля воды по секторам: по полигонам, аналитически в UTM, без растяжения линий.
+    # Линии русла площадь не дают — река, нарисованная осевой, в долю не попадает, и это
+    # оговорено в предупреждении; в городах реки обычно нарисованы полигонами.
+    try:
+        features = water.parse_features(payload)
+        inner = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
+                                              ring_m=(500.0, 2000.0))
+        middle = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
+                                               ring_m=(2000.0, 8000.0))
+        result["water_share"] = {"inner": inner, "middle": middle}
+        # вода по секторам: у какой горы ближайшая точка воды — имя туда. Только именованная
+        # вода и только четыре ближайшие в секторе: иначе в сектор доков попадают 32 фонтана.
+        pick: dict[str, list[tuple[float, str]]] = {}
+        for metric in metrics:
+            if not metric.coords or not metric.name:
+                continue
+            near = min(metric.coords, key=lambda c: float(np.hypot(
+                *(_xy(c, epsg) - site_xy))))
+            x, y = _xy(near, epsg) - site_xy
+            dist = float(np.hypot(x, y))
+            if dist > 2000.0:
+                continue
+            pick.setdefault(geo.mountain_name(math.degrees(math.atan2(x, y)) % 360.0),
+                            []).append((dist, metric.name))
+        names: dict[str, list[str]] = {}
+        for mountain, items in pick.items():
+            seen: list[str] = []
+            for _, name in sorted(items):
+                if name not in seen:
+                    seen.append(name)
+            names[mountain] = seen[:4]
+        result["water_names"] = names
+        result["land_cover"] = {"water": round(inner["area_km2"] / max(inner["ring_km2"], 1e-9), 4)}
+    except Exception as exc:
+        result["water_share_skipped"] = True
+        result["water_share_error"] = str(exc)
     # П6/П4: расхождения источников и низкая уверенность должны звучать в warnings
     conflicts = [m for m in metrics if m.flow_rule == 4]
     lows = [m for m in metrics if m.flow_confidence == "low"]
@@ -171,7 +213,10 @@ def cmd_pack(args) -> int:
     if m.get("flow_conflict"):
         warnings.append("water.flow: low — конфликт OSM и рельефа у " + ", ".join(m["flow_conflict"]))
     if m.get("water_share_skipped"):
-        warnings.append("доля воды по секторам не считается: маска воды не откалибрована по площади")
+        warnings.append("доля воды по секторам не считается: полигоны OSM не получены")
+    if m.get("water_share"):
+        warnings.append("water_share — по полигонам OSM (water=*, natural=water); река, нарисованная "
+                        "осевой, в долю не входит, её длина — sector.water_km")
     if not m.get("water"):
         warnings.append("вода: слои OSM не получены, water и water_share пусты")
     if m.get("water_error"):
