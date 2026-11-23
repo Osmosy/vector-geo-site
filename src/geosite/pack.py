@@ -11,7 +11,7 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.4.1", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.3.1",
+ALGO = {"water": "6.4.1", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.3.2",
         "climate": "1.0.0"}
 
 ALGO_VERSION = "1.1.0"

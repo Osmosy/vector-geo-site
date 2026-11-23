@@ -107,10 +107,25 @@ def _xy(point: tuple[float, float], epsg: int) -> np.ndarray:
 
 
 def _load_osm_file(path: str | None) -> dict | None:
-    """Читать сохранённый ответ Overpass: путь к JSON-файлу фикстуры."""
+    """Читать сохранённый ответ Overpass: JSON, в том числе сжатый gzip.
+
+    Широкая выгрузка на 30 км весит десятки мегабайт и лежит в эталонах как `.json.gz`;
+    распаковывать её руками перед запуском незачем — формат виден по магии файла, а не по
+    расширению (переименованный `.gz` иначе читался бы как текст и падал на 0x8b).
+    """
     if not path:
         return None
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = Path(path).read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        import gzip
+
+        raw = gzip.decompress(raw)
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"{path}: не текст и не gzip ({exc}); ожидался JSON ответа Overpass") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path}: битый JSON ({exc})") from exc
     if "elements" not in data:
         raise SystemExit(f"{path}: в файле нет elements — это не ответ Overpass")
     return data
@@ -362,7 +377,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--osm-file", default=None,
                        help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
         p.add_argument("--osm-file-wide", default=None,
-                       help="ответ Overpass радиусом 30 км (приливность по руслу), только с --offline")
+                       help="ответ Overpass радиусом 30 км (приливность по руслу); подменяет загрузку")
 
     p_res = sub.add_parser("resolve", help="ввод → точка, тип, точность")
     p_res.add_argument("place")

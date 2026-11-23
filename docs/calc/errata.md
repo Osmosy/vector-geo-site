@@ -188,3 +188,8 @@
 - Нашёл: внешняя проверка ZCode (остаток 3). Исправлено в `water 6.4.1`: `--osm-file-wide` и
   `water[].tidal_reason`.
 - Тест: `test_tidal_null_has_reason_when_wide_payload_absent`.
+- Уточнение (23.11.2026): причина пишется **кодом** (`no_wide_payload`), без текста исключения —
+  иначе в пакет попадал путь кеша и пакеты двух машин не сравнивались. Плюс сквозной тест:
+  `test_tidal_resolved_from_wide_payload` (узкая выгрузка + широкая `.json.gz` в том же вызове
+  `cli._measure_water`), и `--osm-file-wide` принимает сжатые файлы по магии, а не по расширению.
+

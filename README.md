@@ -199,12 +199,16 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 132 passed, сеть не нужна
+python -m pytest -q          # 134 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
   --osm-file tests/golden/london-city/fixtures/osm-water.json --out /tmp/pack
+# приливность по руслу: широкая выгрузка (файлы бывают сжатыми — gzip определяется по магии)
+geosite pack "51.5138, -0.0984" --year 2018 --offline \
+  --osm-file tests/golden/london-city/fixtures/osm-water.json \
+  --osm-file-wide tests/golden/london-city/fixtures/osm-water-wide.json.gz --out /tmp/pack-wide
 ```
 
 Покрыто: 24 горы и границы секторов, азимуты и UTM, разбор координат (десятичные и DMS),

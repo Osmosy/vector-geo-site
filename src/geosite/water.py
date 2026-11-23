@@ -1493,10 +1493,12 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
     else:
         try:
             wide = fetch_raw(lat, lon, wide_radius_m, allow_network=allow_network)
-        except Exception as exc:
+        except Exception:
             # Без выгрузки на 30 км границу прилива не поставить: пишем причину, а не молчим.
+            # Только код: текст исключения тянет в пакет путь кеша, и два пакета перестают
+            # сравниваться побитово на разных машинах.
             for metric in pending:
-                metric.tidal_reason = f"no_wide_payload: {exc}"
+                metric.tidal_reason = "no_wide_payload"
             return
     # нужна линия, на которой лежат ОБА: участок и граница прилива.
     # Из линий одной реки выбираем ту, где участок ближе 2 км, а граница — ближайшая.
