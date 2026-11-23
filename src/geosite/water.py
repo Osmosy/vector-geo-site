@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.1.1"
+ALGO_VERSION = "6.1.2"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -553,7 +553,11 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         return None
 
     tags = getattr(feature, "tags", {}) or {}
-    hidden = getattr(feature, "hidden", False) or is_hidden(tags)
+    # Труба — свойство всей линии, а не ближайшего куска: с 6.1.1 склейка несёт теги
+    # ближайшего к участку куска, и поверхностная река с коротким засыпанным участком
+    # (River Moselle, hidden_share 0.10) получала kind: culvert. Для приливности и
+    # направления теги нужны, для трубы — нет.
+    hidden = getattr(feature, "hidden", False)
     kind = "culvert" if hidden else feature.kind
 
     # --- приливность (W5): тег OSM, иначе таблица известных границ ---
@@ -652,6 +656,10 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
             exit_pt = outer[0]
         mouth = _water_mouth(grid, exit_pt, pts[i], site_xy)
 
+    share = getattr(feature, "hidden_share", None)
+    if share is not None and share >= 0.8 and not hidden:
+        hidden = True
+        kind = "culvert"
     visible = None
     if mouth is not None and grid is not None:
         visible = _line_of_sight(grid, np.zeros(2), np.array([mouth.pop("_x"), mouth.pop("_y")]))
