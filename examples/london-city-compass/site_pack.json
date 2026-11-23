@@ -10,7 +10,16 @@
   "lon": -0.0984,
   "elev_m": 28.4,
   "precision": "point",
-  "utm_epsg": 32630
+  "utm_epsg": 32630,
+  "hydro": {
+   "order": 5,
+   "order_class": 1,
+   "discharge_m3s": 89.881,
+   "distance_m": 374.0,
+   "channels_within_km": 3,
+   "hyriv_id": 20335508,
+   "source": "HydroRIVERS v1.0 (WWF/HydroSHEDS, CC-BY 4.0)"
+  }
  },
  "orientation": {
   "facing_true_deg": 180.0,
@@ -1199,7 +1208,7 @@
    {"id":"osm-fleet-river","name":"River Fleet","pieces":3,"hidden_share":0.93,"visible":false,"kind":"river","in_mountain":"乾","out_mountain":"坤","nearest_m":404.3,"bend":"inner","straight_at_site":true,"tidal":null,"confluences":[{"with":"osm-regent's canal-canal","dist_m":4179.2,"mountain":"乾"}],"outflow_visible":null,"curvature_radius_m":74147.3,"between_branches":false,"flow_ways_share":0.25,"crossings_2km":1,"crossing_angle_deg":92.9,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_chosen":"downstream_toward_end","flow_rule":5,"flow_confidence":"medium","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-queenhithe-lake","name":"Queenhithe","pieces":1,"hidden_share":0.0,"visible":true,"kind":"lake","in_mountain":"巳","out_mountain":"巳","nearest_m":405.7,"bend":"outer","straight_at_site":false,"tidal":true,"outflow_visible":null,"curvature_radius_m":270.5,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_start","flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#892252520-lake","name":"#892252520","pieces":1,"hidden_share":0.0,"visible":true,"kind":"lake","in_mountain":"寅","out_mountain":"寅","nearest_m":420.5,"bend":"outer","straight_at_site":false,"tidal":null,"outflow_visible":null,"curvature_radius_m":8.2,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","dem_reason":null,"source":"openstreetmap"},
-   {"id":"osm-thames-river","name":"River Thames","pieces":1,"hidden_share":0.0,"visible":true,"kind":"river","in_mountain":"坤","out_mountain":"辰","nearest_m":463.6,"bend":"outer","straight_at_site":false,"tidal":true,"confluences":[{"with":"osm-walbrook-stream","dist_m":685.3,"mountain":"巳"},{"with":"osm-#1479888244-river","dist_m":2021.2,"mountain":"辰"},{"with":"osm-#1059661300-stream","dist_m":2089.2,"mountain":"坤"},{"with":"osm-neckinger-canal","dist_m":2328.0,"mountain":"辰"}],"water_mouth":{"mountain":"乙","closure_index":0.01,"closure_reason":null,"closure_confidence":"low","enclosure":0.01,"width_m":4850.0,"left_hill_m":5.7,"right_hill_m":44.5,"width_capped":true,"capped_sides":1},"outflow_visible":null,"curvature_radius_m":3146.0,"loop":{"gap_m":1695.5,"along_m":5173.9,"ratio":3.05,"turn_deg":183.2,"area_m2":3333994,"area_k":1.16,"mountain":"乙","site_position":"outside_concave"},"site_position":"outside_concave","between_branches":false,"flow_ways_share":0.25,"crossings_2km":2,"crossing_angle_deg":113.8,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_chosen":"downstream_toward_end","flow_rule":2,"flow_confidence":"medium","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
+   {"id":"osm-thames-river","name":"River Thames","pieces":1,"hidden_share":0.0,"visible":true,"kind":"river","order":5,"discharge_m3s":89.881,"hydro_distance_m":374.0,"in_mountain":"坤","out_mountain":"辰","nearest_m":463.6,"bend":"outer","straight_at_site":false,"tidal":true,"confluences":[{"with":"osm-walbrook-stream","dist_m":685.3,"mountain":"巳"},{"with":"osm-#1479888244-river","dist_m":2021.2,"mountain":"辰"},{"with":"osm-#1059661300-stream","dist_m":2089.2,"mountain":"坤"},{"with":"osm-neckinger-canal","dist_m":2328.0,"mountain":"辰"}],"water_mouth":{"mountain":"乙","closure_index":0.01,"closure_reason":null,"closure_confidence":"low","enclosure":0.01,"width_m":4850.0,"left_hill_m":5.7,"right_hill_m":44.5,"width_capped":true,"capped_sides":1},"outflow_visible":null,"curvature_radius_m":3146.0,"loop":{"gap_m":1695.5,"along_m":5173.9,"ratio":3.05,"turn_deg":183.2,"area_m2":3333994,"area_k":1.16,"mountain":"乙","site_position":"outside_concave"},"site_position":"outside_concave","between_branches":false,"flow_ways_share":0.25,"crossings_2km":2,"crossing_angle_deg":113.8,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_chosen":"downstream_toward_end","flow_rule":2,"flow_confidence":"medium","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#583955117-lake","name":"#583955117","pieces":1,"hidden_share":0.0,"visible":true,"kind":"lake","in_mountain":"辰","out_mountain":"辰","nearest_m":534.4,"bend":"outer","straight_at_site":false,"tidal":null,"outflow_visible":null,"curvature_radius_m":1.0,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-walbrook-stream","name":"Walbrook","pieces":2,"hidden_share":0.94,"visible":false,"kind":"stream","in_mountain":"艮","out_mountain":"巳","nearest_m":546.0,"bend":"outer","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-walbrook-stream","dist_m":558.1,"mountain":"辰"},{"with":"osm-thames-river","dist_m":685.3,"mountain":"巳"}],"outflow_visible":null,"curvature_radius_m":984.6,"between_branches":false,"flow_ways_share":0.25,"crossings_2km":0,"crossing_angle_deg":92.7,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_chosen":"downstream_toward_end","flow_rule":3,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#34040012-lake","name":"#34040012","pieces":1,"hidden_share":0.0,"visible":true,"kind":"lake","in_mountain":"癸","out_mountain":"癸","nearest_m":565.5,"bend":"outer","straight_at_site":false,"tidal":null,"outflow_visible":null,"curvature_radius_m":4611.0,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_rule":0,"flow_confidence":"high","flow_agree":true,"dem_reason":null,"source":"openstreetmap"},
@@ -1249,7 +1258,7 @@
   "violations": []
  },
  "algo": {
-  "water": "6.1.1",
+  "water": "6.2.0",
   "terrain": "2.0.1",
   "geocode": "1.0.0",
   "pack": "1.2.0"
@@ -1257,7 +1266,7 @@
  "files": {
   "water_geojson": "water.geojson",
   "sha256": {
-   "water.geojson": "8b1b7a701bacb113c537c879026ebbfddc2a461afa6471af28df10d7b5127669"
+   "water.geojson": "cd1482888c7ca0eaa82af3df46de0b636ff24355b34c902aea24ba2c762fee66"
   }
  },
  "summary": {

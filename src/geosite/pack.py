@@ -11,7 +11,7 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.1.1", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0"}
+ALGO = {"water": "6.2.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0"}
 
 ALGO_VERSION = "1.1.0"
 
@@ -143,6 +143,11 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
     grid = measured["grid_macro"]
     col, row = ~grid.transform * (measured["x0"], measured["y0"])
     figures.hillshade_png(grid, figures_dir / "hillshade_macro.png", site_px=(int(col), int(row)))
+
+    if measured.get("hydro") is not None:
+        hydro_site = {k: v for k, v in measured["hydro"].items() if not k.startswith("_")}
+        site = {**site, "hydro": hydro_site}
+    warnings = list(warnings) + list(measured.get("hydro_warnings") or [])
 
     water_all = list(measured.get("water", []))
     geometry = measured.get("water_geometry") or {}

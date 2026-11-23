@@ -18,7 +18,8 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
         out.append(WaterObject(
             id=m.id, name=m.name, kind=m.kind if m.kind in
             {"river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"} else "lake",
-            order=m.order, in_mountain=m.in_mountain, out_mountain=m.out_mountain,
+            order=m.order, discharge_m3s=m.discharge_m3s, hydro_distance_m=m.hydro_distance_m,
+            in_mountain=m.in_mountain, out_mountain=m.out_mountain,
             nearest_m=m.nearest_m, bend=m.bend, straight_at_site=m.straight_at_site,
             tidal=m.tidal, confluences=[{"with": c["with"], "dist_m": c["dist_m"],
                                          "mountain": c["mountain"]} for c in m.confluences],

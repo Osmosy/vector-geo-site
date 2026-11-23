@@ -62,6 +62,17 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
     metrics = water.measure_water(lat, lon, epsg=epsg, grid=grid, site_xy=site_xy,
                                   payload=payload, radius_m=8000, wide_payload=wide,
                                   allow_network=False)
+    # порядок реки и расход: HydroRIVERS, офлайн из фикстуры (иначе тест требовал бы 150 МБ шейп-файла)
+    reach = None
+    hydro_file = fixtures / "hydrorivers.json"
+    if hydro_file.exists():
+        from geosite import hydro
+
+        saved = json.loads(hydro_file.read_text(encoding="utf-8"))
+        reaches = [dict(r, _points=[tuple(pt) for pt in r.get("points", [])])
+                   for r in saved.get("reaches", [])]
+        reach = hydro.site_reach(lat, lon, reaches=reaches)
+        hydro.assign(metrics, reach)
     # одна и та же река бывает склеена в несколько линий: берём ближайшую к участку
     by_name: dict[str, object] = {}
     for metric in metrics:
@@ -70,7 +81,7 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
         current = by_name.get(metric.name)
         if current is None or metric.nearest_m < current.nearest_m:
             by_name[metric.name] = metric
-    return {"terrain": grid_measured, "water": by_name}
+    return {"terrain": grid_measured, "water": by_name, "hydro": reach}
 
 
 @pytest.mark.skipif(not SITES, reason="нет эталонов")
@@ -94,6 +105,24 @@ def test_golden_site(name: str):
     result = measure(site, fixtures, with_dem=has_dem)
     facts = expect.get("water") or {}
     failures: list[str] = []
+
+    hydro_facts = expect.get("hydrorivers") or {}
+    if hydro_facts:
+        reach = result.get("hydro") or {}
+        if not reach:
+            failures.append("hydrorivers: участок не выбран, а факты заданы")
+        else:
+            if "order" in hydro_facts and reach.get("order") != hydro_facts["order"]:
+                failures.append(f"hydrorivers.order={reach.get('order')}, ждали {hydro_facts['order']}")
+            if "discharge_m3s_range" in hydro_facts:
+                low, high = hydro_facts["discharge_m3s_range"]
+                got = reach.get("discharge_m3s")
+                if got is None or not (low <= got <= high):
+                    failures.append(f"hydrorivers.discharge_m3s={got} вне {hydro_facts['discharge_m3s_range']}")
+            if "distance_max_m" in hydro_facts:
+                got = reach.get("distance_m")
+                if got is None or got > hydro_facts["distance_max_m"]:
+                    failures.append(f"hydrorivers.distance_m={got} больше {hydro_facts['distance_max_m']}")
 
     for river_name, checks in facts.items():
         metric = result["water"].get(river_name)
@@ -149,6 +178,14 @@ def test_golden_site(name: str):
                 share = metric.hidden_share
                 if share is None or share < float(expected):
                     failures.append(f"{river_name}.hidden_share={share}, ждали ≥ {expected}")
+            elif key == "order":
+                if metric.order != expected:
+                    failures.append(f"{river_name}.order={metric.order}, ждали {expected}")
+            elif key == "discharge_m3s_range":
+                low, high = expected
+                got = metric.discharge_m3s
+                if got is None or not (low <= got <= high):
+                    failures.append(f"{river_name}.discharge_m3s={got} вне {expected}")
             elif key == "closure_index_min":
                 mouth = metric.water_mouth or {}
                 value = mouth.get("closure_index")
