@@ -233,7 +233,11 @@ def test_golden_site(name: str):
 
     for key, expected in (expect.get("water_mouth") or {}).items():
         rivers = list(result["water"].values())
-        mouth = next((r.water_mouth for r in rivers if r.water_mouth), None) or {}
+        # Врата — свойство реки, у которой на участке главное русло: «первый по словарю» давал
+        # Гогсмилл вместо Темзы, как только порядок записей менялся (E-014).
+        with_mouth = [r for r in rivers if r.water_mouth]
+        main = max(with_mouth, key=lambda r: len(r.coords or []), default=None)
+        mouth = (main.water_mouth if main else None) or {}
         if mouth.get(key) != expected:
             failures.append(f"water_mouth.{key}={mouth.get(key)!r}, ждали {expected!r}")
 

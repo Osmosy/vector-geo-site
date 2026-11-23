@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.3.2"
+ALGO_VERSION = "6.4.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -320,6 +320,29 @@ def _segment_distances(pts: np.ndarray, p: np.ndarray) -> np.ndarray:
     return np.hypot(proj[:, 0] - p[0], proj[:, 1] - p[1])
 
 
+def _bend_center(pts: np.ndarray, i: int, *, half_window_m: float = 30.0) -> np.ndarray | None:
+    """Центр кривизны в точке `i`: берём точки на равном удалении по дуге в обе стороны.
+
+    Симметричное окно делает результат независимым от направления обхода линии: три точки
+    те же, только переставлены, а центр описанной окружности от порядка не зависит.
+    """
+    if len(pts) < 3:
+        return None
+    seg = np.hypot(*np.diff(pts, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    s0 = cum[min(i, len(cum) - 1)]
+    total = cum[-1]
+    hw = min(half_window_m, total / 3.0)   # короткая линия: окно сужается вместе с ней
+    if hw < 1.0:
+        return _circumcenter(pts[i - 1], pts[i], pts[i + 1])
+    left_s, right_s = max(0.0, s0 - hw), min(total, s0 + hw)
+    if right_s - left_s < 1.0:
+        return None
+    left = np.array([np.interp(left_s, cum, pts[:, 0]), np.interp(left_s, cum, pts[:, 1])])
+    right = np.array([np.interp(right_s, cum, pts[:, 0]), np.interp(right_s, cum, pts[:, 1])])
+    return _circumcenter(left, pts[i], right)
+
+
 def _circumcenter(a, b, c) -> np.ndarray | None:
     ax, ay = a
     bx, by = b
@@ -484,36 +507,168 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
         total_len = sum(_line_len(f.coords) for f in items)
         hidden_len = sum(_line_len(f.coords) for f in items if hydronym.is_hidden(f.tags))
         hidden_share = None if total_len <= 0 else round(hidden_len / total_len, 2)
-        # жадная сшивка: начинаем с самого длинного куска
-        pieces = sorted(pieces, key=len, reverse=True)
-        chain = list(pieces[0])
-        rest = pieces[1:]
-        while rest:
-            tail = chain[-1]
-            best = None
-            for idx, piece in enumerate(rest):
-                for rev in (False, True):
-                    cand = piece[::-1] if rev else piece
-                    d = _haversine_deg(tail, cand[0])
-                    if best is None or d < best[0]:
-                        best = (d, idx, cand)
-            d, idx, cand = best
-            if d <= max_gap_m:
-                chain.extend(cand)
-                rest.pop(idx)
-            else:
+        # Склейка по связности, а не «тянем хвост»: река в OSM растёт в обе стороны от самого
+        # длинного куска, и односторонняя жадность рвала её на 13 линий (E-014). Сначала
+        # компоненты связности по концам (|разрыв| ≤ max_gap_m), затем внутри компоненты —
+        # пришиваем куски то к началу, то к концу, пока есть что пришивать.
+        for comp in _components(pieces, max_gap_m):
+            items_count = len(comp)
+            for chain, forward, backward in _chain_component(pieces, max_gap_m, idx=comp,
+                                                             with_orientation=True):
+                # Направление линии — как в OSM у большинства её метров: иначе склейка могла
+                # развернуть реку, и «вход/выход» с приливным правилом смотрели в море наоборот.
+                if backward > forward:
+                    chain = chain[::-1]
                 merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
-                                         len(items) - len(rest), hidden, hidden_share,
+                                         items_count, hidden, hidden_share,
                                          tags=dict(common)))
-                chain = list(rest.pop(0))
-        merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
-                                 len(items) - len(rest), hidden, hidden_share,
-                                 tags=dict(common)))
     # ключ куска неуникален: у одной реки их несколько, и словарь слияний молча терял все,
     # кроме последнего. uid различает куски, key остаётся именем реки для потребителя.
     for idx, line in enumerate(merged):
         line.uid = f"{line.key}#{idx}"
     return merged
+
+
+def _components(pieces: list[list[tuple[float, float]]], max_gap_m: float) -> list[list[int]]:
+    """Группы кусков, связанных концами: транзитивно, через союз-файнд.
+
+    Возвращает индексы кусков. Порог тот же, что у склейки: два куска в одной группе, если
+    хоть одна пара их концов ближе `max_gap_m`.
+    """
+    n = len(pieces)
+    parent = list(range(n))
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if find(i) == find(j):
+                continue
+            d = min(_haversine_deg(a, b) for a in (pieces[i][0], pieces[i][-1])
+                    for b in (pieces[j][0], pieces[j][-1]))
+            if d <= max_gap_m:
+                parent[find(i)] = find(j)
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    return list(groups.values())
+
+
+def _chain_component(pieces: list[list[tuple[float, float]]], max_gap_m: float,
+                     idx: list[int] | None = None,
+                     with_orientation: bool = False):
+    """Сшить куски компоненты в линии: главный ствол — самый длинный путь по графу кусков.
+
+    Река в OSM — не ломаная, а граф: у островов два русла, притоки впадают в середину, а в
+    центре Лондона Темза нарезана десятками коротких ways, концы которых лежат в 10–100 м друг
+    от друга. Жадная пришивка «к концу цепочки» рвала её на 13 линий (E-014).
+
+    Кусок — ребро, его концы — узлы. Узел один, если координаты совпадают (допуск 1 м): общий
+    узел OSM даёт ровно 0, а соседние, но разные вершины плотной нарезки сливать нельзя —
+    иначе весь центр города становится одним узлом, и путь через него проходится один раз.
+    Шаг из узла возможен в любой неиспользованный кусок, конец которого ближе `max_gap_m`:
+    так сшиваются разрывы до порога. Главный ствол — самый длинный путь без повтора узлов;
+    остальные куски (второе русло острова, старица) отдаются отдельными линиями.
+    """
+    idx = list(range(len(pieces))) if idx is None else list(idx)
+    if len(idx) == 1:
+        only = [list(pieces[idx[0]])]
+        return [(only[0], _line_len(pieces[idx[0]]), 0.0)] if with_orientation else only
+
+    ends: list[tuple[float, float]] = []
+    for i in idx:
+        ends.extend((pieces[i][0], pieces[i][-1]))
+    parent = list(range(len(ends)))
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for a in range(len(ends)):
+        for b in range(a + 1, len(ends)):
+            if find(a) != find(b) and _haversine_deg(ends[a], ends[b]) <= 1.0:
+                parent[find(a)] = find(b)
+    nid = [find(i) for i in range(len(ends))]
+    xy: dict[int, tuple[float, float]] = {}
+    for pos, i in enumerate(idx):
+        xy.setdefault(nid[2 * pos], ends[2 * pos])
+        xy.setdefault(nid[2 * pos + 1], ends[2 * pos + 1])
+    na = {i: nid[2 * pos] for pos, i in enumerate(idx)}
+    nb = {i: nid[2 * pos + 1] for pos, i in enumerate(idx)}
+    length = {i: _line_len(pieces[i]) for i in idx}
+
+    def options(cur: int, used: set[int]) -> list[tuple[float, int, int, int]]:
+        """(длина куска, кусок, узел входа, узел выхода) — шаги из текущего узла."""
+        cx, cy = xy[cur]
+        out = []
+        for i in idx:
+            if i in used:
+                continue
+            a, b = na[i], nb[i]
+            da = 0.0 if a == cur else _haversine_deg((cx, cy), xy[a])
+            db = 0.0 if b == cur else _haversine_deg((cx, cy), xy[b])
+            if da <= db and da <= max_gap_m:
+                out.append((length[i], i, a, b))
+            elif db <= max_gap_m:
+                out.append((length[i], i, b, a))
+        return out
+
+    used: set[int] = set()
+    lines: list[list[tuple[float, float]]] = []
+    while len(used) < len(idx):
+        best_total, best_path = -1.0, []
+        for start in list(xy):
+            path: list[tuple[int, int]] = []          # (кусок, узел входа)
+            here: set[int] = set()
+            seen = {start}
+            cur, total = start, 0.0
+            while True:
+                step = None
+                for opt in sorted(options(cur, used | here), key=lambda o: -o[0]):
+                    if opt[3] not in seen:
+                        step = opt
+                        break
+                if step is None:
+                    break
+                _, piece, entry, other = step
+                path.append((piece, entry))
+                here.add(piece)
+                total += length[piece]
+                seen.add(other)
+                cur = other
+            if total > best_total:
+                best_total, best_path = total, path
+        if not best_path:
+            piece = next(i for i in idx if i not in used)
+            single = list(pieces[piece])
+            lines.append((single, length[piece], 0.0) if with_orientation else single)
+            used.add(piece)
+            continue
+        chain: list[tuple[float, float]] = []
+        forward, backward = 0.0, 0.0      # сколько метров уложено по OSM и против
+        for piece, entry in best_path:
+            coords = pieces[piece]
+            if na[piece] != nb[piece]:
+                if _haversine_deg(xy[entry], coords[-1]) < _haversine_deg(xy[entry], coords[0]):
+                    coords = coords[::-1]
+                    backward += length[piece]
+                else:
+                    forward += length[piece]
+            # Совпадающий узел не дублируем (допуск 1 м). Больший допуск съел бы до 150 м
+            # геометрии на каждой сшивке — этого хватало, чтобы уехала ширина устья.
+            if chain and _haversine_deg(chain[-1], coords[0]) <= 1.0:
+                chain.extend(coords[1:])
+            else:
+                chain.extend(coords)
+            used.add(piece)
+        lines.append((chain, forward, backward) if with_orientation else chain)
+    return lines
 
 
 def _line_len(coords: list[tuple[float, float]]) -> float:
@@ -669,12 +824,14 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     out_m = geo.mountain_name(out_bearing)
     crossing_angle = geo.angle_distance(in_bearing, out_bearing)
 
-    # изгиб: центр кривизны в точке nearest; участок внутри кривой = обнимает
+    # изгиб: центр кривизны в точке nearest; участок внутри кривой = обнимает.
+    # Окно симметричное по длине дуги, а не по индексам: при склейке линия может идти в любую
+    # сторону, и «сосед по индексу» менялся вместе с направлением — bend переворачивался на
+    # ровном месте (E-014).
     i = min(max(nearest_seg, 1), len(pts) - 2)
-    center = _circumcenter(pts[i - 1], pts[i], pts[i + 1])
+    center = _bend_center(pts, i, half_window_m=30.0)
     if center is None:                      # ровный участок — берём окно шире
-        lo, hi = max(1, i - 6), min(len(pts) - 2, i + 6)
-        center = _circumcenter(pts[lo], pts[i], pts[hi])
+        center = _bend_center(pts, i, half_window_m=150.0)
     bend, radius_m = None, None
     if center is not None:
         radius_m = float(np.hypot(*(center - pts[i])))
@@ -1073,6 +1230,10 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
     for i in range(len(keys)):
         for j in range(i + 1, len(keys)):
             a_key, b_key = keys[i], keys[j]
+            # Куски одной реки сходятся у острова или старицы — это не слияние, а её же русло:
+            # без этой проверки Темза «впадала в себя» дважды (E-014).
+            if labels[a_key] and labels[a_key] == labels[b_key]:
+                continue
             # грубый пространственный отбор: без пересечения bbox пары не бывает слияния
             if not _bbox_near(boxes[a_key], boxes[b_key], pad=1.0):
                 continue
@@ -1209,7 +1370,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             metrics.flow_agree = flow_share >= 0.6
             metrics.flow_ways_share = flow_share
         out.append(metrics)
-    out = _one_entry_per_name(out)
+    out = _one_entry_per_name(out, site_xy=site_xy, epsg=epsg, radius_m=radius_m)
     out.sort(key=lambda m: m.nearest_m)
     _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
     _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,
@@ -1229,12 +1390,30 @@ def _dedupe_confluences(items: list[dict], *, merge_m: float = 50.0) -> list[dic
     return out
 
 
-def _one_entry_per_name(metrics: list[WaterMetrics]) -> list[WaterMetrics]:
+def _coverage_m(coords: list[tuple[float, float]] | None, site_xy: np.ndarray, epsg: int,
+                radius_m: float) -> float:
+    """Сколько метров русла лежит в радиусе участка — мера «это главное русло, а не стаб»."""
+    if not coords or len(coords) < 2:
+        return 0.0
+    pts = to_utm(coords, epsg) - site_xy
+    total = 0.0
+    for a, b in zip(pts[:-1], pts[1:]):
+        mid = (a + b) / 2.0
+        if float(np.hypot(*mid)) <= radius_m:
+            total += float(np.hypot(*(b - a)))
+    return total
+
+
+def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | None = None,
+                        epsg: int | None = None,
+                        radius_m: float = 8000.0) -> list[WaterMetrics]:
     """Одна река — одна запись, даже если русло в OSM разбито на несоприкасающиеся куски.
 
-    Записи группируются по нормализованному имени и типу. Остаётся кусок, ближайший к участку;
-    доля подземного участка берётся максимальной по кускам (если часть реки в трубе — это
-    важно сказать), а число кусков пишется в `pieces`.
+    Записи группируются по нормализованному имени и типу. Остаётся кусок, который покрывает
+    больше всего русла в радиусе участка, а при равенстве — ближайший: «ближайший» без
+    покрытия выбирал обрывок у шлюза, и у Кингстона запись о Темзе описывала 300-метровый
+    стаб вместо главного русла (E-014). Доля подземного участка берётся максимальной по кускам
+    (если часть реки в трубе — это важно сказать), а число кусков пишется в `pieces`.
     """
     groups: dict[str, list[WaterMetrics]] = {}
     for metric in metrics:
@@ -1243,7 +1422,14 @@ def _one_entry_per_name(metrics: list[WaterMetrics]) -> list[WaterMetrics]:
 
     out: list[WaterMetrics] = []
     for items in groups.values():
-        items.sort(key=lambda m: m.nearest_m)
+        if site_xy is not None and epsg is not None:
+            # Покрытие считается только для линейной воды: у озера «покрытие» — это периметр
+            # замкнутого кольца, и правило выбирало дальний пруд вместо ближнего.
+            items.sort(key=lambda m: (-_coverage_m(m.coords, site_xy, epsg, radius_m)
+                                      if m.kind in {"river", "stream", "canal", "culvert"} else 0.0,
+                                      m.nearest_m))
+        else:
+            items.sort(key=lambda m: m.nearest_m)
         keep = items[0]
         if len(items) > 1:
             keep.pieces = len(items)
