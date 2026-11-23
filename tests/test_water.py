@@ -468,3 +468,26 @@ def test_tidal_tag_reaches_flow_rule():
                                    epsg=32630, grid=None)
     assert metric.tidal is True
     assert metric.flow_rule == 2, metric.flow_rule
+
+def test_partly_buried_river_is_not_a_culvert():
+    """Труба — свойство линии: река с коротким засыпанным куском остаётся рекой (Moselle 0.10)."""
+    coords = [(-0.100 + 0.0005 * i, 51.5004) for i in range(6)]
+    mixed = water.MergedLine("osm-mixed-river", "Mixed", "river", coords, 2, False,
+                             hidden_share=0.1,
+                             tags={"waterway": "river", "tunnel": "culvert"})
+    site = water.to_utm([(-0.100, 51.500)], 32630)[0]
+    metric = water.measure_feature(mixed, site_xy=site, lat=51.500, lon=-0.100,
+                                   epsg=32630, grid=None)
+    assert metric.kind == "river"
+    assert metric.visible is True
+
+
+def test_almost_fully_buried_river_is_a_culvert():
+    coords = [(-0.100 + 0.0005 * i, 51.5004) for i in range(6)]
+    buried = water.MergedLine("osm-buried-river", "Buried", "river", coords, 3, False,
+                              hidden_share=0.93, tags={"waterway": "river"})
+    site = water.to_utm([(-0.100, 51.500)], 32630)[0]
+    metric = water.measure_feature(buried, site_xy=site, lat=51.500, lon=-0.100,
+                                   epsg=32630, grid=None)
+    assert metric.kind == "culvert"
+    assert metric.visible is False
