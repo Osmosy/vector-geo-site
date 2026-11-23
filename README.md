@@ -66,7 +66,7 @@ geosite run "51.5138, -0.0984" --facing 180 --year 2018 --out examples/london-ci
 
 ## Живая схема
 
-Смотреть онлайн: https://osmosy.github.io/vector-geo-site/
+Смотреть онлайн: https://osmosy.github.io/vector-geo-site/docs/diagram.html
 
 `docs/diagram.html` — интерактивная схема сборки пакета: источники, расчёт, пакет, проверка.
 Открывается прямо из файла, без сети; клик по блоку даёт числа и причину решения, чипы сверху
