@@ -728,3 +728,43 @@ def test_closed_waterway_with_area_no_stays_a_line():
     feats = water.parse_features(payload)
     assert feats[0].geom == "line"
 
+
+def test_confluence_found_in_short_arm_real_data_severn():
+    """E-015 на реальных линиях: Северн у Глостера, 51.8620, -2.2500.
+
+    Фикстура `tests/fixtures/horseshoe-severn.json` — два `waterway=stream` из OSM. Сток
+    `#41965525` входит в круг 8 км **двумя** куском (2 и 4 вершины), и слияние с `#84733745`
+    на 7974.5 м лежит на меньшем куске. Пока перебирался только самый длинный кусок, этой
+    записи не было ни у одной из двух рек: проверяется ниже подменой `clip_near`.
+    """
+    import json
+    from pathlib import Path
+
+    from geosite import geo
+
+    lat, lon = 51.8620, -2.2500
+    fixture = Path(__file__).parent / "fixtures" / "horseshoe-severn.json"
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    merged = water.merge_by_name(water.parse_features(payload), near=(lat, lon))
+    short = next(line for line in merged if "#41965525" in line.uid)
+
+    pieces = water.clip_near(water.to_utm(short.coords, epsg) - site, 8000.0) or []
+    assert sorted(len(p) for p in pieces) == [2, 4], [len(p) for p in pieces]
+
+    conf = water.find_confluences(merged, site_xy=site, epsg=epsg, radius_m=8000, clip_m=8000.0)
+    distances = [c["dist_m"] for c in conf[short.uid]]
+    assert 7974.5 in distances, distances
+
+    # старый выбор «самый длинный кусок» эту запись терял — воспроизводим подменой
+    original = water.clip_near
+    water.clip_near = lambda pts, limit: (lambda out: [max(out, key=len)] if out else out)(
+        original(pts, limit) or [])
+    try:
+        old_style = water.find_confluences(merged, site_xy=site, epsg=epsg,
+                                           radius_m=8000, clip_m=8000.0)
+    finally:
+        water.clip_near = original
+    assert 7974.5 not in [c["dist_m"] for c in old_style[short.uid]]
+
