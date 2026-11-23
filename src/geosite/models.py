@@ -142,6 +142,10 @@ class WaterObject(BaseModel):
     tidal_source: str | None = None   # osm_tag | known_limit: откуда взят ответ
     tidal_reason: str | None = None   # почему tidal null: нет выгрузки 30 км, границы нет и т. п.
     confluences: list[Confluence] = Field(default_factory=list)
+    # вход русла в водоём: не слияние двух русел, поэтому отдельный список (E-017)
+    waterbody_links: list[dict] = Field(default_factory=list)
+    # линия русла или контур водоёма: в слияниях участвуют только линии (E-017)
+    geom: Literal["line", "area"] = "line"
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
     curvature_radius_m: float | None = None
