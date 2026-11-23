@@ -107,3 +107,36 @@ Overpass по `way(around:8000,…)` отдаёт только те куски �
 
 Слияния считаются только между разными реками: два русла одной реки у острова — не впадение реки
 в себя.
+
+## Как пересчитать слияния по пакету
+
+Числа в CHANGELOG и E-014 считаются по зафиксированному пакету, и способ счёта надо называть:
+у пары рек бывает несколько записей (река впадает в двух местах или куски дают повторы), поэтому
+«сколько пар изменилось» зависит от того, берём мы ближайшую запись пары или любую.
+
+```python
+import json
+
+def pairs(path):
+    """Пары по именам: ключ — пара имён, значение — список дистанций всех записей."""
+    pack = json.load(open(path))
+    names = {o["id"]: (o.get("name") or o["id"]) for o in pack["water"]}
+    out = {}
+    for obj in pack["water"]:
+        me = obj.get("name") or obj["id"]
+        for c in obj.get("confluences") or []:
+            key = frozenset((me, names.get(c["with"], c["with"])))
+            out.setdefault(key, []).append(c["dist_m"])
+    return out
+
+old, new = pairs("examples_632/site_pack.json"), pairs("examples/london-city/site_pack.json")
+print("записей:", sum(len(v) for v in old.values()), "->", sum(len(v) for v in new.values()))
+print("пар:", len(old), "->", len(new), "| ушли:", [tuple(sorted(k)) for k in set(old) - set(new)])
+for k in old:
+    if k in new and abs(min(old[k]) - min(new[k])) > 0.05:
+        print(tuple(sorted(k)), min(old[k]), "->", min(new[k]))
+```
+
+Счёт «по метрикам до агрегации» даёт другую картину (там есть `uid` и кусочные записи) — его
+нельзя смешивать с пакетным.
+
