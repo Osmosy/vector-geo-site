@@ -590,3 +590,49 @@ def test_one_entry_per_name_prefers_main_channel_over_nearest_stub():
     assert len(kept) == 1
     assert kept[0].nearest_m == m_main.nearest_m
     assert kept[0].pieces == 2
+
+def test_confluence_found_in_shorter_arm_of_horseshoe():
+    """E-015: река подковой входит в круг дважды, приток впадает в рукав с меньшим числом вершин.
+
+    Прежний поиск брал внутри круга только самый длинный кусок линии, и слияние терялось.
+    """
+    import numpy as np
+
+    epsg = 32630
+    site = water.to_utm([(0.0, 51.0)], epsg)[0]
+
+    # рукав A: 6 вершин, в 830 м от участка; рукав B: 2 вершины, в 55 м; между ними река
+    # уходит далеко за круг — поэтому в круге это два разных куска одной линии
+    arm_a = [(-0.010 + 0.004 * k, 51.0075) for k in range(6)]
+    far = [(0.010, 51.2000), (-0.010, 51.2000)]
+    arm_b = [(-0.010, 51.0005), (0.010, 51.0005)]
+    horseshoe = make("Horseshoe", arm_a + far + arm_b[::-1])
+    horseshoe.uid = "osm-horseshoe-0"
+    horseshoe.key = "osm-horseshoe-river"
+    trib = make("Tributary", [(-0.005, 50.9900), (-0.005, 51.0020)])
+    trib.uid = "osm-tributary-0"
+    trib.key = "osm-tributary-river"
+
+    out = water.find_confluences([horseshoe, trib], site_xy=site, epsg=epsg, radius_m=8000)
+    assert out.get(trib.uid), "слияние через короткий рукав потеряно"
+    assert min(h["dist_m"] for h in out[trib.uid]) < 1500
+
+def test_tidal_null_has_reason_when_wide_payload_absent():
+    """E-016: без 30-км выгрузки приливность остаётся null, но с причиной, а не молча."""
+    import numpy as np
+
+    epsg = 32630
+    site = water.to_utm([(-0.10, 51.51)], epsg)[0]
+    metric = water.WaterMetrics(
+        id="osm-thames-river", name="River Thames", kind="river", order=None, nearest_m=400.0,
+        in_mountain=None, out_mountain=None, bend=None, bend_kind=None, curvature_radius_m=None,
+        straight_at_site=True, confluences=[], water_mouth=None, outflow_visible=None,
+        flow_dem_dir=None, flow_osm_dir=None, flow_agree=None, flow_chosen="downstream_toward_end",
+        flow_rule=5, flow_confidence="medium", dem_slope_m_per_km=None, dem_slope_snr=None,
+        dem_reason=None, tidal=None, tidal_source=None, source="openstreetmap",
+        coords=[(-0.10, 51.51), (-0.09, 51.51)],
+    )
+    water._resolve_tidal_by_reach([metric], 51.51, -0.10, epsg=epsg, site_xy=site,
+                                  radius_m=8000, wide_payload=None, allow_network=False)
+    assert metric.tidal is None
+    assert metric.tidal_reason and metric.tidal_reason.startswith("no_wide_payload")

@@ -146,3 +146,24 @@
 - Тесты: `test_merge_grows_from_middle_in_both_directions`, `test_island_channels_stay_separate_lines`,
   `test_same_river_pieces_are_not_a_confluence`,
   `test_one_entry_per_name_prefers_main_channel_over_nearest_stub`.
+
+## E-015 — слияние терялось, если река входила в круг дважды
+
+- Место: `water.find_confluences`, выбор геометрии линии внутри окна.
+- Было: из кусков линии, попавших в круг 5 км, в перебор шёл только самый длинный
+  (`max(pieces, key=len)`). Река подковой проходит мимо участка дважды; если приток впадает в
+  рукав с меньшим числом вершин, слияния не находилось ни у одной из рек.
+- Доказательство: синтетика с двумя рукавами (7 и 3 вершины в круге) — слияние пропадало;
+  после правки находится на 800 м у обеих рек.
+- Нашёл: внешняя проверка ZCode (остаток 2). Исправлено в `water 6.4.1`.
+- Тест: `test_confluence_found_in_shorter_arm_of_horseshoe`.
+
+## E-016 — приливность оставалась null без причины при офлайн-сборке
+
+- Место: `water._resolve_tidal_by_reach`, CLI.
+- Было: без выгрузки на 30 км функция молча выходила; у реки из `tidal_limits.json` без тега
+  `tidal` поле оставалось `null`, и отличить «не приливная» от «не смогли посчитать» было нельзя.
+- Доказательство: офлайн-прогон на реке таблицы без широкой выгрузки.
+- Нашёл: внешняя проверка ZCode (остаток 3). Исправлено в `water 6.4.1`: `--osm-file-wide` и
+  `water[].tidal_reason`.
+- Тест: `test_tidal_null_has_reason_when_wide_payload_absent`.

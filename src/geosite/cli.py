@@ -131,8 +131,9 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
         except Exception as exc:
             result["water_error"] = str(exc)
             return result
+    wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy,
-                                  radius_m=8000, payload=payload,
+                                  radius_m=8000, payload=payload, wide_payload=wide_payload,
                                   allow_network=payload is None and not getattr(args, "offline", False))
     # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
     # Источник необязателен: без shapefile пакет собирается, поле остаётся None с предупреждением.
@@ -360,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--offline", action="store_true", help="не ходить в сеть, брать из кеша")
         p.add_argument("--osm-file", default=None,
                        help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
+        p.add_argument("--osm-file-wide", default=None,
+                       help="ответ Overpass радиусом 30 км (приливность по руслу), только с --offline")
 
     p_res = sub.add_parser("resolve", help="ввод → точка, тип, точность")
     p_res.add_argument("place")

@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.4.0"
+ALGO_VERSION = "6.4.1"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -711,6 +711,7 @@ class WaterMetrics:
     tidal: bool | None
     tidal_source: str | None
     source: str
+    tidal_reason: str | None = None
     loop: dict | None = None
     site_position: str | None = None
     hidden_share: float | None = None
@@ -1211,6 +1212,7 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
     lines: dict[str, np.ndarray] = {}
     kinds: dict[str, str] = {}
     labels: dict[str, str] = {}
+    base: dict[str, str] = {}          # ключ куска в круге -> ключ реки
     for idx, f in enumerate(features):
         if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1:
             uid = (getattr(f, "uid", None) or getattr(f, "key", None)
@@ -1219,12 +1221,18 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
             pieces = clip_near(full, clip_m) or []
             if not pieces:
                 continue
-            lines[uid] = np.vstack(pieces) if len(pieces) == 1 else max(pieces, key=len)
-            kinds[uid] = f.kind
-            labels[uid] = getattr(f, "key", None) or uid
+            # Все куски линии внутри круга, а не только самый длинный: река подковой проходит
+            # мимо участка дважды, и приток впадает в тот рукав, где вершин меньше — прежний
+            # выбор «кто длиннее» терял слияние у обеих рек (E-015).
+            for k, piece in enumerate(pieces):
+                key = uid if len(pieces) == 1 else f"{uid}#{k}"
+                lines[key] = piece
+                base[key] = uid
+                kinds[key] = f.kind
+                labels[key] = getattr(f, "key", None) or uid
 
     boxes = {key: _bbox(pts) for key, pts in lines.items()}
-    result: dict[str, list[dict]] = {key: [] for key in lines}
+    result: dict[str, list[dict]] = {uid: [] for uid in dict.fromkeys(base.values())}
 
     keys = list(lines)
     for i in range(len(keys)):
@@ -1268,8 +1276,8 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
                 bearing = geo.normalize_deg(math.degrees(math.atan2(point[0], point[1])))
                 entry = {"dist_m": round(dist, 1), "mountain": geo.mountain_name(bearing),
                          "kind": _confluence_kind(kinds[a_key], kinds[b_key])}
-                result[a_key].append({"with": labels[b_key], **entry})
-                result[b_key].append({"with": labels[a_key], **entry})
+                result[base[a_key]].append({"with": labels[b_key], **entry})
+                result[base[b_key]].append({"with": labels[a_key], **entry})
 
     for key, items in result.items():
         items.sort(key=lambda item: item["dist_m"])
@@ -1485,7 +1493,10 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
     else:
         try:
             wide = fetch_raw(lat, lon, wide_radius_m, allow_network=allow_network)
-        except Exception:
+        except Exception as exc:
+            # Без выгрузки на 30 км границу прилива не поставить: пишем причину, а не молчим.
+            for metric in pending:
+                metric.tidal_reason = f"no_wide_payload: {exc}"
             return
     # нужна линия, на которой лежат ОБА: участок и граница прилива.
     # Из линий одной реки выбираем ту, где участок ближе 2 км, а граница — ближайшая.
@@ -1519,6 +1530,7 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
         line = (wide_lines.get(metric.name) or (None, None))[1]
         entry = tides.limit_entry(metric.name)
         if line is None or entry is None:
+            metric.tidal_reason = "limit_not_on_line"
             continue
         pts = to_utm(line.coords, epsg) - site_xy
         if len(pts) < 3:
@@ -1530,9 +1542,11 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
         d_limit = np.hypot(pts[:, 0] - limit_xy[0], pts[:, 1] - limit_xy[1])
         limit_idx = int(np.argmin(d_limit))
         if float(d_limit[limit_idx]) > 5000.0:
+            metric.tidal_reason = "limit_far_from_line"
             continue
         # downstream_toward_end: по течению индекс растёт
         flow_end = (metric.flow_chosen or "downstream_toward_end") == "downstream_toward_end"
         tide = tides.status_by_distance(entry, cum[site_idx], cum[limit_idx], flow_toward_end=flow_end)
         metric.tidal = tide["tidal"]
         metric.tidal_source = tide["tidal_source"]
+        metric.tidal_reason = None

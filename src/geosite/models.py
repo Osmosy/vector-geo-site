@@ -139,6 +139,7 @@ class WaterObject(BaseModel):
     bend: Literal["outer", "inner", "straight"] | None = None
     straight_at_site: bool | None = None
     tidal: bool | None = None
+    tidal_reason: str | None = None   # почему tidal null: нет выгрузки 30 км, границы нет и т. п.
     confluences: list[Confluence] = Field(default_factory=list)
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
