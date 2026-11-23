@@ -1164,6 +1164,18 @@
           "default": null,
           "title": "Tidal"
         },
+        "tidal_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal Source"
+        },
         "tidal_reason": {
           "anyOf": [
             {
@@ -1425,18 +1437,6 @@
           ],
           "default": null,
           "title": "Dem Reason"
-        },
-        "tidal_source": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tidal Source"
         },
         "source": {
           "anyOf": [
