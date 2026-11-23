@@ -168,6 +168,13 @@ class Exposure(BaseModel):
     windy_mountains: list[str] = Field(default_factory=list)
     sky_view_factor: float | None = None
     winter_sun_hours: float | None = None
+    wind_prevailing_deg: float | None = None
+    wind_prevailing_mountain: str | None = None
+    wind_speed_ms: float | None = None
+    wind_calm_share: float | None = None
+    wind_days: int | None = None
+    wind_seasonal: dict | None = None
+    wind_source: str | None = None
 
 
 class LandCover(BaseModel):

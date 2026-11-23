@@ -22,3 +22,10 @@ source:
   - "OSM: теги waterway/natural на Темзе, слияние с River Fleet"
   - "tidal_limits.json: граница прилива — Teddington Lock (Port of London Authority)"
   - "Copernicus GLO-30 (DSM), профиль бортов долины в 8 км от Сити"
+
+climate:
+  declination_deg_range: [0.5, 2.0]   # WMM на 2026.9: +1.24° на восток (NOAA)
+  wind_prevailing_range: [215, 255]   # ERA5 2016–2025: юго-запад, 235.8°
+  wind_mountain_any: [申, 坤]
+  wind_speed_ms_range: [3.0, 5.0]     # 3.97 м/с на 10 м
+  wind_days_min: 3600                 # десять лет суточных данных
