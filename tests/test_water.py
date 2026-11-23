@@ -636,3 +636,28 @@ def test_tidal_null_has_reason_when_wide_payload_absent():
                                   radius_m=8000, wide_payload=None, allow_network=False)
     assert metric.tidal is None
     assert metric.tidal_reason and metric.tidal_reason.startswith("no_wide_payload")
+
+
+def test_confluence_real_isle_of_dogs_both_arms():
+    """E-015 на реальных данных: у Айл-оф-Догс река входит в круг дважды.
+
+    Фикстура — четыре `way` из OSM вокруг 51.4870, -0.0150 (Темза и два её рукава у острова).
+    Приток впадает в тот рукав, который при обрезке короче: прежний выбор «самый длинный кусок»
+    терял слияние, теперь находятся оба.
+    """
+    import json
+    from pathlib import Path
+
+    from geosite import geo
+
+    fixture = Path(__file__).parent / "fixtures" / "confluence-horseshoe.json"
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+    epsg = geo.utm_epsg(51.4870, -0.0150)
+    site = water.to_utm([(-0.0150, 51.4870)], epsg)[0]
+    feats = water.parse_features(payload)
+    out = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    key = next(k for k in out if k.startswith("osm-way-368175646"))
+    partners = {c["with"].split("-")[2] for c in out[key]}
+    # второй рукав (59041257 на 4793.7 м) и два притока, впадающих в короткий рукав
+    assert {"59041257", "59042050", "4054869"} <= partners, partners
+
