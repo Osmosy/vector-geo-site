@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "vector-geo-site — измерение участка",
+    "output": "docs/vector-geo-site.architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "pack-path",
+        "label": "Путь пакета",
+        "focus": [
+          "place",
+          "osm",
+          "dem",
+          "terrain",
+          "water",
+          "climate",
+          "pack",
+          "artifacts"
+        ],
+        "note": "От точки на карте до site_pack.json: рельеф, вода и климат считаются раздельно и сходятся в сборке."
+      },
+      {
+        "id": "sources",
+        "label": "Источники и кеш",
+        "focus": [
+          "osm",
+          "dem",
+          "hydrorivers",
+          "climate_src"
+        ],
+        "note": "Четыре внешних источника и кеш: пустой ответ зеркала не становится фактом, тайлы и архивы не качаются дважды."
+      },
+      {
+        "id": "checks",
+        "label": "Инварианты и эталоны",
+        "focus": [
+          "pack",
+          "artifacts",
+          "checks"
+        ],
+        "note": "Пакет проверяется схемой и инвариантами I-01…I-10, эталоны сверяют числа с картой, лоцией и DEM."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "place",
+      "type": "external",
+      "label": "Место",
+      "sublabel": "адрес или координаты",
+      "pos": [
+        40,
+        24
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "osm",
+      "type": "external",
+      "label": "Overpass / OSM",
+      "sublabel": "waterway + отношения",
+      "pos": [
+        470,
+        24
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "dem",
+      "type": "external",
+      "label": "Copernicus GLO-30",
+      "sublabel": "DEM 30 м",
+      "pos": [
+        230,
+        24
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "hydrorivers",
+      "type": "external",
+      "label": "HydroRIVERS",
+      "sublabel": "порядок и расход",
+      "pos": [
+        710,
+        24
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "climate_src",
+      "type": "cloud",
+      "label": "ERA5 и WMM",
+      "sublabel": "ветер 10 лет, склонение",
+      "pos": [
+        950,
+        24
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "terrain",
+      "type": "backend",
+      "label": "terrain",
+      "sublabel": "24 горы, четыре духа",
+      "pos": [
+        230,
+        148
+      ],
+      "size": [
+        160,
+        72
+      ]
+    },
+    {
+      "id": "water",
+      "type": "backend",
+      "label": "water + hydro",
+      "sublabel": "русло, слияния, петля",
+      "pos": [
+        560,
+        148
+      ],
+      "size": [
+        180,
+        72
+      ]
+    },
+    {
+      "id": "climate",
+      "type": "backend",
+      "label": "climate",
+      "sublabel": "склонение и ветер",
+      "pos": [
+        950,
+        148
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "pack",
+      "type": "backend",
+      "label": "pack",
+      "sublabel": "модели и версии",
+      "pos": [
+        560,
+        290
+      ],
+      "size": [
+        180,
+        72
+      ]
+    },
+    {
+      "id": "artifacts",
+      "type": "database",
+      "label": "site_pack.json",
+      "sublabel": "water.geojson · figures",
+      "pos": [
+        300,
+        412
+      ],
+      "size": [
+        200,
+        72
+      ]
+    },
+    {
+      "id": "checks",
+      "type": "security",
+      "label": "validate и тесты",
+      "sublabel": "инварианты · 117 · эталоны",
+      "pos": [
+        820,
+        412
+      ],
+      "size": [
+        200,
+        72
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "place-terrain",
+      "from": "place",
+      "to": "terrain",
+      "label": "координаты",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "dem-terrain",
+      "from": "dem",
+      "to": "terrain",
+      "label": "тайлы, мозаика UTM",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        310,
+        98
+      ]
+    },
+    {
+      "id": "terrain-water",
+      "from": "terrain",
+      "to": "water",
+      "label": "видимость и борта",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "osm-water",
+      "from": "osm",
+      "to": "water",
+      "label": "элементы и отношения",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hydrorivers-water",
+      "from": "hydrorivers",
+      "to": "water",
+      "label": "ORD_STRA, м³/с",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "climate-climate",
+      "from": "climate_src",
+      "to": "climate",
+      "label": "3653 суток, WMM",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1035,
+        98
+      ]
+    },
+    {
+      "id": "terrain-pack",
+      "from": "terrain",
+      "to": "pack",
+      "label": "сектора, духи, жила",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "water-pack",
+      "from": "water",
+      "to": "pack",
+      "label": "метрики воды",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        650,
+        234
+      ]
+    },
+    {
+      "id": "climate-pack",
+      "from": "climate",
+      "to": "pack",
+      "label": "азимут и ветер",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "pack-artifacts",
+      "from": "pack",
+      "to": "artifacts",
+      "label": "site_pack/1",
+      "fromSide": "left",
+      "toSide": "top"
+    },
+    {
+      "id": "pack-checks",
+      "from": "pack",
+      "to": "checks",
+      "label": "пакет на проверку",
+      "fromSide": "right",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Версии, которые пишутся в пакет",
+      "items": [
+        "water 6.3.1 · terrain 2.0.1 · climate 1.0.0 · pack 1.2.0",
+        "каждая метрика помечена версией алгоритма: старое читается как stale_algo, а не как текущее",
+        "чего не посчитали — quality.warnings, а не выдуманное число"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Границы измерения",
+      "items": [
+        "DEM только Copernicus S3: запасного источника нет",
+        "порядок и расход — HydroRIVERS 1.0 со смещением сети до 1.5 км",
+        "ветер региональный (сетка ERA5 9–30 км), двор по нему не судится",
+        "кеш ~/.cache/vector-geo-site: ответы Overpass по хешу точки, тайлы DEM, индекс HydroRIVERS"
+      ]
+    }
+  ]
+}
