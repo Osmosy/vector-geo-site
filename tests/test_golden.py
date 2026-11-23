@@ -81,7 +81,17 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
         current = by_name.get(metric.name)
         if current is None or metric.nearest_m < current.nearest_m:
             by_name[metric.name] = metric
-    return {"terrain": grid_measured, "water": by_name, "hydro": reach}
+    climate_facts = {}
+    wind_file = fixtures / "wind.json"
+    if wind_file.exists():
+        from geosite import climate
+
+        climate_facts["wind"] = climate.summarize(
+            json.loads(wind_file.read_text(encoding="utf-8")))
+        # склонение считается и без сети: это чистый расчёт WMM
+        climate_facts["declination"] = climate.declination(lat, lon, year=2026.9)
+    return {"terrain": grid_measured, "water": by_name, "hydro": reach,
+            "climate": climate_facts}
 
 
 @pytest.mark.skipif(not SITES, reason="нет эталонов")
@@ -105,6 +115,33 @@ def test_golden_site(name: str):
     result = measure(site, fixtures, with_dem=has_dem)
     facts = expect.get("water") or {}
     failures: list[str] = []
+
+    climate_facts = expect.get("climate") or {}
+    if climate_facts:
+        got = result.get("climate") or {}
+        decl = (got.get("declination") or {}).get("deg")
+        if "declination_deg_range" in climate_facts:
+            low, high = climate_facts["declination_deg_range"]
+            if decl is None or not (low <= decl <= high):
+                failures.append(f"склонение={decl} вне {climate_facts['declination_deg_range']}")
+        wind = got.get("wind") or {}
+        if "wind_prevailing_range" in climate_facts:
+            low, high = climate_facts["wind_prevailing_range"]
+            value = wind.get("prevailing_from_deg")
+            if value is None or not (low <= value <= high):
+                failures.append(f"ветер: {value} вне {climate_facts['wind_prevailing_range']}")
+        if "wind_mountain_any" in climate_facts:
+            allowed = set(climate_facts["wind_mountain_any"])
+            if wind.get("prevailing_from_mountain") not in allowed:
+                failures.append(f"ветер: гора {wind.get('prevailing_from_mountain')} не из {sorted(allowed)}")
+        if "wind_speed_ms_range" in climate_facts:
+            low, high = climate_facts["wind_speed_ms_range"]
+            value = wind.get("mean_speed_ms")
+            if value is None or not (low <= value <= high):
+                failures.append(f"ветер: скорость {value} вне {climate_facts['wind_speed_ms_range']}")
+        if "wind_days_min" in climate_facts:
+            if (wind.get("days") or 0) < climate_facts["wind_days_min"]:
+                failures.append(f"ветер: дней {wind.get('days')}, ждали ≥ {climate_facts['wind_days_min']}")
 
     hydro_facts = expect.get("hydrorivers") or {}
     if hydro_facts:

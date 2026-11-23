@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import geo, hydro, terrain, water, water_pack
+from . import climate, geo, hydro, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -221,16 +221,30 @@ def cmd_pack(args) -> int:
         warnings.append("вода: слои OSM не получены, water и water_share пусты")
     if m.get("water_error"):
         warnings.append(f"вода: {m['water_error']}")
-    warnings.append("склонение и ветер не рассчитаны (этап 4)")
     warnings.append("рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, "
                     "в плотной застройке возможны искажения")
     if r.precision in {"district", "settlement"}:
         warnings.append("точка — историческое ядро/центр по геокодеру, не контур здания")
 
+    # этап 4: склонение по WMM (офлайн) и ветер по архиву ERA5 (кеш/сеть)
+    decl = None
+    try:
+        decl = climate.declination(r.lat, r.lon)
+    except Exception as exc:
+        warnings.append(f"склонение не рассчитано: {exc}")
+    wind = None
+    try:
+        wind = climate.summary(r.lat, r.lon, allow_network=not args.offline)
+        m["wind"] = wind
+    except Exception as exc:
+        warnings.append(f"ветер не рассчитан: {exc}")
+    if wind is not None:
+        m["exposure"] = {**(m.get("exposure") or {}), "wind": wind}
+
     orientation = {
         "facing_true_deg": round(facing, 1),
-        "declination_deg": None,
-        "facing_mag_deg": None,
+        "declination_deg": None if decl is None else decl["deg"],
+        "facing_mag_deg": None if decl is None else climate.magnetic_bearing(facing, decl["deg"]),
         "facing_mountain": geo.mountain_name(facing),
         "sitting_mountain": geo.mountain_name(facing + 180.0),
         "source": orientation_source,

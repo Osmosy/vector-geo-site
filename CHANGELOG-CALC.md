@@ -130,3 +130,15 @@
 - `sectors[].water` — до четырёх ближайших именованных вод в секторе (было пустое поле).
 - `land_cover.water` — доля воды по полигонам в кольце 0.5–2 км.
 - Калибровка и границы — `docs/calc/water_share.md`.
+
+## climate 1.0.0 (этап 4) — 23.11.2026
+
+- **Магнитное склонение** по WMM (pygeomag, без сети): `orientation.declination_deg` и
+  `orientation.facing_mag_deg` = истинный − склонение. Лондон +1.24°, Нижний Новгород +13.76°.
+- **Ветер** по ERA5 (Open-Meteo archive, 10 лет суточных, 2016–2025): `exposure.wind_prevailing_deg`
+  (векторный средний перенос), `wind_speed_ms`, `wind_calm_share`, `wind_seasonal`,
+  `wind_days`, `wind_source`; повторяемость по секторам — `sectors[].wind_share`.
+- Лондон: 235.8° (申), 3.97 м/с, зима 234.1° / 4.38 м/с, лето 241.0° / 3.69 м/с.
+- Оговорка «склонение и ветер не рассчитаны (этап 4)» убрана; без архива ветра поля `null`
+  и причина в `quality.warnings`.
+- Правило и границы (сетка ERA5, высота 10 м, штили) — `docs/calc/climate.md`.

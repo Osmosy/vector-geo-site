@@ -11,7 +11,8 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.3.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0"}
+ALGO = {"water": "6.3.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0",
+        "climate": "1.0.0"}
 
 ALGO_VERSION = "1.1.0"
 
@@ -147,10 +148,12 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                  if tuple(r.get("r_km") or ()) == (2.0, 8.0) else None),
                 "peaks": r.get("peaks", []),
             })
+        wind_share = (measured.get("wind") or {}).get("by_mountain", {}).get(s["mountain"])
         sectors.append({"mountain": s["mountain"], "from_deg": geo.mountain_bounds(s["mountain"])[0],
                         "to_deg": geo.mountain_bounds(s["mountain"])[1], "rings": rings,
                         "water": (measured.get("water_names") or {}).get(s["mountain"], []),
-                        "water_km": _km(s["mountain"])})
+                        "water_km": _km(s["mountain"]),
+                        "wind_share": wind_share})
 
     # Схемы: роза, профиль горизонта, отмывка макро-охвата
     label = site_label or query.get("input", "")
@@ -178,6 +181,19 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         write_water_geojson(path, water_all, geometry)
         sha[geojson_name] = hashlib.sha256(path.read_bytes()).hexdigest()
 
+    exposure = dict(measured.get("exposure") or {})
+    wind = exposure.pop("wind", None)
+    if wind:
+        exposure.update({
+            "wind_prevailing_deg": wind.get("prevailing_from_deg"),
+            "wind_prevailing_mountain": wind.get("prevailing_from_mountain"),
+            "wind_speed_ms": wind.get("mean_speed_ms"),
+            "wind_calm_share": wind.get("calm_share"),
+            "wind_days": wind.get("days"),
+            "wind_seasonal": wind.get("seasonal"),
+            "wind_source": wind.get("source"),
+        })
+
     pack = SitePack(
         query=query,
         site=site,
@@ -189,7 +205,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         dragon_vein=measured.get("dragon_vein"),
         water=kept,
         roads=measured.get("roads", []),
-        exposure=measured.get("exposure"),
+        exposure=exposure or None,
         land_cover=measured.get("land_cover"),
         quality={"dem": "Copernicus DEM GLO-30 (DSM)", "dem_resolution_m": dem_resolution_m,
                  "warnings": warnings, "notes": notes},

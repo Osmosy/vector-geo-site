@@ -23,6 +23,8 @@
  },
  "orientation": {
   "facing_true_deg": 135.0,
+  "declination_deg": 1.238,
+  "facing_mag_deg": 133.8,
   "facing_mountain": "巽",
   "sitting_mountain": "乾",
   "source": "model",
@@ -85,7 +87,8 @@
     "#1187869365",
     "City Road Basin",
     "Wenlock Basin"
-   ]
+   ],
+   "wind_share": 0.021
   },
   {
    "mountain": "癸",
@@ -137,7 +140,8 @@
     "#34040012",
     "#1468573932",
     "#192954297"
-   ]
+   ],
+   "wind_share": 0.032
   },
   {
    "mountain": "丑",
@@ -184,7 +188,8 @@
      "horizon_deg": 0.27,
      "water_share": null
     }
-   ]
+   ],
+   "wind_share": 0.032
   },
   {
    "mountain": "艮",
@@ -234,7 +239,8 @@
    ],
    "water": [
     "Waterfall"
-   ]
+   ],
+   "wind_share": 0.038
   },
   {
    "mountain": "寅",
@@ -286,7 +292,8 @@
     "#892252520",
     "#836249109"
    ],
-   "water_km": 0.678
+   "water_km": 0.678,
+   "wind_share": 0.039
   },
   {
    "mountain": "甲",
@@ -334,7 +341,8 @@
      "water_share": null
     }
    ],
-   "water_km": 0.343
+   "water_km": 0.343,
+   "wind_share": 0.045
   },
   {
    "mountain": "卯",
@@ -386,7 +394,8 @@
     "#1422123333",
     "#1422123334"
    ],
-   "water_km": 0.208
+   "water_km": 0.208,
+   "wind_share": 0.029
   },
   {
    "mountain": "乙",
@@ -440,7 +449,8 @@
     "West Dock",
     "Central Basin"
    ],
-   "water_km": 0.38
+   "water_km": 0.38,
+   "wind_share": 0.016
   },
   {
    "mountain": "辰",
@@ -494,7 +504,8 @@
     "Tower Dock",
     "#436220356"
    ],
-   "water_km": 1.264
+   "water_km": 1.264,
+   "wind_share": 0.015
   },
   {
    "mountain": "巽",
@@ -542,7 +553,8 @@
      "water_share": null
     }
    ],
-   "water_km": 0.619
+   "water_km": 0.619,
+   "wind_share": 0.017
   },
   {
    "mountain": "巳",
@@ -593,7 +605,8 @@
    "water": [
     "Queenhithe"
    ],
-   "water_km": 0.252
+   "water_km": 0.252,
+   "wind_share": 0.014
   },
   {
    "mountain": "丙",
@@ -644,7 +657,8 @@
    "water": [
     "#1080219125"
    ],
-   "water_km": 0.08
+   "water_km": 0.08,
+   "wind_share": 0.024
   },
   {
    "mountain": "午",
@@ -695,7 +709,8 @@
    "water": [
     "River Thames",
     "#451796441"
-   ]
+   ],
+   "wind_share": 0.037
   },
   {
    "mountain": "丁",
@@ -742,7 +757,8 @@
      "horizon_deg": 0.25,
      "water_share": null
     }
-   ]
+   ],
+   "wind_share": 0.057
   },
   {
    "mountain": "未",
@@ -793,7 +809,8 @@
    "water": [
     "#1183751616"
    ],
-   "water_km": 0.141
+   "water_km": 0.141,
+   "wind_share": 0.085
   },
   {
    "mountain": "坤",
@@ -844,7 +861,8 @@
    "water": [
     "#583416272"
    ],
-   "water_km": 0.472
+   "water_km": 0.472,
+   "wind_share": 0.113
   },
   {
    "mountain": "申",
@@ -892,7 +910,8 @@
      "water_share": null
     }
    ],
-   "water_km": 1.355
+   "water_km": 1.355,
+   "wind_share": 0.105
   },
   {
    "mountain": "庚",
@@ -945,7 +964,8 @@
     "Fountain Court Fountain",
     "#559178841",
     "#583930364"
-   ]
+   ],
+   "wind_share": 0.087
   },
   {
    "mountain": "酉",
@@ -992,7 +1012,8 @@
      "horizon_deg": 0.15,
      "water_share": null
     }
-   ]
+   ],
+   "wind_share": 0.057
   },
   {
    "mountain": "辛",
@@ -1044,7 +1065,8 @@
     "#1303532135",
     "#376650111",
     "#376650105"
-   ]
+   ],
+   "wind_share": 0.038
   },
   {
    "mountain": "戌",
@@ -1096,7 +1118,8 @@
     "#1202299504",
     "#1055909236"
    ],
-   "water_km": 0.171
+   "water_km": 0.171,
+   "wind_share": 0.028
   },
   {
    "mountain": "乾",
@@ -1147,7 +1170,8 @@
    "water": [
     "#996071739"
    ],
-   "water_km": 1.147
+   "water_km": 1.147,
+   "wind_share": 0.028
   },
   {
    "mountain": "亥",
@@ -1195,7 +1219,8 @@
      "water_share": null
     }
    ],
-   "water_km": 0.378
+   "water_km": 0.378,
+   "wind_share": 0.023
   },
   {
    "mountain": "壬",
@@ -1245,7 +1270,8 @@
    ],
    "water": [
     "#705413315"
-   ]
+   ],
+   "wind_share": 0.022
   }
  ],
  "point": {
@@ -1329,6 +1355,26 @@
    {"id":"osm-#5122307-canal","name":"#5122307","pieces":1,"hidden_share":0.0,"visible":true,"kind":"canal","in_mountain":"丑","out_mountain":"丑","nearest_m":2904.2,"bend":"outer","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-regent's canal-canal","dist_m":2904.2,"mountain":"丑"},{"with":"osm-#373395041-river","dist_m":2914.5,"mountain":"丑"}],"outflow_visible":null,"curvature_radius_m":596011.7,"between_branches":false,"flow_ways_share":0.25,"crossings_2km":0,"crossing_angle_deg":1.5,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#5926768-canal","name":"#5926768","pieces":1,"hidden_share":1.0,"visible":false,"kind":"culvert","in_mountain":"乙","out_mountain":"乙","nearest_m":2966.2,"bend":"inner","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-#5724255-canal","dist_m":2966.2,"mountain":"乙"}],"outflow_visible":null,"curvature_radius_m":120.6,"between_branches":false,"crossings_2km":0,"crossing_angle_deg":1.2,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","dem_reason":null,"source":"openstreetmap"}
   ],
+ "exposure": {
+  "wind_prevailing_deg": 235.8,
+  "wind_prevailing_mountain": "申",
+  "wind_speed_ms": 3.97,
+  "wind_calm_share": 0.002,
+  "wind_days": 3653,
+  "wind_seasonal": {
+   "winter": {
+    "prevailing_from_deg": 234.1,
+    "mean_speed_ms": 4.38,
+    "days": 903
+   },
+   "summer": {
+    "prevailing_from_deg": 241.0,
+    "mean_speed_ms": 3.69,
+    "days": 920
+   }
+  },
+  "wind_source": "ERA5 через Open-Meteo archive API (суточные, 10 м)"
+ },
  "land_cover": {
   "water": 0.0024
  },
@@ -1338,7 +1384,6 @@
   "warnings": [
    "water.flow: low — конфликт OSM и рельефа у #7833362, River Lea, #59041927, #446582987",
    "water_share — по полигонам OSM (water=*, natural=water); река, нарисованная осевой, в долю не входит, её длина — sector.water_km",
-   "склонение и ветер не рассчитаны (этап 4)",
    "рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, в плотной застройке возможны искажения"
   ],
   "notes": [
@@ -1352,7 +1397,8 @@
   "water": "6.3.0",
   "terrain": "2.0.1",
   "geocode": "1.0.0",
-  "pack": "1.2.0"
+  "pack": "1.2.0",
+  "climate": "1.0.0"
  },
  "files": {
   "water_geojson": "water.geojson",
