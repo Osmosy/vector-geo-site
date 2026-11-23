@@ -93,7 +93,7 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
     out = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
                               meso_km=8.0, facing_deg=facing, point_smooth_m=point_smooth)
     if with_water:
-        out.update(_measure_water(r, out, epsg, payload=osm_payload))
+        out.update(_measure_water(r, out, epsg, payload=osm_payload, args=args))
     return out
 
 
@@ -116,7 +116,7 @@ def _load_osm_file(path: str | None) -> dict | None:
     return data
 
 
-def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None) -> dict:
+def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, args=None) -> dict:
     """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш.
 
     `payload` — готовый ответ Overpass (файл): тогда сети не нужно вовсе, и пакет
@@ -131,7 +131,9 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None) ->
         except Exception as exc:
             result["water_error"] = str(exc)
             return result
-    metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy, radius_m=8000)
+    metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy,
+                                  radius_m=8000, payload=payload,
+                                  allow_network=payload is None and not getattr(args, "offline", False))
     # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
     # Источник необязателен: без shapefile пакет собирается, поле остаётся None с предупреждением.
     try:
@@ -298,7 +300,7 @@ def cmd_water(args) -> int:
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
     m = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
                             meso_km=8.0, facing_deg=None, point_smooth_m=point_smooth)
-    w = _measure_water(r, m, epsg, payload=_load_osm_file(getattr(args, "osm_file", None)))
+    w = _measure_water(r, m, epsg, payload=_load_osm_file(getattr(args, "osm_file", None)), args=args)
     rows = [{"id": o.id, "name": o.name, "kind": o.kind, "nearest_m": o.nearest_m,
              "in": o.in_mountain, "out": o.out_mountain, "bend": o.bend,
              "curvature_km": None if o.curvature_radius_m is None else round(o.curvature_radius_m / 1000, 2),
@@ -377,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.set_defaults(func=cmd_run)
 
     p_water = sub.add_parser("water", help="вода: реки, изгибы, слияния, врата")
-    p_water.add_argument("place")
+    common(p_water)
     p_water.set_defaults(func=cmd_water)
 
     p_val = sub.add_parser("validate", help="проверить site_pack.json на инварианты")
@@ -389,9 +391,18 @@ def main(argv: list[str] | None = None) -> int:
     p_schema.set_defaults(func=cmd_schema)
 
     args = ap.parse_args(argv)
+    # Флаг офлайна ставим на время команды и снимаем после: иначе один вызов `main()` в процессе
+    # (тесты, ноутбук) оставляет сеть выключенной для всех следующих вызовов.
+    prev_offline = os.environ.get("GEOSITE_OFFLINE")
     if getattr(args, "offline", False):
         os.environ["GEOSITE_OFFLINE"] = "1"
-    return args.func(args)
+    try:
+        return args.func(args)
+    finally:
+        if prev_offline is None:
+            os.environ.pop("GEOSITE_OFFLINE", None)
+        else:
+            os.environ["GEOSITE_OFFLINE"] = prev_offline
 
 
 if __name__ == "__main__":
