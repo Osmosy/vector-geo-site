@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import geo, terrain, water, water_pack
+from . import geo, hydro, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -108,6 +108,15 @@ def _measure_water(r, measured: dict, epsg: int) -> dict:
         result["water_error"] = str(exc)
         return result
     metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy, radius_m=8000)
+    # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
+    # Источник необязателен: без shapefile пакет собирается, поле остаётся None с предупреждением.
+    try:
+        reach = hydro.site_reach(r.lat, r.lon)
+        result["hydro"] = reach
+        result.setdefault("hydro_warnings", []).extend(hydro.assign(metrics, reach))
+    except Exception as exc:  # нет pyshp, нет архива, битый индекс
+        result["hydro"] = None
+        result.setdefault("hydro_warnings", []).append(f"hydro: источник недоступен ({exc})")
     result["water"] = water_pack.to_objects(metrics)
     # геометрия для water.geojson: берём её у самих метрик, а не сопоставляем два разных списка
     # по порядку — они фильтруются независимо (одна река = одна запись), и zip давал чужую линию

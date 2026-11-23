@@ -2,10 +2,15 @@
 # DEM вырезан из Copernicus DEM GLO-30 (тайл N50_00_E007_00) 23.11.2026.
 water:
   "Rhein":
+    order: 7
     nearest_m_range: [30, 1200]        # город стоит прямо на берегу
     flow_chosen: downstream_toward_end # Рейн течёт на север, к Кобленцу
     closure_index_min: 0.5             # ущелье: enclosure 1.334, ширина 550 м, борта 427/307 м
     confluences_min: 1                 # Lohbach/Forstbach впадают в Рейн у города
+hydrorivers:
+  order: 7                     # Рейн в ущелье: 1757 м3/с
+  discharge_m3s_range: [1200, 2200]
+  distance_max_m: 1500
 source:
   - "OSM: геометрия Rhein в ущелье у Санкт-Гоара (имя реки в OSM — Rhein)"
   - "Лоция/карта: ущелье Рейна, борта до 200 м над водой"

@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.1.1"
+ALGO_VERSION = "6.2.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -538,6 +538,9 @@ class WaterMetrics:
     crossings_2km: int = 0
     crossing_angle_deg: float | None = None
     flow_ways_share: float | None = None
+    discharge_m3s: float | None = None
+    hydro_distance_m: float | None = None
+    hydro_agree: float | None = None
     coords: list[tuple[float, float]] = field(default_factory=list)
 
 

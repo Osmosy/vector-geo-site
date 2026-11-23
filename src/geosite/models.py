@@ -31,6 +31,7 @@ class Site(BaseModel):
     precision: Precision
     utm_epsg: int
     boundary: str | None = None
+    hydro: dict | None = None
 
 
 class Orientation(BaseModel):
@@ -129,6 +130,8 @@ class WaterObject(BaseModel):
     visible: bool | None = None
     kind: Literal["river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"]
     order: int | None = None
+    discharge_m3s: float | None = None
+    hydro_distance_m: float | None = None
     in_mountain: str | None = None
     out_mountain: str | None = None
     nearest_m: float | None = None

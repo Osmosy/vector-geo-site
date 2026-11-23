@@ -702,6 +702,19 @@
           ],
           "default": null,
           "title": "Boundary"
+        },
+        "hydro": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hydro"
         }
       },
       "required": [
@@ -940,6 +953,30 @@
           ],
           "default": null,
           "title": "Order"
+        },
+        "discharge_m3s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discharge M3S"
+        },
+        "hydro_distance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hydro Distance M"
         },
         "in_mountain": {
           "anyOf": [
