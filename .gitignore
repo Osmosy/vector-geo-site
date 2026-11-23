@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 *.part
 site-*/
+# доказательства прогона archify visual-check, не документация
+*.visual-check.*

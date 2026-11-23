@@ -66,11 +66,17 @@ geosite run "51.5138, -0.0984" --facing 180 --year 2018 --out examples/london-ci
 
 ## Живая схема
 
-Смотреть онлайн: https://osmosy.github.io/vector-geo-site/docs/diagram.html
+Смотреть онлайн: https://osmosy.github.io/vector-geo-site/docs/vector-geo-site.architecture.html
 
-`docs/diagram.html` — интерактивная схема сборки пакета: источники, расчёт, пакет, проверка.
-Открывается прямо из файла, без сети; клик по блоку даёт числа и причину решения, чипы сверху
-подсвечивают маршруты (полная сборка, офлайн на фикстуре, эталоны, проверка схемы).
+`docs/vector-geo-site.architecture.html` — интерактивная схема (рендерер archify, как в остальных
+репозиториях экосистемы): темы, поиск по узлам, трассировка связей, guided views, экспорт.
+Спецификация схемы — `docs/vector-geo-site.architecture.json`; схема пересобирается из неё,
+поэтому правки идут в JSON, а не в HTML:
+
+```bash
+node ~/.hermes/skills/archify/bin/archify.mjs deliver architecture \
+  docs/vector-geo-site.architecture.json docs/vector-geo-site.architecture.html --quality showcase --json
+```
 
 ## Установка
 
