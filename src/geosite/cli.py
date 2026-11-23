@@ -272,11 +272,18 @@ def cmd_pack(args) -> int:
             "precision": r.precision, "utm_epsg": geo.utm_epsg(r.lat, r.lon),
             "boundary": None}
     out_dir = Path(args.out or f"site-{abs(r.lat):.3f}-{abs(r.lon):.3f}")
+    dem_source = m.get("dem_source") or "copernicus"
+    dem_label = m.get("dem_label") or "Copernicus DEM GLO-30 (DSM)"
+    if dem_source != "copernicus":
+        # Не молчим: SRTM — не модель поверхности, он не видит крыши и кроны, и «горы» на нём ниже.
+        warnings.append(f"рельеф — запасной источник: {dem_label}; числа по рельефу не сравнимы "
+                        f"с пакетами на Copernicus")
     pack = build_pack(query={"input": r.input, "kind": r.kind, "resolved_by": r.resolved_by,
                              "alternatives": r.alternatives[:3]},
                       site=site, orientation=orientation, chart_year=_chart_year(args.year),
                       measured=m, warnings=warnings, notes=notes,
-                      dem_resolution_m=30.0, out_dir=out_dir, site_label=r.display_name[:60])
+                      dem_resolution_m=30.0, dem_source=dem_source, dem_label=dem_label,
+                      out_dir=out_dir, site_label=r.display_name[:60])
     print(f"пакет: {out_dir / 'site_pack.json'} ({len(pack.sectors)} секторов, схемы в figures/)")
     return 0
 

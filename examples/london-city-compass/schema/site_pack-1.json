@@ -534,6 +534,18 @@
           "title": "Dem",
           "type": "string"
         },
+        "dem_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Source"
+        },
         "dem_resolution_m": {
           "anyOf": [
             {

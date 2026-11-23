@@ -529,3 +529,64 @@ def test_hidden_predicates_agree_on_both_tag_spellings():
     for tags in ({"covered": "culvert"}, {"tunnel": "yes"}, {"tunnel": "culvert"},
                  {"location": "underground"}, {"waterway": "river"}):
         assert water.is_hidden(tags) == water.hydronym.is_hidden(tags)
+
+def test_merge_grows_from_middle_in_both_directions():
+    """E-014: река растёт в обе стороны от самого длинного куска, а не только по течению."""
+    def seg(lon0, lon1, lat=51.0, n=5):
+        return [(lon0 + (lon1 - lon0) * k / (n - 1), lat) for k in range(n)]
+    fees = [make("R", seg(0.000, 0.004)), make("R", seg(0.004, 0.010)),
+            make("R", seg(0.010, 0.014))]
+    merged = water.merge_by_name(fees)
+    assert len(merged) == 1
+    assert merged[0].ways == 3
+    lons = [c[0] for c in merged[0].coords]
+    assert lons == sorted(lons), "линия должна идти по порядку, без возвратов"
+
+
+def test_island_channels_stay_separate_lines():
+    """Два русла вокруг острова — две линии, а не одна петля из перемешанных кусков."""
+    fork, merge_pt = (0.004, 51.000), (0.010, 51.000)
+    fees = [make("R", [(0.000, 51.000), (0.002, 51.000), fork]),
+            make("R", [fork, (0.006, 51.002), (0.008, 51.002), merge_pt]),
+            make("R", [fork, (0.006, 50.998), (0.008, 50.998), merge_pt]),
+            make("R", [merge_pt, (0.012, 51.000), (0.014, 51.000)])]
+    merged = water.merge_by_name(fees)
+    assert len(merged) == 2, "главное русло и второе русло острова — две линии"
+    main = max(merged, key=lambda m: len(m.coords))
+    assert len(main.coords) >= 8
+    assert main.coords[0][0] == 0.0 and main.coords[-1][0] == 0.014, "ствол идёт от подхода до продолжения"
+
+
+def test_same_river_pieces_are_not_a_confluence():
+    """E-014: куски одной реки, сходящиеся у острова, — это не впадение реки в себя."""
+    import numpy as np
+    def seg(lon0, lon1, lat, n=5):
+        return [(lon0 + (lon1 - lon0) * k / (n - 1), lat) for k in range(n)]
+    site = np.array([0.0, 0.0])
+    epsg = 32630
+    north = make("R", seg(0.0000, 0.0100, 51.002))
+    south = make("R", seg(0.0000, 0.0100, 50.998))
+    north.uid, south.uid = "r-n", "r-s"
+    north.key = south.key = "osm-r-river"
+    out = water.find_confluences([north, south], site_xy=site, epsg=epsg, radius_m=8000)
+    assert all(not items for items in out.values())
+
+
+def test_one_entry_per_name_prefers_main_channel_over_nearest_stub():
+    """E-014: запись о реке описывает главное русло, а не ближайший обрывок у шлюза."""
+    import numpy as np
+    site = water.to_utm([(0.0, 51.0)], 32630)[0]
+    main = water.MergedLine("osm-r-river", "R", "river",
+                            [(-0.004, 51.0004), (0.0, 51.0004), (0.009, 51.0004)], 5, False, 0.0,
+                            uid="a", tags={})
+    stub = water.MergedLine("osm-r-river", "R", "river",
+                            [(-0.00020, 51.0002), (-0.00020, 51.0010)], 1, False, 0.0,
+                            uid="b", tags={})
+    m_main = water.measure_feature(main, site_xy=site, lat=51.0, lon=0.0, epsg=32630, grid=None)
+    m_stub = water.measure_feature(stub, site_xy=site, lat=51.0, lon=0.0, epsg=32630, grid=None)
+    assert m_main is not None and m_stub is not None
+    assert m_stub.nearest_m < m_main.nearest_m
+    kept = water._one_entry_per_name([m_stub, m_main], site_xy=site, epsg=32630)
+    assert len(kept) == 1
+    assert kept[0].nearest_m == m_main.nearest_m
+    assert kept[0].pieces == 2

@@ -186,6 +186,7 @@ class LandCover(BaseModel):
 
 class Quality(BaseModel):
     dem: str
+    dem_source: str | None = None      # copernicus | srtm: по числу источника видно, чем считали
     dem_resolution_m: float | None = None
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
