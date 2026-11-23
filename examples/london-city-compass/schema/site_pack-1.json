@@ -1164,6 +1164,18 @@
           "default": null,
           "title": "Tidal"
         },
+        "tidal_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal Reason"
+        },
         "confluences": {
           "items": {
             "$ref": "#/$defs/Confluence"
