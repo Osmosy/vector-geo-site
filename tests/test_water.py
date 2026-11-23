@@ -432,3 +432,39 @@ def test_relation_ways_drop_far_members(monkeypatch, tmp_path):
     monkeypatch.setattr(w, "_ask", fake_ask)
     ways = w.relation_ways(56.33, 44.01, 8000)
     assert [el["id"] for el in ways] == [1]
+
+
+# --- теги склейки: приливность и правило течения (water 6.1.1) ---
+
+def test_merge_takes_tags_of_piece_nearest_site():
+    """Теги — у куска, ближайшего к участку: приливность свойство места, а не всей реки."""
+    tidal = make("T", [(-0.10, 51.50), (-0.099, 51.50)],
+                 tags={"waterway": "river", "tidal": "yes"})
+    dry = make("T", [(-0.0989, 51.50), (-0.098, 51.50)],
+               tags={"waterway": "river", "tidal": "no"})
+    merged = water.merge_by_name([tidal, dry], near=(51.50, -0.10))
+    assert len(merged) == 1
+    assert merged[0].tags.get("tidal") == "yes"
+
+
+def test_merge_without_site_keeps_only_common_tags():
+    """Без участка остаются только общие теги: один кусок в трубе не делает трубой всю реку."""
+    open_part = make("C", [(-0.10, 51.50), (-0.099, 51.50)],
+                     tags={"waterway": "river", "tidal": "yes"})
+    culvert = make("C", [(-0.0989, 51.50), (-0.098, 51.50)],
+                   tags={"waterway": "river", "tidal": "yes", "tunnel": "culvert"})
+    merged = water.merge_by_name([open_part, culvert])
+    assert merged[0].tags.get("tidal") == "yes"
+    assert "tunnel" not in merged[0].tags
+
+
+def test_tidal_tag_reaches_flow_rule():
+    """Приливный кусок у участка даёт правило 2, а не 5 «рельеф молчит»."""
+    piece = make("Т", [(-0.100, 51.500), (-0.097, 51.500)],
+                 tags={"waterway": "river", "tidal": "yes"})
+    merged = water.merge_by_name([piece], near=(51.50, -0.10))
+    site = water.to_utm([(-0.10, 51.50)], 32630)[0]
+    metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.10,
+                                   epsg=32630, grid=None)
+    assert metric.tidal is True
+    assert metric.flow_rule == 2, metric.flow_rule

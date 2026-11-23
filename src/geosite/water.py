@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.1.0"
+ALGO_VERSION = "6.1.1"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -398,6 +398,10 @@ class MergedLine:
     hidden: bool
     hidden_share: float | None = None
     uid: str = ""
+    # теги, одинаковые у всех кусков: по ним решается приливность (тег `tidal`) и порядок
+    # отрисовки. У склейки своих тегов не было, и приливная Темза получала flow_rule 5 —
+    # «рельеф молчит», хотя тег `tidal=yes` есть у всех её кусков.
+    tags: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.uid:
@@ -409,11 +413,16 @@ class MergedLine:
 KIND_RANK = {"river": 5, "canal": 4, "stream": 3, "lake": 2, "dock": 1, "sea": 0}
 
 
-def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[MergedLine]:
+def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
+                  near: tuple[float, float] | None = None) -> list[MergedLine]:
     """Склеить отрезки одной реки в одну линию: OSM хранит реку десятками ways.
 
     Подряд идущие куски сшиваются по ближайшим концам, если разрыв не больше max_gap_m;
     иначе линия остаётся отдельной. Анонимные куски (без имени) не склеиваются вовсе.
+
+    `near` — координаты участка: теги берутся у куска, ближайшего к нему (приливность и
+    порядок отрисовки — свойство места, а не всей реки). Без `near` остаются только теги,
+    одинаковые у всех кусков.
     """
     groups: dict[tuple[str, str], list[Feature]] = {}
     for f in features:
@@ -431,6 +440,19 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[
         kind = max((f.kind for f in items), key=lambda k: KIND_RANK.get(k, 0))
         pieces = [f.coords for f in items]
         hidden = all(is_hidden(f.tags) for f in items)
+        # теги склейки: у склейки своих тегов не было, и приливная Темза получала rule 5 —
+        # «рельеф молчит», хотя тег `tidal=yes` есть у кусков у самого участка. Берём теги
+        # ближайшего к участку куска; без участка — только то, что совпадает у всех кусков
+        # (иначе один кусок в трубе объявил бы трубой всю реку).
+        if near is not None:
+            lat0, lon0 = near
+            nearest_item = min(
+                items,
+                key=lambda f: min(geo.haversine_m(lat0, lon0, c[1], c[0]) for c in f.coords))
+            common = dict(nearest_item.tags)
+        else:
+            common = {k: v for k, v in items[0].tags.items()
+                      if all(f.tags.get(k) == v for f in items[1:])}
         total_len = sum(_line_len(f.coords) for f in items)
         hidden_len = sum(_line_len(f.coords) for f in items if hydronym.is_hidden(f.tags))
         hidden_share = None if total_len <= 0 else round(hidden_len / total_len, 2)
@@ -453,10 +475,12 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0) -> list[
                 rest.pop(idx)
             else:
                 merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
-                                         len(items) - len(rest), hidden, hidden_share))
+                                         len(items) - len(rest), hidden, hidden_share,
+                                         tags=dict(common)))
                 chain = list(rest.pop(0))
         merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
-                                 len(items) - len(rest), hidden, hidden_share))
+                                 len(items) - len(rest), hidden, hidden_share,
+                                 tags=dict(common)))
     # ключ куска неуникален: у одной реки их несколько, и словарь слияний молча терял все,
     # кроме последнего. uid различает куски, key остаётся именем реки для потребителя.
     for idx, line in enumerate(merged):
@@ -1093,7 +1117,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
     if payload is None:
         payload = fetch_raw(lat, lon, radius_m, allow_network=allow_network)
     features = parse_features(payload)[:max_features]
-    merged = merge_by_name(features)
+    merged = merge_by_name(features, near=(lat, lon))
 
     window_m = max(window_factor * float(radius_m), window_min_m)
     from pyproj import Transformer
@@ -1111,7 +1135,8 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             lons, lats = inv.transform(piece[:, 0] + site_xy[0], piece[:, 1] + site_xy[1])
             chunks.append(MergedLine(line.key, line.name, line.kind,
                                      list(zip(lons, lats)), line.ways, line.hidden,
-                                     line.hidden_share, uid=f"{line.uid}-{idx}"))
+                                     line.hidden_share, uid=f"{line.uid}-{idx}",
+                                     tags=dict(line.tags)))
 
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу
     near = []
