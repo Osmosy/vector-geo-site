@@ -129,7 +129,9 @@ def pairs(path):
             out.setdefault(key, []).append(c["dist_m"])
     return out
 
-old, new = pairs("examples_632/site_pack.json"), pairs("examples/london-city/site_pack.json")
+# база сравнения — пакет water 6.3.2, в рабочем дереве его нет; берём из истории:
+#   git show 13ea7ca:examples/london-city/site_pack.json > /tmp/old_pack.json
+old, new = pairs("/tmp/old_pack.json"), pairs("examples/london-city/site_pack.json")
 print("записей:", sum(len(v) for v in old.values()), "->", sum(len(v) for v in new.values()))
 print("пар:", len(old), "->", len(new), "| ушли:", [tuple(sorted(k)) for k in set(old) - set(new)])
 for k in old:
