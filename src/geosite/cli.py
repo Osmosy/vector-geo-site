@@ -107,14 +107,11 @@ def _measure_water(r, measured: dict, epsg: int) -> dict:
     except Exception as exc:
         result["water_error"] = str(exc)
         return result
-    features = water.parse_features(payload)
     metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy, radius_m=8000)
     result["water"] = water_pack.to_objects(metrics)
-    # геометрия для water.geojson: тот же id, что в пакете (W7)
-    result["water_geometry"] = {
-        metrics_item.id: merged_item.coords
-        for metrics_item, merged_item in zip(metrics, [m for m in water.merge_by_name(features) if m.coords])
-    }
+    # геометрия для water.geojson: берём её у самих метрик, а не сопоставляем два разных списка
+    # по порядку — они фильтруются независимо (одна река = одна запись), и zip давал чужую линию
+    result["water_geometry"] = {item.id: item.coords for item in metrics if item.coords}
     # Долю воды по секторам пока не считаем: маска воды требует калибровки
     # (полигоны OSM чинятся buffer(0), линии расширяются — площадь систематически завышается).
     result["water_share_skipped"] = True

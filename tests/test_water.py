@@ -310,3 +310,125 @@ def test_loop_circle_neck_positions():
     assert outside["site_position"].startswith("outside")
     assert inside["turn_deg"] >= 180.0
     assert inside["area_k"] >= 0.05
+
+
+# --- R5: река из отношения OSM ---
+
+def test_merge_kind_priority_river_over_stream():
+    """Один старый кусок waterway=stream не переименовывает реку в ручей."""
+    big = make("Волга", [(-0.100 + i * 0.001, 51.50) for i in range(30)], kind="stream")
+    part = make("Волга", [(-0.07005, 51.50), (-0.065, 51.50)], kind="river")
+    merged = water.merge_by_name([big, part])
+    assert len(merged) == 1
+    assert merged[0].kind == "river"
+
+
+def test_merge_gives_unique_uid_per_chunk():
+    """Куски одной реки получают разные uid: иначе словарь слияний теряет все, кроме одного."""
+    a = make("R", [(-0.10, 51.50), (-0.099, 51.50)], osm_id=1)
+    b = make("R", [(-0.06, 51.50), (-0.059, 51.50)], osm_id=2)     # 2.8 км разрыв
+    merged = water.merge_by_name([a, b])
+    assert len(merged) == 2
+    assert merged[0].key == merged[1].key
+    assert merged[0].uid != merged[1].uid
+
+
+def test_confluence_found_on_second_chunk_of_same_river():
+    """Слияние ищется у всех кусков реки, а не только у последнего в словаре."""
+    from pyproj import Transformer
+
+    epsg = 32630
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    site = np.array(tr.transform(-0.100, 51.500))
+
+    # река разорвана надвое: ближний кусок у участка, дальний — в 4 км восточнее
+    near_chunk = make("R", [(-0.106, 51.498), (-0.100, 51.500)], osm_id=1)
+    far_chunk = make("R", [(-0.060, 51.500), (-0.050, 51.500)], osm_id=2)
+    trib = make("T", [(-0.055, 51.494), (-0.055, 51.506)], osm_id=3)
+    merged = water.merge_by_name([near_chunk, far_chunk, trib])
+    res = water.find_confluences(merged, site_xy=site, epsg=epsg, clip_m=8000.0)
+    r_uid = [m.uid for m in merged if m.name == "R"][1]
+    assert res[r_uid], "слияние на дальнем куске реки потеряно"
+    assert res[r_uid][0]["with"] == "osm-t-river"
+
+
+def test_loop_not_taken_from_far_reach():
+    """Петля ищется рядом с участком: у длинной реки самая петлистая пара лежит далеко."""
+    ring = _circle_with_neck() + np.array([40000.0, 0.0])   # петля в 40 км от участка
+    straight = np.array([[x, 0.0] for x in np.arange(-20000.0, 20001.0, 100.0)])
+    pts = np.vstack([straight, ring])
+    far = water._detect_loop(pts, near_site_m=3000.0)
+    assert far is None, far
+
+
+def test_clip_near_keeps_boundary_points():
+    """Окно режет линию по границе круга, а не по последнему узлу внутри."""
+    pts = np.array([[x, 0.0] for x in np.arange(-20000.0, 20001.0, 500.0)])
+    pieces = water.clip_near(pts, 12000.0)
+    assert len(pieces) == 1
+    assert abs(float(np.hypot(*pieces[0][0])) - 12000.0) < 1.0
+    assert abs(float(np.hypot(*pieces[0][-1])) - 12000.0) < 1.0
+
+
+def test_relation_closed_flag_only_for_rings():
+    """Члены отношения-линии не помечаются замкнутыми: иначе линия читается как полигон."""
+    payload = {"elements": [
+        {"type": "relation", "id": 7, "tags": {"waterway": "river", "name": "R"},
+         "members": [
+             {"type": "way", "role": "main_stream",
+              "geometry": [{"lon": 0.0, "lat": 0.0}, {"lon": 0.01, "lat": 0.0}]},
+             {"type": "way", "role": "outer",
+              "geometry": [{"lon": 0.0, "lat": 0.0}, {"lon": 0.01, "lat": 0.0},
+                           {"lon": 0.01, "lat": 0.01}, {"lon": 0.0, "lat": 0.0}]},
+         ]},
+    ]}
+    features = water.parse_features(payload)
+    assert [f.closed for f in features] == [False, True]
+
+
+def test_relation_ways_take_name_from_relation(monkeypatch, tmp_path):
+    """Кусок без своего имени получает имя отношения — иначе он не склеивается с рекой."""
+    from geosite import water as w
+
+    monkeypatch.setattr(w, "CACHE_DIR", tmp_path)
+    answers = []
+
+    def fake_ask(query, **kwargs):
+        answers.append(query)
+        if "out body;" in query:
+            return {"elements": [{"type": "relation", "id": 99,
+                                  "tags": {"waterway": "river", "name": "Тест"},
+                                  "members": [{"type": "way", "ref": 555, "role": "main_stream"}]}]}
+        return {"elements": [{"type": "way", "id": 555, "tags": {"waterway": "stream"},
+                              "geometry": [{"lon": 44.0, "lat": 56.33},
+                                           {"lon": 44.01, "lat": 56.335}]}]}
+
+    monkeypatch.setattr(w, "_ask", fake_ask)
+    ways = w.relation_ways(56.33, 44.01, 8000)
+    assert len(ways) == 1
+    assert ways[0]["tags"]["name"] == "Тест"
+    assert ways[0]["tags"]["_rel"] == "99"
+
+
+def test_relation_ways_drop_far_members(monkeypatch, tmp_path):
+    """Куски дальше 2.5 радиуса не тянутся в пакет: Волга на 3000 км иначе стоит секунд."""
+    from geosite import water as w
+
+    monkeypatch.setattr(w, "CACHE_DIR", tmp_path)
+
+    def fake_ask(query, **kwargs):
+        if "out body;" in query:
+            return {"elements": [{"type": "relation", "id": 99,
+                                  "tags": {"waterway": "river", "name": "Тест"},
+                                  "members": [{"type": "way", "ref": 1, "role": "main_stream"},
+                                              {"type": "way", "ref": 2, "role": "main_stream"}]}]}
+        return {"elements": [
+            {"type": "way", "id": 1, "tags": {"waterway": "river"},
+             "geometry": [{"lon": 44.0, "lat": 56.33}, {"lon": 44.01, "lat": 56.335}]},
+            {"type": "way", "id": 2, "tags": {"waterway": "river"},
+             "geometry": [{"lon": 44.0, "lat": 54.0}, {"lon": 44.01, "lat": 54.005}]},
+        ]}
+
+    monkeypatch.setattr(w, "_ask", fake_ask)
+    ways = w.relation_ways(56.33, 44.01, 8000)
+    assert [el["id"] for el in ways] == [1]
