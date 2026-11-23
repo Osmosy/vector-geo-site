@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.3.1"
+ALGO_VERSION = "6.3.2"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -234,12 +234,13 @@ def relation_ways(lat: float, lon: float, radius_m: int = 8000, *, allow_network
 
 
 def is_hidden(tags: dict) -> bool:
-    """Вода под землёй: culvert, covered, underground — для «скрытой воды» канона."""
-    if (tags.get("tunnel") or "").lower() == "culvert":
-        return True
-    if (tags.get("covered") or "").lower() in {"yes", "culvert"}:
-        return True
-    return (tags.get("location") or "").lower() == "underground"
+    """Вода под землёй: culvert, covered, underground — для «скрытой воды» канона.
+
+    Единственный источник правила — `hidden_tags` в `data/name_aliases.json`: два
+    независимых списка расходились на `covered=culvert` и `tunnel=yes`, и одна и та же
+    линия считалась скрытой для вида, но не для доли (E-013).
+    """
+    return hydronym.is_hidden(tags)
 
 
 def _kind_of(tags: dict) -> str:
@@ -348,6 +349,33 @@ def _crossings_with_circle(pts: np.ndarray, radius: float) -> list[np.ndarray]:
                 hi = mid
         out.append(a + (b - a) * ((lo + hi) / 2))
     return out
+
+
+def clip_runs_near(pts: np.ndarray, limit_m: float) -> list[tuple[int, int]]:
+    """Участки ломаной внутри круга как диапазоны индексов исходных точек.
+
+    Возвращает пары `(i0, i1)` включительно, включая по одной точке снаружи с каждой стороны:
+    так кусок доходит до границы окна и не рвётся раньше срока. Сами точки не пересчитываются —
+    узлы остаются теми же, что пришли из OSM.
+    """
+    if len(pts) < 2:
+        return []
+    d = np.hypot(pts[:, 0], pts[:, 1])
+    if float(d.max()) <= limit_m:
+        return [(0, len(pts) - 1)]
+    inside = d <= limit_m
+    runs: list[tuple[int, int]] = []
+    start = None
+    for i, flag in enumerate(inside):
+        if flag and start is None:
+            start = i
+        elif not flag and start is not None:
+            if i - start >= 2:
+                runs.append((max(0, start - 1), min(len(pts) - 1, i)))
+            start = None
+    if start is not None and len(pts) - start >= 2:
+        runs.append((max(0, start - 1), len(pts) - 1))
+    return runs
 
 
 def clip_near(pts: np.ndarray, limit_m: float) -> list[np.ndarray]:
@@ -560,7 +588,14 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     # ближайшего к участку куска, и поверхностная река с коротким засыпанным участком
     # (River Moselle, hidden_share 0.10) получала kind: culvert. Теги нужны для приливности
     # и правила течения, для трубы — нет.
+    #
+    # Вид определяется здесь, до правил течения: иначе правило зависело от того, каким путём
+    # объект стал трубой (тег куска давал rule 0, доля скрытого — правило 3/5), и две
+    # одинаково подземные реки получали разный ответ (E-012).
     hidden = getattr(feature, "hidden", False)
+    share = getattr(feature, "hidden_share", None)
+    if share is not None and share >= 0.8:
+        hidden = True
     kind = "culvert" if hidden else feature.kind
 
     # --- приливность (W5): тег OSM, иначе таблица известных границ ---
@@ -659,10 +694,6 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
             exit_pt = outer[0]
         mouth = _water_mouth(grid, exit_pt, pts[i], site_xy)
 
-    share = getattr(feature, "hidden_share", None)
-    if share is not None and share >= 0.8 and not hidden:
-        hidden = True
-        kind = "culvert"
     visible = None
     if mouth is not None and grid is not None:
         visible = _line_of_sight(grid, np.zeros(2), np.array([mouth.pop("_x"), mouth.pop("_y")]))
@@ -1131,21 +1162,22 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
     merged = merge_by_name(features, near=(lat, lon))
 
     window_m = max(window_factor * float(radius_m), window_min_m)
-    from pyproj import Transformer
-    inv = Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
     chunks: list[MergedLine] = []
     for line in merged:
         pts = to_utm(line.coords, epsg) - site_xy
-        pieces = clip_near(pts, window_m) if len(pts) > 1 else []
-        if not pieces:
+        runs = clip_runs_near(pts, window_m) if len(pts) > 1 else []
+        if not runs:
             continue
-        if len(pieces) == 1 and len(pieces[0]) == len(pts):
+        if len(runs) == 1 and runs[0] == (0, len(line.coords) - 1):
             chunks.append(line)
             continue
-        for idx, piece in enumerate(pieces):
-            lons, lats = inv.transform(piece[:, 0] + site_xy[0], piece[:, 1] + site_xy[1])
+        for idx, (i0, i1) in enumerate(runs):
+            # Узлы берутся из исходной линии в градусах, а не пересчётом нарезанных UTM-точек:
+            # обратный пересчёт давал сдвиг ~1e-9 м, из-за которого устье притока (внутренняя
+            # вершина главной реки) переставало быть общим узлом, и слияние Флит × Темза
+            # пропадало (E-011).
             chunks.append(MergedLine(line.key, line.name, line.kind,
-                                     list(zip(lons, lats)), line.ways, line.hidden,
+                                     list(line.coords[i0:i1 + 1]), line.ways, line.hidden,
                                      line.hidden_share, uid=f"{line.uid}-{idx}",
                                      tags=dict(line.tags)))
 

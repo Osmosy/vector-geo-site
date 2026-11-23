@@ -491,3 +491,41 @@ def test_almost_fully_buried_river_is_a_culvert():
                                    epsg=32630, grid=None)
     assert metric.kind == "culvert"
     assert metric.visible is False
+
+def test_clip_runs_keep_original_vertices():
+    """T2: нарезка окна возвращает диапазоны индексов, а не пересчитанные точки."""
+    import numpy as np
+    pts = np.array([[0.0, 0.0], [5000.0, 0.0], [20000.0, 0.0], [25000.0, 0.0]])
+    runs = water.clip_runs_near(pts, 12000.0)
+    assert runs == [(0, 2)]
+    coords = [(-0.1, 51.0), (-0.05, 51.0), (0.0, 51.0), (0.05, 51.0)]
+    i0, i1 = runs[0]
+    assert coords[i0:i1 + 1][-1] == coords[2]      # последний узел — исходный, не пересчитанный
+
+
+def test_clip_runs_inside_window_is_whole_line():
+    import numpy as np
+    pts = np.array([[0.0, 0.0], [100.0, 0.0], [200.0, 0.0]])
+    assert water.clip_runs_near(pts, 12000.0) == [(0, 2)]
+
+
+def test_culvert_gets_no_flow_rule():
+    """T3: труба — всегда правило 0, независимо от того, как ею стала (тег или доля)."""
+    coords = [(-0.100 + 0.0004 * i, 51.5004) for i in range(8)]
+    site = water.to_utm([(-0.100, 51.500)], 32630)[0]
+    cases = (({"waterway": "river", "tunnel": "culvert"}, True, None),   # тег: склейка уже поставила hidden
+             ({"waterway": "river"}, False, 0.95))                       # доля скрытого
+    for tags, is_hidden, share in cases:
+        buried = water.MergedLine("osm-buried", "Buried", "river", coords, 3, is_hidden,
+                                  hidden_share=share, tags=tags)
+        metric = water.measure_feature(buried, site_xy=site, lat=51.500, lon=-0.100,
+                                       epsg=32630, grid=None)
+        assert metric.kind == "culvert"
+        assert metric.flow_rule == 0
+
+
+def test_hidden_predicates_agree_on_both_tag_spellings():
+    """T4: один предикат для вида и для доли — `covered=culvert` и `tunnel=yes` не расходятся."""
+    for tags in ({"covered": "culvert"}, {"tunnel": "yes"}, {"tunnel": "culvert"},
+                 {"location": "underground"}, {"waterway": "river"}):
+        assert water.is_hidden(tags) == water.hydronym.is_hidden(tags)
