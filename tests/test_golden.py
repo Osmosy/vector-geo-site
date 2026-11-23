@@ -142,6 +142,13 @@ def test_golden_site(name: str):
             elif key == "confluences_min":
                 if len(metric.confluences) < int(expected):
                     failures.append(f"{river_name}: слияний {len(metric.confluences)}, ждали ≥ {expected}")
+            elif key == "visible":
+                if metric.visible is not expected:
+                    failures.append(f"{river_name}.visible={metric.visible}, ждали {expected}")
+            elif key == "hidden_share_min":
+                share = metric.hidden_share
+                if share is None or share < float(expected):
+                    failures.append(f"{river_name}.hidden_share={share}, ждали ≥ {expected}")
             elif key == "closure_index_min":
                 mouth = metric.water_mouth or {}
                 value = mouth.get("closure_index")
