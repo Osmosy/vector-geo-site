@@ -11,7 +11,7 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.4.0", "terrain": "2.0.1", "geocode": "1.0.0", "pack": "1.2.0",
+ALGO = {"water": "6.4.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.3.0",
         "climate": "1.0.0"}
 
 ALGO_VERSION = "1.1.0"
@@ -115,6 +115,7 @@ def write_water_geojson(path: Path, objects: list, geometry: dict) -> None:
 def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                measured: dict, warnings: list[str], notes: list[str],
                dem_resolution_m: float, out_dir: Path,
+               dem_source: str = "copernicus", dem_label: str = "Copernicus DEM GLO-30 (DSM)",
                site_label: str = "") -> SitePack:
     out_dir = Path(out_dir)
     figures_dir = out_dir / "figures"
@@ -207,7 +208,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         roads=measured.get("roads", []),
         exposure=exposure or None,
         land_cover=measured.get("land_cover"),
-        quality={"dem": "Copernicus DEM GLO-30 (DSM)", "dem_resolution_m": dem_resolution_m,
+        quality={"dem": dem_label, "dem_source": dem_source, "dem_resolution_m": dem_resolution_m,
                  "warnings": warnings, "notes": notes},
         summary=summary,
         files={"water_geojson": geojson_name, "sha256": sha},

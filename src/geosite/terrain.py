@@ -13,7 +13,7 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
-ALGO_VERSION = "2.0.1"
+ALGO_VERSION = "2.1.0"
 
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
@@ -274,6 +274,10 @@ def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
         # Точку считаем по сглаженному слою: на 30-метровом DSM крыши дают уклон 20° и «гребень»
         "point": point_description(smooth(meso, max(point_smooth_m, 9 * resolution_m)), x0, y0),
         "x0": x0, "y0": y0,
+        # откуда рельеф: пакет обязан сказать, Copernicus это или запасной SRTM
+        "dem_source": getattr(macro, "source", "copernicus"),
+        "dem_label": getattr(macro, "label", ""),
+        "dem_attribution": getattr(macro, "attribution", ""),
     }
     if facing_deg is not None:
         result["four_spirits"] = four_spirits(macro_s, frame_macro, z0, facing_deg, meso_km=meso_km)
