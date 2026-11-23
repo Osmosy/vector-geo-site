@@ -84,7 +84,7 @@ def cmd_fetch(args) -> int:
     return 0
 
 
-def _measure(args, r, *, with_water: bool = True) -> dict:
+def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = None) -> dict:
     epsg = geo.utm_epsg(r.lat, r.lon)
     macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
     facing = args.facing
@@ -93,20 +93,35 @@ def _measure(args, r, *, with_water: bool = True) -> dict:
     out = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
                               meso_km=8.0, facing_deg=facing, point_smooth_m=point_smooth)
     if with_water:
-        out.update(_measure_water(r, out, epsg))
+        out.update(_measure_water(r, out, epsg, payload=osm_payload))
     return out
 
 
-def _measure_water(r, measured: dict, epsg: int) -> dict:
-    """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш."""
+def _load_osm_file(path: str | None) -> dict | None:
+    """Читать сохранённый ответ Overpass: путь к JSON-файлу фикстуры."""
+    if not path:
+        return None
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if "elements" not in data:
+        raise SystemExit(f"{path}: в файле нет elements — это не ответ Overpass")
+    return data
+
+
+def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None) -> dict:
+    """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш.
+
+    `payload` — готовый ответ Overpass (файл): тогда сети не нужно вообще, и пакет можно
+    пересобрать офлайн на фикстуре эталона (`geosite pack --osm-file <fixture>`).
+    """
     site_xy = np.array([measured["x0"], measured["y0"]])
     grid = measured["grid_macro"]
     result: dict = {"water": [], "roads": []}
-    try:
-        payload = water.fetch_raw(r.lat, r.lon, 8000)
-    except Exception as exc:
-        result["water_error"] = str(exc)
-        return result
+    if payload is None:
+        try:
+            payload = water.fetch_raw(r.lat, r.lon, 8000)
+        except Exception as exc:
+            result["water_error"] = str(exc)
+            return result
     metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy, radius_m=8000)
     result["water"] = water_pack.to_objects(metrics)
     # геометрия для water.geojson: берём её у самих метрик, а не сопоставляем два разных списка
@@ -142,7 +157,7 @@ def cmd_terrain(args) -> int:
 def cmd_pack(args) -> int:
     from .pack import build_pack
     r = _resolve(args.place)
-    m = _measure(args, r)
+    m = _measure(args, r, osm_payload=_load_osm_file(getattr(args, "osm_file", None)))
     facing = args.facing
     warnings, notes = [], []
     if facing is None:
@@ -215,7 +230,7 @@ def cmd_water(args) -> int:
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
     m = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
                             meso_km=8.0, facing_deg=None, point_smooth_m=point_smooth)
-    w = _measure_water(r, m, epsg)
+    w = _measure_water(r, m, epsg, payload=_load_osm_file(getattr(args, "osm_file", None)))
     rows = [{"id": o.id, "name": o.name, "kind": o.kind, "nearest_m": o.nearest_m,
              "in": o.in_mountain, "out": o.out_mountain, "bend": o.bend,
              "curvature_km": None if o.curvature_radius_m is None else round(o.curvature_radius_m / 1000, 2),
@@ -266,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--year", type=int, default=None, help="год постройки / заселения")
         p.add_argument("--out", default=None, help="каталог пакета")
         p.add_argument("--offline", action="store_true", help="не ходить в сеть, брать из кеша")
+        p.add_argument("--osm-file", default=None,
+                       help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
 
     p_res = sub.add_parser("resolve", help="ввод → точка, тип, точность")
     p_res.add_argument("place")

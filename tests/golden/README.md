@@ -34,9 +34,35 @@ DEM вырезается из кеша тайлов Copernicus (`~/.cache/vector
 Широкая выгрузка хранится в `fixtures/osm-water-wide.json.gz` (сжата, иначе десятки мегабайт),
 и нужна только для определения приливности по положению вдоль русла.
 
+## Происхождение фикстур
+
+| Эталон | OSM-выгрузка | DEM |
+|---|---|---|
+| london-city, london-isle-of-dogs, kingston-upon-thames | 22.11.2026, Overpass (osm-water.json) | 22.11.2026, Copernicus GLO-30 |
+| nizhny-novgorod-strelka | 23.11.2026, Overpass + отношения OSM (osm-water.json) | — (без DEM) |
+| moscow-kremlin | 23.11.2026, maps.mail.ru:Overpass | 23.11.2026, Copernicus GLO-30 |
+| sankt-goar-rhine | 23.11.2026, Overpass | 23.11.2026, Copernicus GLO-30 N50/E007 |
+
+Дата и зеркало записаны и в `expect.yaml` там, где выгрузка отличается от обычной; где нет —
+источник тот же Overpass через maps.mail.ru, дата в таблице выше.
+
 ## Зеркала Overpass
 
 Порядок: `maps.mail.ru` (полная планета, отвечает, когда немецкое зеркало в очереди),
 `overpass-api.de`, затем `overpass.osm.ch`. Последнее держит только Швейцарию и на запросы о
 Москве возвращает пустой список — пустой ответ принимается только после того, как его дали
 все зеркала, иначе участок остаётся без воды навсегда (так и был «blocked» у Москвы).
+
+## Проверка пакета целиком, офлайн
+
+`expect.yaml` проверяет метрики через `measure_water`, но пакет можно собрать целиком без сети —
+из той же выгрузки:
+
+```bash
+geosite pack "51.5138, -0.0984" --year 2018 --offline \
+  --osm-file tests/golden/london-city/fixtures/osm-water.json --out /tmp/pack
+geosite validate /tmp/pack/site_pack.json
+```
+
+DEM при этом берётся из кеша тайлов (или сети, если кеша нет); водный слой, склонение и
+климат считаются без сети, ветер — из кеша архива.
