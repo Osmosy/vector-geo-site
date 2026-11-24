@@ -814,6 +814,37 @@ def test_area_gets_only_waterbody_fields():
     assert area.riverbank_of == line.id, (area.riverbank_of, line.id)
 
 
+def test_dock_channel_links_to_area_and_gets_low():
+    """E-020 п.1-2: канал внутри дока привязан к контуру и не выглядит надёжным руслом.
+
+    Линия `waterway=canal` с именем дока раньше шла в отчёте отдельным руслом с входом и
+    выходом в одной горе и уверенностью `high`: у канала по правилу 0 «течения нет», и
+    уверенность описывала правило направления, а не годность пары 來水/去水.
+    """
+    lat, lon = 51.5000, -0.1000
+    payload = {"elements": [
+        {"type": "way", "id": 11, "tags": {"natural": "water", "water": "canal",
+                                           "dock": "yes", "name": "Test Dock"},
+         "geometry": _ring(lat, lon, 0.002)},
+        # канал лежит в 500 м к северу и короток: оба конца в одном секторе, 子 → 子
+        {"type": "way", "id": 12, "tags": {"waterway": "canal", "name": "Test Dock"},
+         "geometry": [{"lat": lat + 0.0045, "lon": lon - 0.0004},
+                      {"lat": lat + 0.0045, "lon": lon + 0.0004}]},
+    ]}
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+                                  payload=payload, allow_network=False)
+
+    area = next(m for m in metrics if m.geom == "area")
+    line = next(m for m in metrics if m.geom == "line")
+    assert area.kind == "dock"
+    assert line.dock_channel_of == area.id, (line.dock_channel_of, area.id)
+    assert line.in_mountain == line.out_mountain
+    assert line.same_mountain_reason, line.same_mountain_reason
+    assert line.flow_confidence == "low", line.flow_confidence
+
+
 def test_flow_share_ignores_area_contours():
     """E-018: контур не участвует в доле совпадения направления течения.
 

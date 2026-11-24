@@ -1272,6 +1272,18 @@
           "default": null,
           "title": "Riverbank Of"
         },
+        "dock_channel_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dock Channel Of"
+        },
         "water_mouth": {
           "anyOf": [
             {

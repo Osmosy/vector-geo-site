@@ -11,10 +11,10 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "7.2.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.7.0",
+ALGO = {"water": "7.3.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.8.0",
         "climate": "1.0.0"}
 
-ALGO_VERSION = "1.4.0"
+ALGO_VERSION = "1.5.0"
 
 ATTRIBUTION = [
     "© OpenStreetMap contributors",

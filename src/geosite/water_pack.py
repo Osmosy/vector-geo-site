@@ -30,6 +30,7 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             nearest_m=m.nearest_m, bend=m.bend, straight_at_site=m.straight_at_site,
             nearest_azimuth_deg=m.nearest_azimuth_deg, nearest_mountain=m.nearest_mountain,
             area_m2=m.area_m2, site_inside=m.site_inside, riverbank_of=m.riverbank_of,
+            dock_channel_of=m.dock_channel_of,
             tidal=m.tidal, tidal_source=m.tidal_source,
             tidal_reason=(None if m.tidal is not None else m.tidal_reason),
             confluences=[{"with": c["with"], "dist_m": c["dist_m"],

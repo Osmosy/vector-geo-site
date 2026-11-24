@@ -343,3 +343,16 @@
 в фикстуре два безымянных `waterway=stream`, самого Северна там нет. Тест переименован в
 `test_confluence_found_in_short_arm_real_data_gloucester_streams`, фикстура —
 `horseshoe-gloucester-streams.json`.
+
+## water 7.3.0 + pack 1.8.0 — 24.11.2026
+
+**Док-каналы перестали быть руслами, уверенность больше не привязана к виду водотока (E-020,
+дополнение).**
+
+- `dock_channel_of: <id контура>` у линии канала с именем дока (West Dock, East Dock,
+  Central Basin).
+- `flow_confidence: low` у любого видимого водотока с входом и выходом в одной горе; раньше —
+  только `river` и `stream`. Каналы получали `high` по правилу 0 «течения нет».
+- Лондон: 3 док-канала привязаны к контурам, `I-07b` предупреждений стало 5 (было 3):
+  `#436220356`, `west dock canal`, `central basin canal`, плюс `low` у двух полей направления.
+- Тест: `test_dock_channel_links_to_area_and_gets_low`; всего **146 passed, 2 deselected**.

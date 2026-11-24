@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "7.2.0"
+ALGO_VERSION = "7.3.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -795,6 +795,8 @@ class WaterMetrics:
     area_m2: float | None = None
     site_inside: bool | None = None
     riverbank_of: str | None = None
+    # линия канала внутри дока: отдельной рекой не выводится (E-020 п.1)
+    dock_channel_of: str | None = None
 
 
 def is_watercourse(obj) -> bool:
@@ -1002,7 +1004,10 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
             same_reason = "короткий кусок"
         elif crossing_angle < 30.0:
             same_reason = "касательная"
-        if same_reason and flow_chosen and kind in {"river", "stream"}:
+        if same_reason:
+            # E-020 п.2: причина «вход и выход в одной горе» понижает уверенность у любого
+            # видимого водотока. Раньше это касалось только river/stream, а у каналов стояло
+            # `high` по правилу 0 («течения нет»), и док-каналы с 乙 → 乙 выглядели надёжно.
             flow_conf = "low"
 
     return WaterMetrics(
@@ -1592,6 +1597,15 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         tags = area_tags.get(metric.id, {})
         if (tags.get("water") or "") == "river" or tags.get("waterway") == "riverbank":
             metric.riverbank_of = line_ids.get(hydronym.normalize_name(metric.name) or metric.name)
+    # Канал внутри дока (`waterway=canal` с именем дока) привязывается к контуру с тем же
+    # именем: в отчёте он не идёт как отдельное русло, у дока остаются его поля водоёма.
+    dock_ids: dict[str, str] = {}
+    for metric in out:
+        if metric.geom == "area" and metric.name and metric.kind in {"dock", "sea"}:
+            dock_ids.setdefault(hydronym.normalize_name(metric.name) or metric.name, metric.id)
+    for metric in out:
+        if is_watercourse(metric) and metric.name and metric.geom != "area":
+            metric.dock_channel_of = dock_ids.get(hydronym.normalize_name(metric.name) or metric.name)
     out.sort(key=lambda m: m.nearest_m)
     _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
     _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,

@@ -152,6 +152,7 @@ class WaterObject(BaseModel):
     area_m2: float | None = None
     site_inside: bool | None = None
     riverbank_of: str | None = None
+    dock_channel_of: str | None = None
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
     curvature_radius_m: float | None = None
