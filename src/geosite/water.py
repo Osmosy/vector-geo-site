@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "7.1.0"
+ALGO_VERSION = "7.2.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -38,6 +38,26 @@ MIRRORS = [
 
 WATERWAY_KINDS = {"river", "stream", "canal", "drain", "ditch"}
 LOOP_MIN_RATIO = 3.0        # W2: петля — отношение длины русла к разрыву не меньше этого
+LOOP_MIN_TURN_DEG = 180.0   # R4: и русло должно завернуться не меньше чем на пол-оборота
+LOOP_MIN_AREA_K = 0.05      # R4: площадь кольца в долях gap²
+
+
+def loop_confidence(ratio: float, turn_deg: float, area_k: float) -> tuple[dict, str]:
+    """Насколько петля превышает каждый порог и какова её уверенность (E-021).
+
+    `margin` — превышение в долях собственного порога: 0.0 значит «ровно на пороге».
+    Уверенность берётся по худшему из трёх условий: меньше 10 % — low, до 30 % — medium,
+    дальше high. Петля Темзы в Сити (`ratio` 3.05 при пороге 3) иначе выглядела так же
+    твёрдо, как настоящая излучина с запасом вдвое.
+    """
+    margins = {
+        "ratio": ratio / LOOP_MIN_RATIO - 1.0,
+        "turn": turn_deg / LOOP_MIN_TURN_DEG - 1.0,
+        "area": area_k / LOOP_MIN_AREA_K - 1.0,
+    }
+    worst = min(margins.values())
+    confidence = "low" if worst < 0.10 else ("medium" if worst < 0.30 else "high")
+    return {key: float(round(value, 3)) for key, value in margins.items()}, confidence
 
 
 @dataclass
@@ -1242,12 +1262,14 @@ def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 15
     bearing = geo.normalize_deg(math.degrees(math.atan2(mid[0], mid[1])))
 
     is_loop = (ratio >= min_ratio and turn >= min_turn_deg and area >= area_k * gap * gap)
+    margin, confidence = loop_confidence(ratio, turn, area / (gap * gap))
     return {
         "gap_m": round(gap, 1), "along_m": round(along, 1), "ratio": round(ratio, 2),
         "turn_deg": round(turn, 1), "area_m2": round(area), "area_k": round(area / (gap * gap), 3),
         "mountain": geo.mountain_name(bearing),
         "is_loop": bool(is_loop),
         "site_position": _site_position(ring, mid, far),
+        "margin": margin, "confidence": confidence,
     }
 
 

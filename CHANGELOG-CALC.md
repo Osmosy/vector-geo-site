@@ -281,10 +281,10 @@
   площадным участником; слияний только из линий, которых не было в 6.3.2, — ноль.
 - Тесты: +3 на площади (`test_waterbody_outlines_do_not_make_confluences` на данных Стратфорда,
   `test_area_polygon_never_joins_confluence_search`, `test_closed_waterway_with_area_no_stays_a_line`),
-  всего **139 passed, 2 deselected**. **E-015 подтверждён на реальных линиях**: Северн у
-  Глостера, сток `#41965525` входит в круг 8 км двумя кусками (2 и 4 вершины), слияние с
+  всего **139 passed, 2 deselected**. **E-015 подтверждён на реальных линиях**: ручьи у
+  Глостера (не Северн — в фикстуре два безымянных `stream`), сток `#41965525` входит в круг 8 км двумя кусками (2 и 4 вершины), слияние с
   `#84733745` на 7974.5 м лежит на меньшем куске — до 6.4.1 запись терялась. Тест
-  `test_confluence_found_in_short_arm_real_data_severn` на фикстуре из двух `way`. Прежний
+  `test_confluence_found_in_short_arm_real_data_gloucester_streams` на фикстуре из двух `way`. Прежний
   «реальный случай» (Айл-оф-Догс) был контурами водоёмов и снят — это E-017.
 
 ## water 7.0.0 + pack 1.5.0 — 24.11.2026
@@ -326,3 +326,20 @@
 - Пакет Лондона: нарушений нет, предупреждений I-07b три — `#436220356` (короткий кусок, 5.5 м в
   круге), `west dock canal` и `central basin canal`.
 - Тесты: +3 в `tests/test_validate.py`; всего **144 passed, 2 deselected**.
+
+## water 7.2.0 + pack 1.7.0 — 24.11.2026
+
+**Пограничная петля перестала выглядеть уверенной (E-021).** В `loop` добавлены `margin` —
+превышение каждого условия в долях его порога — и `confidence`: `low` при запасе меньше 10 %,
+`medium` до 30 %, `high` дальше. Положение участка (`site_position`) в отчёт выводит навык.
+
+- Лондон, Темза в Сити: `ratio` 3.05 при пороге 3.0, поворот 183.2° при 180°, площадь
+  1.16·gap² — `margin {0.017, 0.018, 22.194}`, `confidence: low`, `site_position:
+  outside_concave`.
+- У Айл-оф-Догс петля та же, поэтому `low` и там; `site_position` — `inside`.
+- Тест: `test_loop_confidence_margins`; всего **145 passed, 2 deselected**.
+
+**Подпись E-015 исправлена**: случай называется «ручьи у Глостера», а не «Северн у Глостера» —
+в фикстуре два безымянных `waterway=stream`, самого Северна там нет. Тест переименован в
+`test_confluence_found_in_short_arm_real_data_gloucester_streams`, фикстура —
+`horseshoe-gloucester-streams.json`.

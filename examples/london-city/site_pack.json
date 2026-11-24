@@ -1319,7 +1319,7 @@
    {"id":"osm-fleet-river","name":"River Fleet","pieces":7,"hidden_share":0.93,"visible":false,"kind":"culvert","in_mountain":"乾","out_mountain":"坤","nearest_m":404.3,"bend":"inner","straight_at_site":true,"tidal":null,"confluences":[{"with":"osm-thames-river","dist_m":603.1,"mountain":"坤"},{"with":"osm-regent's canal-canal","dist_m":4179.2,"mountain":"乾"}],"geom":"line","outflow_visible":null,"curvature_radius_m":24948.0,"between_branches":false,"flow_ways_share":0.31,"crossings_2km":1,"crossing_angle_deg":100.8,"length_2km_m":2380.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-queenhithe-lake","name":"Queenhithe","hidden_share":0.0,"visible":true,"kind":"lake","nearest_m":405.7,"geom":"area","nearest_azimuth_deg":149.9,"nearest_mountain":"巳","area_m2":1548.1,"site_inside":false,"source":"openstreetmap"},
    {"id":"osm-#892252520-lake","name":"#892252520","hidden_share":0.0,"visible":true,"kind":"lake","nearest_m":420.5,"geom":"area","nearest_azimuth_deg":63.7,"nearest_mountain":"寅","area_m2":69.8,"site_inside":false,"source":"openstreetmap"},
-   {"id":"osm-thames-river","name":"River Thames","pieces":5,"hidden_share":0.0,"visible":true,"kind":"river","order":5,"discharge_m3s":89.881,"hydro_distance_m":374.0,"in_mountain":"坤","out_mountain":"辰","nearest_m":463.6,"bend":"outer","straight_at_site":false,"tidal":true,"tidal_source":"osm_tag","confluences":[{"with":"osm-fleet-river","dist_m":603.1,"mountain":"坤"},{"with":"osm-walbrook-stream","dist_m":685.3,"mountain":"巳"},{"with":"osm-#1479888244-river","dist_m":2021.2,"mountain":"辰"},{"with":"osm-#1059661300-stream","dist_m":2089.2,"mountain":"坤"}],"geom":"line","water_mouth":{"mountain":"乙","closure_index":0.01,"closure_reason":null,"closure_confidence":"low","enclosure":0.01,"width_m":4850.0,"left_hill_m":5.7,"right_hill_m":44.5,"width_capped":true,"capped_sides":1},"outflow_visible":null,"curvature_radius_m":3822.3,"loop":{"gap_m":1695.5,"along_m":5173.9,"ratio":3.05,"turn_deg":183.2,"area_m2":3333994,"area_k":1.16,"mountain":"乙","site_position":"outside_concave"},"site_position":"outside_concave","between_branches":false,"flow_ways_share":0.31,"crossings_2km":2,"crossing_angle_deg":113.8,"length_2km_m":3860.7,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_chosen":"downstream_toward_end","flow_rule":2,"flow_confidence":"medium","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
+   {"id":"osm-thames-river","name":"River Thames","pieces":5,"hidden_share":0.0,"visible":true,"kind":"river","order":5,"discharge_m3s":89.881,"hydro_distance_m":374.0,"in_mountain":"坤","out_mountain":"辰","nearest_m":463.6,"bend":"outer","straight_at_site":false,"tidal":true,"tidal_source":"osm_tag","confluences":[{"with":"osm-fleet-river","dist_m":603.1,"mountain":"坤"},{"with":"osm-walbrook-stream","dist_m":685.3,"mountain":"巳"},{"with":"osm-#1479888244-river","dist_m":2021.2,"mountain":"辰"},{"with":"osm-#1059661300-stream","dist_m":2089.2,"mountain":"坤"}],"geom":"line","water_mouth":{"mountain":"乙","closure_index":0.01,"closure_reason":null,"closure_confidence":"low","enclosure":0.01,"width_m":4850.0,"left_hill_m":5.7,"right_hill_m":44.5,"width_capped":true,"capped_sides":1},"outflow_visible":null,"curvature_radius_m":3822.3,"loop":{"gap_m":1695.5,"along_m":5173.9,"ratio":3.05,"turn_deg":183.2,"area_m2":3333994,"area_k":1.16,"mountain":"乙","site_position":"outside_concave","margin":{"ratio":0.017,"turn":0.018,"area":22.194},"confidence":"low"},"site_position":"outside_concave","between_branches":false,"flow_ways_share":0.31,"crossings_2km":2,"crossing_angle_deg":113.8,"length_2km_m":3860.7,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_chosen":"downstream_toward_end","flow_rule":2,"flow_confidence":"medium","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#583955117-lake","name":"#583955117","hidden_share":0.0,"visible":true,"kind":"lake","nearest_m":534.4,"geom":"area","nearest_azimuth_deg":124.5,"nearest_mountain":"辰","area_m2":3.5,"site_inside":false,"source":"openstreetmap"},
    {"id":"osm-walbrook-stream","name":"Walbrook","pieces":2,"hidden_share":0.94,"visible":false,"kind":"culvert","in_mountain":"艮","out_mountain":"辰","nearest_m":546.0,"bend":"outer","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-thames-river","dist_m":685.3,"mountain":"巳"}],"geom":"line","outflow_visible":null,"curvature_radius_m":551.7,"site_position":"outside_convex","between_branches":false,"flow_ways_share":0.31,"crossings_2km":0,"crossing_angle_deg":64.8,"length_2km_m":1875.3,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-#34040012-lake","name":"#34040012","hidden_share":0.0,"visible":true,"kind":"lake","nearest_m":565.5,"geom":"area","nearest_azimuth_deg":20.5,"nearest_mountain":"癸","area_m2":2548.7,"site_inside":false,"source":"openstreetmap"},
@@ -1400,16 +1400,16 @@
   "violations": []
  },
  "algo": {
-  "water": "7.1.0",
+  "water": "7.2.0",
   "terrain": "2.1.0",
   "geocode": "1.0.0",
-  "pack": "1.6.0",
+  "pack": "1.7.0",
   "climate": "1.0.0"
  },
  "files": {
   "water_geojson": "water.geojson",
   "sha256": {
-   "water.geojson": "b89e84800276507f0a0b0a4050fe33a0ad965f15327539fe0db6caabfda51b1f"
+   "water.geojson": "f99a63ebaa33c068c009a9add42dba43a2bd2884b2ea43da0ac483bb5792528c"
   }
  },
  "summary": {
