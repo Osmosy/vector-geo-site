@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "7.3.0"
+ALGO_VERSION = "7.4.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -876,6 +876,10 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     from pyproj import Transformer
     inv = Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
     nearest_abs = pts[nearest_seg] + site_xy
+    # Сторона участка — по ближайшей точке русла: она нужна и тогда, когда вход с выходом
+    # не измерить (вне круга 2 км), чтобы в отчёте остались расстояние и сторона.
+    side_bearing = geo.normalize_deg(math.degrees(math.atan2(float(pts[nearest_seg][0]),
+                                                            float(pts[nearest_seg][1]))))
     n_lon, n_lat = inv.transform(nearest_abs[0], nearest_abs[1])
     tide = tides.status(tags, feature.name, n_lon, n_lat)
 
@@ -1009,6 +1013,13 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
             # видимого водотока. Раньше это касалось только river/stream, а у каналов стояло
             # `high` по правилу 0 («течения нет»), и док-каналы с 乙 → 乙 выглядели надёжно.
             flow_conf = "low"
+        if same_reason == "вне круга выборки":
+            # Внутри круга 2 км от русла нет ни метра: пара 來水/去水 не измерена, поэтому горы,
+            # направление и уверенность не пишем вовсе, а не выдаём «вход 辰, выход 辰».
+            # `flow_chosen` убирается вместе с уверенностью — иначе I-10 видит поле без пары.
+            in_m = out_m = None
+            flow_conf = None
+            flow_chosen = None
 
     return WaterMetrics(
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
@@ -1048,6 +1059,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         crossing_angle_deg=round(crossing_angle, 1),
         length_2km_m=round(length_2km, 1) if length_2km is not None else None,
         same_mountain_reason=same_reason,
+        nearest_azimuth_deg=round(side_bearing, 1),
+        nearest_mountain=geo.mountain_name(side_bearing),
         coords=list(feature.coords),
     )
 
