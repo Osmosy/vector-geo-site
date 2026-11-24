@@ -845,6 +845,32 @@ def test_dock_channel_links_to_area_and_gets_low():
     assert line.flow_confidence == "low", line.flow_confidence
 
 
+def test_far_course_has_no_entry_and_exit_mountains():
+    """Русло вне круга 2 км: пара 來水/去水 не измерена, остаются расстояние и сторона.
+
+    Раньше в этом случае писались одинаковые горы входа и выхода с причиной «вне круга
+    выборки» и уверенностью low: числа выглядели замеренными, хотя внутри круга от русла нет
+    ни метра. Теперь `in_mountain` и `out_mountain` отсутствуют (`None`), а сторона участка
+    остаётся в `nearest_mountain`.
+    """
+    lat, lon = 51.5000, -0.1000
+    payload = {"elements": [
+        {"type": "way", "id": 21, "tags": {"waterway": "river"},
+         "geometry": [{"lat": lat + 0.030, "lon": lon - 0.0005},
+                      {"lat": lat + 0.030, "lon": lon + 0.0005}]},
+    ]}
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+                                  payload=payload, allow_network=False)
+    far = next(m for m in metrics if m.geom == "line")
+    assert far.length_2km_m == 0.0, far.length_2km_m
+    assert far.in_mountain is None and far.out_mountain is None
+    assert far.flow_confidence is None and far.flow_chosen is None   # I-10: поле без пары нельзя
+    assert far.nearest_mountain == "子", far.nearest_mountain      # сторона северная
+    assert far.same_mountain_reason == "вне круга выборки"
+
+
 def test_flow_share_ignores_area_contours():
     """E-018: контур не участвует в доле совпадения направления течения.
 
