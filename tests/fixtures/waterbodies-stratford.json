@@ -1,6 +1,6 @@
 {
  "version": 0.6,
- "generator": "geosite fixture: 4 ways from OSM at Isle of Dogs (51.4870,-0.0150)",
+ "generator": "geosite fixture: 4 ways from OSM around 51.530,-0.014 (Stratford, Bow Back Rivers) — St Thomas Creek line + three natural=water outlines",
  "elements": [
   {
    "type": "way",

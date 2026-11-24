@@ -27,6 +27,8 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             tidal_reason=(None if m.tidal is not None else m.tidal_reason),
             confluences=[{"with": c["with"], "dist_m": c["dist_m"],
                                          "mountain": c["mountain"]} for c in m.confluences],
+            waterbody_links=list(m.waterbody_links),
+            geom=getattr(m, "geom", "line"),
             water_mouth=mouth, outflow_visible=m.outflow_visible,
             curvature_radius_m=m.curvature_radius_m,
             loop=m.loop, site_position=m.site_position,

@@ -638,26 +638,133 @@ def test_tidal_null_has_reason_when_wide_payload_absent():
     assert metric.tidal_reason and metric.tidal_reason.startswith("no_wide_payload")
 
 
-def test_confluence_real_isle_of_dogs_both_arms():
-    """E-015 на реальных данных: у Айл-оф-Догс река входит в круг дважды.
+def test_waterbody_outlines_do_not_make_confluences():
+    """E-017: контуры водоёмов не дают слияний — проверка на реальных данных OSM.
 
-    Фикстура — четыре `way` из OSM вокруг 51.4870, -0.0150 (Темза и два её рукава у острова).
-    Приток впадает в тот рукав, который при обрезке короче: прежний выбор «самый длинный кусок»
-    терял слияние, теперь находятся оба.
+    Фикстура `tests/fixtures/waterbodies-stratford.json` — четыре `way` из OSM вокруг точки
+    51.530, -0.014 (Стратфорд, Боу-Бэк-Риверс): линия St Thomas Creek (`waterway=river`,
+    16 точек) и три замкнутых `natural=water` (Боу-Крик, канал в трубе, бассейн).
+    До 6.5.0 контуры объявлялись водотоками, и пересечения берегов засчитывались как
+    впадения: 8 ложных записей. Теперь слияний нет, а вход ручья в водоём пишется
+    отдельным списком `enters_waterbody`, которого слияния не касаются.
     """
     import json
     from pathlib import Path
 
     from geosite import geo
 
-    fixture = Path(__file__).parent / "fixtures" / "confluence-horseshoe.json"
+    fixture = Path(__file__).parent / "fixtures" / "waterbodies-stratford.json"
     payload = json.loads(fixture.read_text(encoding="utf-8"))
-    epsg = geo.utm_epsg(51.4870, -0.0150)
-    site = water.to_utm([(-0.0150, 51.4870)], epsg)[0]
+    epsg = geo.utm_epsg(51.5300, -0.0140)
+    site = water.to_utm([(-0.0140, 51.5300)], epsg)[0]
     feats = water.parse_features(payload)
-    out = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
-    key = next(k for k in out if k.startswith("osm-way-368175646"))
-    partners = {c["with"].split("-")[2] for c in out[key]}
-    # второй рукав (59041257 на 4793.7 м) и два притока, впадающих в короткий рукав
-    assert {"59041257", "59042050", "4054869"} <= partners, partners
+
+    kinds = {f.osm_id: (f.kind, f.geom) for f in feats}
+    assert kinds[4054869] == ("river", "line")          # ручей — линия
+    for way in (59041257, 59042050, 368175646):          # три контура — площади
+        assert kinds[way][1] == "area", kinds[way]
+
+    conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    assert not any(conf.values()), {k: v for k, v in conf.items() if v}
+
+    links = water.find_waterbody_links(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    creek = next(v for k, v in links.items() if k.startswith("osm-way-4054869"))
+    assert creek, links
+    assert all(item["kind"] == "enters_waterbody" for item in creek)
+
+
+def test_area_polygon_never_joins_confluence_search():
+    """E-017: прямоугольник `natural=water` и линия, пересекающая его контур дважды.
+
+    Ложное слияние «берег × берег» возникает не из-за геометрии, а из-за классификации:
+    замкнутый водоём объявлялся рекой. Теперь вид площади — `lake`, геометрия — `area`,
+    и в поиск слияний она не попадает вовсе. Линия внутри площади даёт только вход.
+    """
+    lat, lon = 51.5000, -0.1000
+    d = 0.0009                                   # ~100 м
+
+    def ring(sign: int) -> list[dict]:
+        return [{"lat": lat + sign * d, "lon": lon - d}, {"lat": lat + sign * d, "lon": lon + d},
+                {"lat": lat - sign * d, "lon": lon + d}, {"lat": lat - sign * d, "lon": lon - d},
+                {"lat": lat + sign * d, "lon": lon - d}]
+
+    payload = {"elements": [
+        {"type": "way", "id": 1, "tags": {"natural": "water", "water": "canal"}, "geometry": ring(2)},
+        {"type": "way", "id": 2, "tags": {"natural": "water", "water": "river"}, "geometry": ring(1)},
+        {"type": "way", "id": 3, "tags": {"waterway": "river", "name": "Test Brook"},
+         "geometry": [{"lat": lat, "lon": lon - 0.004}, {"lat": lat, "lon": lon},
+                      {"lat": lat, "lon": lon + 0.004}]},
+    ]}
+    from geosite import geo
+
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    feats = water.parse_features(payload)
+    assert [f.geom for f in feats] == ["area", "area", "line"]
+    # вид не меняется: площадной контур `water=river|canal` остаётся `river` как поверхность
+    # воды, а не русло — разделяет их отдельное поле `geom`, иначе пакеты менялись бы целиком
+    assert [f.kind for f in feats] == ["river", "river", "river"]
+
+    conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    assert not any(conf.values()), conf
+
+    # инвариант I-13: участники слияний — только линии; здесь площадь не участвует ни разу
+    line_keys = {f"osm-{f.osm_type}-{f.osm_id}-{i}" for i, f in enumerate(feats) if f.geom == "line"}
+    for key, items in conf.items():
+        if items:
+            assert key in line_keys
+            for item in items:
+                assert item["with"] in line_keys
+
+
+def test_closed_waterway_with_area_no_stays_a_line():
+    """E-017: замкнутый `waterway=canal` с `area=no` — всё-таки линия, а не контур."""
+    lat, lon = 51.5000, -0.1000
+    ring = [{"lat": lat, "lon": lon}, {"lat": lat, "lon": lon + 0.001},
+            {"lat": lat + 0.001, "lon": lon + 0.001}, {"lat": lat, "lon": lon}]
+    payload = {"elements": [
+        {"type": "way", "id": 1, "tags": {"waterway": "canal", "area": "no"}, "geometry": ring},
+    ]}
+    feats = water.parse_features(payload)
+    assert feats[0].geom == "line"
+
+
+def test_confluence_found_in_short_arm_real_data_severn():
+    """E-015 на реальных линиях: Северн у Глостера, 51.8620, -2.2500.
+
+    Фикстура `tests/fixtures/horseshoe-severn.json` — два `waterway=stream` из OSM. Сток
+    `#41965525` входит в круг 8 км **двумя** куском (2 и 4 вершины), и слияние с `#84733745`
+    на 7974.5 м лежит на меньшем куске. Пока перебирался только самый длинный кусок, этой
+    записи не было ни у одной из двух рек: проверяется ниже подменой `clip_near`.
+    """
+    import json
+    from pathlib import Path
+
+    from geosite import geo
+
+    lat, lon = 51.8620, -2.2500
+    fixture = Path(__file__).parent / "fixtures" / "horseshoe-severn.json"
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    merged = water.merge_by_name(water.parse_features(payload), near=(lat, lon))
+    short = next(line for line in merged if "#41965525" in line.uid)
+
+    pieces = water.clip_near(water.to_utm(short.coords, epsg) - site, 8000.0) or []
+    assert sorted(len(p) for p in pieces) == [2, 4], [len(p) for p in pieces]
+
+    conf = water.find_confluences(merged, site_xy=site, epsg=epsg, radius_m=8000, clip_m=8000.0)
+    distances = [c["dist_m"] for c in conf[short.uid]]
+    assert 7974.5 in distances, distances
+
+    # старый выбор «самый длинный кусок» эту запись терял — воспроизводим подменой
+    original = water.clip_near
+    water.clip_near = lambda pts, limit: (lambda out: [max(out, key=len)] if out else out)(
+        original(pts, limit) or [])
+    try:
+        old_style = water.find_confluences(merged, site_xy=site, epsg=epsg,
+                                           radius_m=8000, clip_m=8000.0)
+    finally:
+        water.clip_near = original
+    assert 7974.5 not in [c["dist_m"] for c in old_style[short.uid]]
 

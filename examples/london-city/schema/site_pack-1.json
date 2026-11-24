@@ -1195,6 +1195,23 @@
           "title": "Confluences",
           "type": "array"
         },
+        "waterbody_links": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Waterbody Links",
+          "type": "array"
+        },
+        "geom": {
+          "default": "line",
+          "enum": [
+            "line",
+            "area"
+          ],
+          "title": "Geom",
+          "type": "string"
+        },
         "water_mouth": {
           "anyOf": [
             {

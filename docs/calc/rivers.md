@@ -129,9 +129,11 @@ def pairs(path):
             out.setdefault(key, []).append(c["dist_m"])
     return out
 
-# база сравнения — пакет water 6.3.2, в рабочем дереве его нет; берём из истории:
+# обе стороны сравнения — зафиксированные в истории пакеты, иначе числа «плывут» с каждой
+# версией; 13ea7ca — water 6.3.2, 8a62083 — water 6.4.1 (после PR #26)
 #   git show 13ea7ca:examples/london-city/site_pack.json > /tmp/old_pack.json
-old, new = pairs("/tmp/old_pack.json"), pairs("examples/london-city/site_pack.json")
+#   git show 8a62083:examples/london-city/site_pack.json > /tmp/new_pack.json
+old, new = pairs("/tmp/old_pack.json"), pairs("/tmp/new_pack.json")
 print("записей:", sum(len(v) for v in old.values()), "->", sum(len(v) for v in new.values()))
 print("пар:", len(old), "->", len(new), "| ушли:", [tuple(sorted(k)) for k in set(old) - set(new)])
 for k in old:
@@ -141,4 +143,56 @@ for k in old:
 
 Счёт «по метрикам до агрегации» даёт другую картину (там есть `uid` и кусочные записи) — его
 нельзя смешивать с пакетным.
+
+## Линии и площади (water 6.5.0)
+
+Русло — это линия, а водоём — контур. OSM размечает их по-разному, и до 6.5.0 оба вида попадали
+в поиск слияний: замкнутый `natural=water` с `water=river|canal` объявлялся «рекой», перебор пар
+находил пересечение его берега с берегом соседнего водоёма, и это записывалось как впадение.
+В примере Лондона так возникали 20 записей из 63, у Стратфорда — все 8 (E-017).
+
+Правило:
+
+| объект | `geom` | пример |
+|---|---|---|
+| `waterway=river|stream|canal|drain|ditch` без замыкания | `line` | русло Темзы |
+| замкнутый `natural=water` | `area` | контур реки, док, бассейн |
+| `waterway=riverbank`, `landuse=reservoir|basin` | `area` | берег, водохранилище |
+| замкнутый `waterway=*` с `area=no` | `line` | размеченная петля канала |
+
+`confluences` — только между линиями. Вход русла в водоём — не слияние: он пишется в
+`waterbody_links` с `kind: enters_waterbody`, потому что река в озеро втекает, а не «впадает
+в второе русло». Вид (`kind`) при этом не меняется: `water=river` у площади остаётся `river`
+как поверхность воды, и потребитель пакета видит разницу по `geom`.
+
+Инвариант I-13: у каждой записи слияния оба участника — линии. Проверяется по зафиксированным
+пакетам, а не только на синтетике.
+
+## Пересчёт 626 → 631 и 554 → 557 (water 6.5.0)
+
+Числа из E-015 посчитаны не по пакету, а по записям слияний **до склейки в линии**: каждая пара
+пишется в обе стороны, и куски одной реки считаются отдельно, поэтому записей больше, чем в пакете
+(у тех же участков в 6.5.0 — 63 и 60). С пакетными числами эти смешивать нельзя. Воспроизводится
+на трёх коммитах — `13ea7ca` (6.3.2), `5a531ee` (6.4.1) и текущий; исходники версии берутся из
+worktree:
+
+```python
+# git worktree add /tmp/w632 13ea7ca   # затем 5a531ee и текущая ветка
+# GEOSITE_OFFLINE=1 PYTHONPATH=/tmp/w632/src python snippet.py
+from geosite import geo, water
+
+lat, lon = 51.4870, -0.0150        # Айл-оф-Догс; Гринвич — 51.4826, -0.0077
+epsg = geo.utm_epsg(lat, lon)
+site = water.to_utm([(lon, lat)], epsg)[0]
+payload = water.fetch_raw(lat, lon, 8000, allow_network=False)   # кеш Overpass
+feats = water.parse_features(payload)
+conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+print(sum(len(v) for v in conf.values()))
+```
+
+Результат: Айл-оф-Догс **626 → 631 → 462**, Гринвич **554 → 557 → 451**. Прирост 6.4.1 дали три
+новые пары на каждом участке, и все с контуром в составе (разбор — в E-017). В 6.5.0 записи с
+контурами ушли целиком, поэтому к 6.3.2 стало меньше на 164 и 103, а не на 5 и 3: контуры
+участвовали и в старых парах. Слияний только из линий, которых не было в 6.3.2, — ноль.
+
 

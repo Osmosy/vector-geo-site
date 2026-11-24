@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.4.1"
+ALGO_VERSION = "6.5.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -49,6 +49,9 @@ class Feature:
     tags: dict = field(default_factory=dict)
     coords: list[tuple[float, float]] = field(default_factory=list)   # (lon, lat)
     closed: bool = False
+    # линия русла или контур водоёма: контуры берегов нельзя считать водотоками, иначе
+    # пересечение двух берегов засчитывается как впадение (E-017)
+    geom: str = "line"             # line / area
 
 
 def _query(lat: float, lon: float, radius_m: int) -> str:
@@ -247,6 +250,10 @@ def _kind_of(tags: dict) -> str:
     natural = tags.get("natural")
     waterway = tags.get("waterway")
     if natural == "water":
+        # вид остаётся прежним: `water=river|canal` у площадного контура — это поверхность
+        # реки, и потребитель пакета читает её как `river`. Что это не русло, а контур,
+        # говорит отдельное поле `geom` (E-017), поэтому вид здесь не меняется — иначе
+        # пересчёт пакетов менял бы 85 объектов «река → озеро» без нужды.
         if tags.get("water") in {"river", "canal"} or tags.get("waterway") == "riverbank":
             return "river"
         if tags.get("water") == "dock" or tags.get("landuse") == "dock":
@@ -263,6 +270,29 @@ def _kind_of(tags: dict) -> str:
     if waterway == "dam":
         return "dam"
     return "other"
+
+
+AREA_LANDUSE = {"reservoir", "basin"}
+
+
+def _geom_of(tags: dict, closed: bool) -> str:
+    """Контур водоёма или линия русла.
+
+    Площадью считается: замкнутый `natural=water`, `waterway=riverbank`, `landuse=reservoir|basin`,
+    а также любой замкнутый `waterway=*` без явного `area=no` — в OSM так иногда рисуют берега.
+    Всё остальное — линия. Разделение нужно, потому что пересечение двух берегов не слияние:
+    у Стратфорда контур канала и контур реки «впадали» друг в друга (E-017).
+    """
+    explicit = (tags.get("area") or "").lower()
+    if explicit == "no":
+        return "line"
+    if tags.get("natural") == "water" or tags.get("waterway") == "riverbank":
+        return "area"
+    if (tags.get("landuse") or "") in AREA_LANDUSE:
+        return "area"
+    if not closed:
+        return "line"
+    return "area" if tags.get("waterway") else "line"
 
 
 def _name_of(tags: dict) -> str | None:
@@ -284,7 +314,8 @@ def parse_features(payload: dict) -> list[Feature]:
             if not coords or kind == "other":
                 continue
             closed = len(coords) > 3 and abs(coords[0][0] - coords[-1][0]) < 1e-9 and abs(coords[0][1] - coords[-1][1]) < 1e-9
-            out.append(Feature(el.get("id", 0), "way", _name_of(tags), kind, tags, coords, closed))
+            out.append(Feature(el.get("id", 0), "way", _name_of(tags), kind, tags, coords, closed,
+                               _geom_of(tags, closed)))
         elif el.get("type") == "relation" and el.get("members"):
             # члены отношения не склеиваем в один контур: иначе между ними появляются
             # хорды через полгорода и доля воды раздувается
@@ -294,8 +325,10 @@ def parse_features(payload: dict) -> list[Feature]:
                     closed = (len(geom) > 3
                               and abs(geom[0][0] - geom[-1][0]) < 1e-9
                               and abs(geom[0][1] - geom[-1][1]) < 1e-9)
+                    # член отношения с `natural=water` — часть контура водоёма, площадью он
+                    # становится по тому же правилу, что и отдельный замкнутый way
                     out.append(Feature(el.get("id", 0) * 1000 + idx, "relation", _name_of(tags),
-                                       _kind_of(tags), tags, geom, closed))
+                                       _kind_of(tags), tags, geom, closed, _geom_of(tags, closed)))
     return out
 
 
@@ -453,6 +486,7 @@ class MergedLine:
     # отрисовки. У склейки своих тегов не было, и приливная Темза получала flow_rule 5 —
     # «рельеф молчит», хотя тег `tidal=yes` есть у всех её кусков.
     tags: dict = field(default_factory=dict)
+    geom: str = "line"             # line / area
 
     def __post_init__(self) -> None:
         if not self.uid:
@@ -481,11 +515,13 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
             continue
         # ключ склейки — нормализованное имя: «River Fleet» и «The Fleet» — один водоток
         # тип в ключ не входит: одна река в OSM бывает и river, и stream на разных участках
-        key = (hydronym.normalize_name(f.name) or f"#{f.osm_id}", "")
+        # контур водоёма и русло с тем же именем — разные объекты: склеенные в одну линию,
+        # они дают скачки геометрии и ложные слияния берегов (E-017)
+        key = (hydronym.normalize_name(f.name) or f"#{f.osm_id}", f.geom)
         groups.setdefault(key, []).append(f)
 
     merged: list[MergedLine] = []
-    for (name, kind), items in groups.items():
+    for (name, geom), items in groups.items():
         longest = max(items, key=lambda f: len(f.coords))
         display = longest.name or name
         kind = max((f.kind for f in items), key=lambda k: KIND_RANK.get(k, 0))
@@ -521,7 +557,7 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
                     chain = chain[::-1]
                 merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
                                          items_count, hidden, hidden_share,
-                                         tags=dict(common)))
+                                         tags=dict(common), geom=items[0].geom))
     # ключ куска неуникален: у одной реки их несколько, и словарь слияний молча терял все,
     # кроме последнего. uid различает куски, key остаётся именем реки для потребителя.
     for idx, line in enumerate(merged):
@@ -726,6 +762,9 @@ class WaterMetrics:
     hydro_distance_m: float | None = None
     hydro_agree: float | None = None
     coords: list[tuple[float, float]] = field(default_factory=list)
+    # места, где русло входит в водоём: не слияние, поэтому отдельный список (E-017)
+    waterbody_links: list[dict] = field(default_factory=list)
+    geom: str = "line"             # line / area: контур водоёма не русло
 
 
 def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, epsg: int,
@@ -884,6 +923,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         curvature_radius_m=None if radius_m is None else round(radius_m, 1),
         straight_at_site=bool(straight and nearest_m < in_radius_m),
         confluences=[],
+        geom=getattr(feature, "geom", "line"),
         water_mouth=mouth,
         hidden_share=feature.hidden_share,
         visible=(feature.hidden_share or 0.0) < 0.8,
@@ -1191,6 +1231,57 @@ def _confluence_kind(a_kind: str, b_kind: str) -> str:
     return "confluence"
 
 
+def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
+                         radius_m: float = 8000.0) -> dict[str, list[dict]]:
+    """Где линия русла входит в водоём: конец линии лежит внутри контура площади.
+
+    Это не слияние: река не «впадает» в озеро в смысле двух русел, она в него втекает.
+    В `confluences` такие места не пишутся — раньше контуры берегов считались водотоками,
+    и пересечение двух берегов у Стратфорда выглядело как впадение (E-017).
+
+    Ключ — uid линии, значение — список `{"water": имя или uid водоёма, "dist_m", "kind"}`.
+    """
+    from shapely.geometry import Point, Polygon
+
+    areas: list[tuple[str, object]] = []
+    for idx, f in enumerate(features):
+        if f.geom != "area" or len(f.coords) < 4:
+            continue
+        ring = to_utm(f.coords, epsg) - site_xy
+        if float(np.hypot(*ring.T).min()) > radius_m:
+            continue
+        poly = Polygon(ring)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.area < 2000.0:
+            # меньше 2000 м² — не водоём, а щель в обводке контура
+            continue
+        areas.append((f.name or f"osm-{f.osm_type}-{f.osm_id}-{idx}", poly))
+
+    out: dict[str, list[dict]] = {}
+    for idx, f in enumerate(features):
+        if f.geom != "line" or f.kind not in {"river", "stream", "canal"} or len(f.coords) < 2:
+            continue
+        pts = to_utm(f.coords, epsg) - site_xy
+        uid = getattr(f, "uid", None) or f"osm-{f.osm_type}-{f.osm_id}-{idx}"
+        label = f.name or uid
+        for area_label, poly in areas:
+            if area_label == label:
+                continue
+            # конец линии внутри контура — вход в водоём; у русла, нарисованного от устья,
+            # вход в озеро — это начало, поэтому проверяются оба конца
+            for end in (pts[-1], pts[0]):
+                if not poly.contains(Point(float(end[0]), float(end[1]))):
+                    continue
+                dist = float(np.hypot(*end))
+                if dist <= radius_m:
+                    out.setdefault(uid, []).append({"water": area_label,
+                                                    "dist_m": round(dist, 1),
+                                                    "kind": "enters_waterbody"})
+                break
+    return out
+
+
 def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
                      radius_m: float = 8000.0, merge_m: float = 50.0,
                      max_per_line: int = 5, clip_m: float = 5000.0) -> dict[str, list[dict]]:
@@ -1214,7 +1305,8 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
     labels: dict[str, str] = {}
     base: dict[str, str] = {}          # ключ куска в круге -> ключ реки
     for idx, f in enumerate(features):
-        if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1:
+        # только русла: контур берега — не водоток, и пересечение двух берегов не впадение (E-017)
+        if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1 and f.geom == "line":
             uid = (getattr(f, "uid", None) or getattr(f, "key", None)
                    or f"osm-{f.osm_type}-{f.osm_id}-{idx}")
             full = to_utm(f.coords, epsg) - site_xy
@@ -1348,7 +1440,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             chunks.append(MergedLine(line.key, line.name, line.kind,
                                      list(line.coords[i0:i1 + 1]), line.ways, line.hidden,
                                      line.hidden_share, uid=f"{line.uid}-{idx}",
-                                     tags=dict(line.tags)))
+                                     tags=dict(line.tags), geom=line.geom))
 
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу
     near = []
@@ -1358,11 +1450,18 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             near.append(line)
     confluences = find_confluences(near, site_xy=site_xy, epsg=epsg, radius_m=radius_m,
                                    clip_m=float(radius_m))
+    # Входы в водоёмы ищем по целым линиям и целым контурам, а не по нарезанным кускам:
+    # кусок кольца — не замкнутый контур, и `Polygon` из него закрывает разрыв хордой (E-017).
+    links = find_waterbody_links(merged, site_xy=site_xy, epsg=epsg, radius_m=radius_m)
     # одна река — несколько кусков: слияние, найденное на любом из них, относится к реке
     by_name: dict[str, list[dict]] = {}
+    links_by_name: dict[str, list[dict]] = {}
     for line in near:
         key = hydronym.normalize_name(line.name) or line.key
         by_name.setdefault(key, []).extend(confluences.get(line.uid, []))
+    for line in merged:
+        key = hydronym.normalize_name(line.name) or line.key
+        links_by_name.setdefault(key, []).extend(links.get(line.uid, []))
 
     flow_share = flow_convention_share(features, grid, epsg)
     out: list[WaterMetrics] = []
@@ -1374,6 +1473,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         key = hydronym.normalize_name(metrics.name) or metrics.id
         items = _dedupe_confluences(by_name.get(key, []))
         metrics.confluences = items[:4]
+        metrics.waterbody_links = _dedupe_links(links_by_name.get(key, []))[:4]
         if flow_share is not None and metrics.kind in {"river", "stream", "canal"}:
             metrics.flow_agree = flow_share >= 0.6
             metrics.flow_ways_share = flow_share
@@ -1395,6 +1495,17 @@ def _dedupe_confluences(items: list[dict], *, merge_m: float = 50.0) -> list[dic
                 break
         else:
             out.append(item)
+    return out
+
+
+def _dedupe_links(items: list[dict], *, merge_m: float = 50.0) -> list[dict]:
+    """Один и тот же вход в водоём приходит от каждого куска линии — оставить по одному."""
+    out: list[dict] = []
+    for item in sorted(items, key=lambda it: it["dist_m"]):
+        if any(kept["water"] == item["water"] and abs(kept["dist_m"] - item["dist_m"]) <= merge_m
+               for kept in out):
+            continue
+        out.append(item)
     return out
 
 
@@ -1434,7 +1545,8 @@ def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | No
             # Покрытие считается только для линейной воды: у озера «покрытие» — это периметр
             # замкнутого кольца, и правило выбирало дальний пруд вместо ближнего.
             items.sort(key=lambda m: (-_coverage_m(m.coords, site_xy, epsg, radius_m)
-                                      if m.kind in {"river", "stream", "canal", "culvert"} else 0.0,
+                                      if m.kind in {"river", "stream", "canal", "culvert"}
+                                      and m.geom == "line" else 0.0,
                                       m.nearest_m))
         else:
             items.sort(key=lambda m: m.nearest_m)

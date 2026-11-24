@@ -130,3 +130,28 @@ def test_mouth_confidence_reaches_pack():
     assert obj.water_mouth.enclosure == 0.01
     assert obj.flow_rule == 2 and obj.flow_confidence == "medium"
     assert obj.flow_chosen == "downstream_toward_end"
+
+
+def test_i13_confluence_participants_are_lines():
+    """I-13: в слиянии участвуют только линии русла, никогда — контуры водоёмов.
+
+    Инвариант проверяется по зафиксированным пакетам: если однажды контур берега снова
+    попадёт в поиск слияний (E-017), пакет это покажет — участник будет с `geom: area`.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    checked = 0
+    for pack_path in sorted(root.glob("examples/*/site_pack.json")):
+        pack = json.loads(pack_path.read_text(encoding="utf-8"))
+        by_id = {obj["id"]: obj for obj in pack.get("water") or []}
+        for obj in pack.get("water") or []:
+            for conf in obj.get("confluences") or []:
+                assert obj.get("geom", "line") == "line", (pack_path.name, obj["id"])
+                partner = by_id.get(conf["with"])
+                assert partner is not None, (pack_path.name, obj["id"], conf["with"])
+                assert partner.get("geom", "line") == "line", (pack_path.name, obj["id"], conf["with"])
+                checked += 1
+    assert checked > 0, "пакетов с слияниями не нашлось — проверять нечего"
+
