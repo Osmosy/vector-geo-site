@@ -234,6 +234,40 @@
 - Нашёл: внешняя проверка ZCode (тест был подписан «Айл-оф-Догс», а фикстура — Стратфорд).
 
 
+## E-018. Площадные объекты получали речные поля
+
+- Где: `water.measure_feature`, `water.flow_convention_share`, `water._one_entry_per_name`,
+  `water._kind_of`, `hydro.assign`, `pack.trim_water`.
+- Было: `geom: area` появился в 6.5.0, но проверялся только в поиске слияний. Все остальные
+  расчёты продолжали мерить контур как русло. В пакете Лондона **16 площадей из 16** несли
+  `in_mountain`/`out_mountain` (всегда одну и ту же гору: начало контура = конец), `bend: outer`
+  и направление течения; у `#373395041` нашлась «петля» `ratio 599.12` при `gap_m 4.7` — контур
+  замыкался сам на себя. Доля совпадения направления течения считалась и по площадям: у
+  замкнутого кольца «конец ниже начала» всегда ложно, поэтому каждая площадь тянула её вниз.
+  `hydro.assign` предлагал площади как кандидата на порядок реки, `pack.trim_water` отбирал их
+  по речному порогу в 3 км.
+- Стало (`water 7.0.0`):
+  - одна проверка `water.is_watercourse(f)` = `geom == "line"` и вид из
+    `river|stream|canal|culvert`; применена в перечисленных местах и в `_one_entry_per_name`;
+  - у площади считается только вода: `nearest_m`, `nearest_azimuth_deg`, `nearest_mountain`,
+    `area_m2`, `site_inside`, `visible`, `waterbody_links`, `riverbank_of`;
+  - речных полей у площади нет **вовсе** — не null, а отсутствуют: `in_mountain`,
+    `out_mountain`, `bend`, `bend_kind`, `loop`, `site_position`, `flow_*`, `water_mouth`,
+    `tidal_*`, `crossings_2km`, `confluences`, `pieces`;
+  - вид у контура — `lake` / `dock` / `sea`, а не `river`: бассейн и док больше не называются
+    рекой;
+  - берег реки (`water = river` или `waterway = riverbank`) привязывается к линии русла с тем же
+    именем через `riverbank_of`;
+  - док и бассейн в пакете живут по порогу 2 км (`WATERBODY_KEEP_M`), остальные водоёмы — по 1 км.
+- Доказательство: пакет Лондона (пересобран офлайн из эталонной фикстуры): площадей с речными
+  полями **16 → 0**; `by_kind` — `river` 108 → 25, `lake` 439 → 471, появились `dock` 63;
+  объектов в пакете 42 → 44 (бассейны City Road и Wenlock остались, но как `dock`), входов в
+  водоёмы 9 → 11; слияния не изменились — 47. Всего измеренных объектов 739 → 750: берег и
+  русло с одним именем больше не вытесняют друг друга в `_one_entry_per_name`.
+- Тесты: `test_area_gets_only_waterbody_fields`, `test_flow_share_ignores_area_contours`;
+  `test_area_polygon_never_joins_confluence_search` ожидает у контура вид `lake`.
+- Нашёл: внешняя проверка Claude (24.11.2026), после слияния PR #29.
+
 ## E-016 — приливность оставалась null без причины при офлайн-сборке
 
 - Место: `water._resolve_tidal_by_reach`, CLI.

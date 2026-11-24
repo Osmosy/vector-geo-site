@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "6.5.0"
+ALGO_VERSION = "7.0.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -249,17 +249,18 @@ def is_hidden(tags: dict) -> bool:
 def _kind_of(tags: dict) -> str:
     natural = tags.get("natural")
     waterway = tags.get("waterway")
-    if natural == "water":
-        # вид остаётся прежним: `water=river|canal` у площадного контура — это поверхность
-        # реки, и потребитель пакета читает её как `river`. Что это не русло, а контур,
-        # говорит отдельное поле `geom` (E-017), поэтому вид здесь не меняется — иначе
-        # пересчёт пакетов менял бы 85 объектов «река → озеро» без нужды.
-        if tags.get("water") in {"river", "canal"} or tags.get("waterway") == "riverbank":
-            return "river"
-        if tags.get("water") == "dock" or tags.get("landuse") == "dock":
-            return "dock"
-        if tags.get("place") == "sea" or tags.get("water") == "sea":
+    if (natural == "water" or waterway == "riverbank"
+            or (tags.get("landuse") or "") in AREA_LANDUSE):
+        # Вид описывает поверхность воды, а не русло: у контура это lake / dock / sea (E-018).
+        # До 7.0.0 `water=river|canal` у контура давал `river`, и потребитель пакета принимал
+        # берег за реку — с входом и выходом воды, изгибом и петлёй.
+        water = (tags.get("water") or "").lower()
+        landuse = (tags.get("landuse") or "").lower()
+        text = " ".join(str(tags.get(k) or "") for k in ("name", "name:en", "alt_name")).lower()
+        if water == "sea" or tags.get("place") == "sea":
             return "sea"
+        if water in {"basin", "dock"} or landuse in {"basin", "dock"} or "basin" in text or "dock" in text:
+            return "dock"
         return "lake"
     if waterway == "river":
         return "river"
@@ -731,7 +732,7 @@ class WaterMetrics:
     bend: str | None
     bend_kind: str | None
     curvature_radius_m: float | None
-    straight_at_site: bool
+    straight_at_site: bool | None
     confluences: list[dict]
     water_mouth: dict | None
     outflow_visible: bool | None
@@ -765,6 +766,54 @@ class WaterMetrics:
     # места, где русло входит в водоём: не слияние, поэтому отдельный список (E-017)
     waterbody_links: list[dict] = field(default_factory=list)
     geom: str = "line"             # line / area: контур водоёма не русло
+    # поля водоёма: у контура нет входа/выхода, изгиба и петли, но есть площадь и сторона (E-018)
+    nearest_azimuth_deg: float | None = None
+    nearest_mountain: str | None = None
+    area_m2: float | None = None
+    site_inside: bool | None = None
+    riverbank_of: str | None = None
+
+
+def is_watercourse(obj) -> bool:
+    """Русло реки: линия, а не контур водоёма.
+
+    Единственное место, где решается «считать ли речные поля». Принимает `Feature`,
+    `MergedLine` и `WaterMetrics` — у всех есть `geom` и `kind`. Площадной контур получает
+    только поля водоёма: у него нет входа и выхода воды, изгиба, петли и направления (E-018).
+    """
+    return getattr(obj, "geom", "line") == "line" and getattr(obj, "kind", None) in {
+        "river", "stream", "canal", "culvert"}
+
+
+def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int,
+                       nearest_m: float) -> "WaterMetrics":
+    """Контур водоёма: площадь, сторона и ближайшая точка, без речных полей.
+
+    `in_mountain`, `out_mountain`, `bend`, `loop`, `flow_*`, `water_mouth` и `tidal_*` не
+    заполняются, потому что их нет по смыслу: у бассейна нет течения и устья. Речных нулей
+    тоже не пишем — потребитель должен отличать «не считали» от «посчитали и вышло 0».
+    """
+    x, y = float(pts[nearest_seg][0]), float(pts[nearest_seg][1])
+    bearing = geo.normalize_deg(math.degrees(math.atan2(x, y)))
+    return WaterMetrics(
+        id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
+        name=feature.name, kind=feature.kind, order=None,
+        nearest_m=round(nearest_m, 1),
+        in_mountain=None, out_mountain=None, bend=None, bend_kind=None,
+        curvature_radius_m=None, straight_at_site=None, confluences=[],
+        water_mouth=None, outflow_visible=None, flow_dem_dir=None, flow_osm_dir=None,
+        flow_agree=None, flow_chosen=None, flow_rule=None, flow_confidence=None,
+        dem_slope_m_per_km=None, dem_slope_snr=None, dem_reason=None,
+        tidal=None, tidal_source=None, source="openstreetmap",
+        geom="area",
+        nearest_azimuth_deg=round(bearing, 1),
+        nearest_mountain=geo.mountain_name(bearing),
+        area_m2=round(abs(_polyline_area(pts)), 1) if len(pts) >= 4 else None,
+        site_inside=(bool(_point_in_poly(0.0, 0.0, pts)) if len(pts) >= 4 else None),
+        hidden_share=getattr(feature, "hidden_share", None),
+        visible=(getattr(feature, "hidden_share", None) or 0.0) < 0.8,
+        coords=list(feature.coords),
+    )
 
 
 def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, epsg: int,
@@ -777,6 +826,11 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     nearest_m = float(dists[nearest_seg])
     if nearest_m > meso_radius_m:
         return None
+
+    if getattr(feature, "geom", "line") == "area":
+        # Контур водоёма: площадь, сторона и ближайшая точка. Речных полей у него нет по
+        # смыслу — бассейн не втекает и не вытекает, у него нет ни устья, ни петли (E-018).
+        return _measure_waterbody(feature, pts=pts, nearest_seg=nearest_seg, nearest_m=nearest_m)
 
     tags = getattr(feature, "tags", {}) or {}
     # Труба — свойство всей линии, а не ближайшего куска: с 6.1.1 склейка несёт теги
@@ -1389,7 +1443,7 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
         return None
     agree = total = 0
     for f in features:
-        if f.kind not in {"river", "stream"} or len(f.coords) < 2:
+        if f.kind not in {"river", "stream"} or not is_watercourse(f) or len(f.coords) < 2:
             continue
         pts = to_utm([f.coords[0], f.coords[-1]], epsg)
         z0 = grid.point_value(*pts[0])
@@ -1474,11 +1528,25 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         items = _dedupe_confluences(by_name.get(key, []))
         metrics.confluences = items[:4]
         metrics.waterbody_links = _dedupe_links(links_by_name.get(key, []))[:4]
-        if flow_share is not None and metrics.kind in {"river", "stream", "canal"}:
+        if flow_share is not None and is_watercourse(metrics):
             metrics.flow_agree = flow_share >= 0.6
             metrics.flow_ways_share = flow_share
         out.append(metrics)
     out = _one_entry_per_name(out, site_xy=site_xy, epsg=epsg, radius_m=radius_m)
+    # Берег реки (`natural=water, water=river` или `waterway=riverbank`) привязывается к линии
+    # русла с тем же именем: отдельной «рекой» он не выводится, у него только поля водоёма (E-018).
+    area_tags = {line.key: dict(getattr(line, "tags", {}) or {}) for line in merged
+                 if getattr(line, "geom", "line") == "area"}
+    line_ids: dict[str, str] = {}
+    for metric in out:
+        if is_watercourse(metric) and metric.name:
+            line_ids.setdefault(hydronym.normalize_name(metric.name) or metric.name, metric.id)
+    for metric in out:
+        if metric.geom != "area" or not metric.name:
+            continue
+        tags = area_tags.get(metric.id, {})
+        if (tags.get("water") or "") == "river" or tags.get("waterway") == "riverbank":
+            metric.riverbank_of = line_ids.get(hydronym.normalize_name(metric.name) or metric.name)
     out.sort(key=lambda m: m.nearest_m)
     _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
     _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,
@@ -1536,7 +1604,9 @@ def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | No
     """
     groups: dict[str, list[WaterMetrics]] = {}
     for metric in metrics:
-        key = hydronym.normalize_name(metric.name) or metric.id
+        # Группа — имя и вид геометрии: русло и его берег с одним именем — разные объекты,
+        # и раньше один вытеснял другой, поэтому у контура не было видно полей водоёма (E-018).
+        key = f"{hydronym.normalize_name(metric.name) or metric.id}|{metric.geom}"
         groups.setdefault(key, []).append(metric)
 
     out: list[WaterMetrics] = []
@@ -1545,8 +1615,7 @@ def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | No
             # Покрытие считается только для линейной воды: у озера «покрытие» — это периметр
             # замкнутого кольца, и правило выбирало дальний пруд вместо ближнего.
             items.sort(key=lambda m: (-_coverage_m(m.coords, site_xy, epsg, radius_m)
-                                      if m.kind in {"river", "stream", "canal", "culvert"}
-                                      and m.geom == "line" else 0.0,
+                                      if is_watercourse(m) else 0.0,
                                       m.nearest_m))
         else:
             items.sort(key=lambda m: m.nearest_m)
@@ -1569,7 +1638,7 @@ def _resolve_tidal_by_tags(metrics: list[WaterMetrics], features: list[Feature],
     который ближе всего к участку, — он и описывает воду рядом с точкой.
     """
     for metric in metrics:
-        if metric.tidal is not None or not metric.name:
+        if not is_watercourse(metric) or metric.tidal is not None or not metric.name:
             continue
         best = None
         for feature in features:
@@ -1597,7 +1666,8 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
     на русло, и сравниваются расстояния вдоль него. Сравнение по координате ошибается на
     изгибах: Кингстон западнее Теддингтона, но стоит выше него по течению.
     """
-    pending = [m for m in metrics if m.tidal is None and m.name and tides.limit_entry(m.name)]
+    pending = [m for m in metrics if is_watercourse(m) and m.tidal is None and m.name
+               and tides.limit_entry(m.name)]
     if not pending:
         return
     if wide_payload is not None:

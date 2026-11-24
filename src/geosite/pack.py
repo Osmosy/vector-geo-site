@@ -11,10 +11,10 @@ from . import figures, geo
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "6.5.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.4.0",
+ALGO = {"water": "7.0.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.5.0",
         "climate": "1.0.0"}
 
-ALGO_VERSION = "1.1.0"
+ALGO_VERSION = "1.2.0"
 
 ATTRIBUTION = [
     "© OpenStreetMap contributors",
@@ -24,6 +24,7 @@ ATTRIBUTION = [
 
 RIVER_KEEP_M = 3000.0       # W7: реки до 3 км попадают в пакет
 OTHER_KEEP_M = 1000.0       # водоёмы и скрытая вода — до 1 км
+WATERBODY_KEEP_M = 2000.0   # док и бассейн: именованная вода у самого участка (E-018)
 
 
 KEEP_NULL = {"closure_index", "closure_reason", "tidal", "dem_reason", "flow_dem_dir",
@@ -67,12 +68,19 @@ def _prune(value):
 
 def trim_water(objects: list) -> list:
     """Оставить в пакете то, что читает интерпретатор: ближние реки, вода и все слияния."""
+    from .water import is_watercourse
+
     kept = []
     for item in objects:
         nearest = item.nearest_m or 1e9
-        if item.kind in {"river", "stream"} and nearest <= RIVER_KEEP_M:
+        # Порог реки — для русла. Водоём живёт по общему порогу в 1 км, но док и бассейн —
+        # это именованная вода, которую читает толкователь, поэтому им оставлен порог реки:
+        # иначе City Road Basin в 1,8 км исчезал из пакета вместе с речными полями (E-018).
+        if is_watercourse(item) and nearest <= RIVER_KEEP_M:
             kept.append(item)
-        elif item.kind not in {"river", "stream"} and nearest <= OTHER_KEEP_M:
+        elif item.kind in {"dock", "sea"} and nearest <= WATERBODY_KEEP_M:
+            kept.append(item)
+        elif nearest <= OTHER_KEEP_M:
             kept.append(item)
         elif item.confluences:
             kept.append(item)
@@ -94,6 +102,26 @@ def water_summary(all_objects: list, kept: list) -> dict:
             "by_in_mountain": by_direction}
 
 
+# Речные поля, которых у контура водоёма нет по смыслу: бассейн не втекает и не вытекает,
+# у него нет устья, изгиба и петли. Не null, а именно отсутствуют — null означал бы «считали,
+# но не вышло» (E-018).
+AREA_DROP = (
+    "in_mountain", "out_mountain", "bend", "bend_kind", "curvature_radius_m", "straight_at_site",
+    "loop", "site_position", "flow_osm_dir", "flow_dem_dir", "flow_chosen", "flow_rule",
+    "flow_confidence", "flow_agree", "flow_ways_share", "dem_slope_m_per_km", "dem_slope_snr",
+    "dem_reason", "water_mouth", "outflow_visible", "tidal", "tidal_source", "tidal_reason",
+    "crossings_2km", "crossing_angle_deg", "between_branches", "order", "discharge_m3s",
+    "hydro_distance_m", "pieces", "confluences",
+)
+
+
+def _strip_area_fields(props: dict) -> dict:
+    """Убрать речные поля у площадного объекта, оставив только данные водоёма (E-018)."""
+    if props.get("geom") != "area":
+        return props
+    return {key: value for key, value in props.items() if key not in AREA_DROP}
+
+
 def write_water_geojson(path: Path, objects: list, geometry: dict) -> None:
     """Полный набор воды с геометрией: то, что не влезло в пакет, живёт здесь."""
     features = []
@@ -101,7 +129,7 @@ def write_water_geojson(path: Path, objects: list, geometry: dict) -> None:
         coords = geometry.get(item.id)
         if not coords:
             continue
-        props = item.model_dump(mode="json")
+        props = _strip_area_fields(item.model_dump(mode="json"))
         features.append({
             "type": "Feature",
             "geometry": {"type": "LineString", "coordinates": [[float(x), float(y)] for x, y in coords]},
@@ -215,6 +243,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         attribution=ATTRIBUTION,
     )
     payload = pack.model_dump(by_alias=True, exclude_none=False)
+    payload["water"] = [_strip_area_fields(item) for item in payload.get("water") or []]
     payload = _prune(payload)
     payload["algo"] = dict(ALGO)
     violations = validate_mod.validate(payload)
