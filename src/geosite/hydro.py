@@ -193,9 +193,11 @@ def assign(metrics, reach: dict | None, *, max_site_m: float = 1000.0,
     if reach is None:
         warnings.append("hydro: в радиусе 2 км нет участка HydroRIVERS — порядок и расход не определены")
         return warnings
+    from .water import is_watercourse
+
     points = reach.get("_points") or []
     rivers = [m for m in metrics
-              if m.kind in ("river", "canal") and m.nearest_m is not None
+              if is_watercourse(m) and m.nearest_m is not None
               and m.nearest_m <= max_site_m]
     if not points or not rivers:
         warnings.append("hydro: участок есть, но совпадения с руслом проверить нечем — порядок не проставлен")

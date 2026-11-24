@@ -146,6 +146,12 @@ class WaterObject(BaseModel):
     waterbody_links: list[dict] = Field(default_factory=list)
     # линия русла или контур водоёма: в слияниях участвуют только линии (E-017)
     geom: Literal["line", "area"] = "line"
+    # поля водоёма: у контура нет входа и выхода воды, изгиба и петли (E-018)
+    nearest_azimuth_deg: float | None = None
+    nearest_mountain: str | None = None
+    area_m2: float | None = None
+    site_inside: bool | None = None
+    riverbank_of: str | None = None
     water_mouth: WaterMouth | None = None
     outflow_visible: bool | None = None
     curvature_radius_m: float | None = None

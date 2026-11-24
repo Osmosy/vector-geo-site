@@ -286,3 +286,26 @@
   `#84733745` на 7974.5 м лежит на меньшем куске — до 6.4.1 запись терялась. Тест
   `test_confluence_found_in_short_arm_real_data_severn` на фикстуре из двух `way`. Прежний
   «реальный случай» (Айл-оф-Догс) был контурами водоёмов и снят — это E-017.
+
+## water 7.0.0 + pack 1.5.0 — 24.11.2026
+
+**Контур водоёма больше не считается руслом.** Мажорная версия: у площадей исчезают речные поля,
+меняется вид бассейнов и состав пакета — потребителю, который читал `river` у берега, нужно
+смотреть на `geom` и на поля водоёма (E-018).
+
+- Одна проверка `water.is_watercourse` (`geom == "line"` и вид `river|stream|canal|culvert`)
+  применена в `measure_feature`, `flow_convention_share`, `_one_entry_per_name`, `hydro.assign`
+  и `pack.trim_water`.
+- У площади только вода: `nearest_m`, `nearest_azimuth_deg`, `nearest_mountain`, `area_m2`,
+  `site_inside`, `visible`, `waterbody_links`, `riverbank_of`. Речные поля отсутствуют, а не
+  остаются null: у бассейна нет ни устья, ни петли.
+- Вид контура: `lake` / `dock` / `sea`. Берег реки получает `riverbank_of` с id линии русла.
+- Док и бассейн попадают в пакет до 2 км (`WATERBODY_KEEP_M`), остальные водоёмы — до 1 км.
+- Пакет Лондона: площадей с речными полями **16 → 0**; `by_kind` `river` 108 → 25,
+  `lake` 439 → 471, `dock` 63; в пакете 42 → 44 объекта (`City Road Basin` и `Wenlock Basin`
+  остались как `dock`), входов в водоёмы 9 → 11, слияний по-прежнему 47.
+- `_one_entry_per_name` группирует по имени **и** геометрии: берег и русло с одним именем больше
+  не вытесняют друг друга (измеренных объектов 739 → 750).
+- Тесты: `test_area_gets_only_waterbody_fields`, `test_flow_share_ignores_area_contours`;
+  в `test_area_polygon_never_joins_confluence_search` вид контура теперь `lake`.
+  Всего **141 passed, 2 deselected**.

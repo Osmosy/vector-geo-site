@@ -11,18 +11,25 @@ from .water import WaterMetrics, to_utm
 
 
 def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
+    from .water import is_watercourse
+
     out: list[WaterObject] = []
     for m in metrics:
         mouth = None
         if m.water_mouth:
             # передаём словарь целиком: выборочная сборка уже теряла уверенность и enclosure
             mouth = WaterMouth(**{k: v for k, v in m.water_mouth.items() if not k.startswith("_")})
+        area = not is_watercourse(m)
         out.append(WaterObject(
             id=m.id, name=m.name, kind=m.kind if m.kind in
             {"river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"} else "lake",
-            order=m.order, discharge_m3s=m.discharge_m3s, hydro_distance_m=m.hydro_distance_m,
+            order=None if area else m.order,
+            discharge_m3s=None if area else m.discharge_m3s,
+            hydro_distance_m=None if area else m.hydro_distance_m,
             in_mountain=m.in_mountain, out_mountain=m.out_mountain,
             nearest_m=m.nearest_m, bend=m.bend, straight_at_site=m.straight_at_site,
+            nearest_azimuth_deg=m.nearest_azimuth_deg, nearest_mountain=m.nearest_mountain,
+            area_m2=m.area_m2, site_inside=m.site_inside, riverbank_of=m.riverbank_of,
             tidal=m.tidal, tidal_source=m.tidal_source,
             tidal_reason=(None if m.tidal is not None else m.tidal_reason),
             confluences=[{"with": c["with"], "dist_m": c["dist_m"],
@@ -34,7 +41,7 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             loop=m.loop, site_position=m.site_position,
             between_branches=m.between_branches,
             flow_ways_share=m.flow_ways_share,
-            crossings_2km=m.crossings_2km,
+            crossings_2km=None if area else m.crossings_2km,
             crossing_angle_deg=m.crossing_angle_deg,
             flow_dem_dir=m.flow_dem_dir, flow_osm_dir=m.flow_osm_dir, flow_agree=m.flow_agree,
             flow_chosen=m.flow_chosen, flow_rule=m.flow_rule, flow_confidence=m.flow_confidence,

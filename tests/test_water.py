@@ -701,9 +701,8 @@ def test_area_polygon_never_joins_confluence_search():
     site = water.to_utm([(lon, lat)], epsg)[0]
     feats = water.parse_features(payload)
     assert [f.geom for f in feats] == ["area", "area", "line"]
-    # вид не меняется: площадной контур `water=river|canal` остаётся `river` как поверхность
-    # воды, а не русло — разделяет их отдельное поле `geom`, иначе пакеты менялись бы целиком
-    assert [f.kind for f in feats] == ["river", "river", "river"]
+    # вид описывает поверхность воды: у контура это не русло (E-018). Разделяет их `geom`.
+    assert [f.kind for f in feats] == ["lake", "lake", "river"]
 
     conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
     assert not any(conf.values()), conf
@@ -768,3 +767,69 @@ def test_confluence_found_in_short_arm_real_data_severn():
         water.clip_near = original
     assert 7974.5 not in [c["dist_m"] for c in old_style[short.uid]]
 
+
+
+def _ring(lat: float, lon: float, d: float) -> list[dict]:
+    return [{"lat": lat - d, "lon": lon - d}, {"lat": lat - d, "lon": lon + d},
+            {"lat": lat + d, "lon": lon + d}, {"lat": lat + d, "lon": lon - d},
+            {"lat": lat - d, "lon": lon - d}]
+
+
+def test_area_gets_only_waterbody_fields():
+    """E-018: у контура водоёма нет речных полей — ни значений, ни нулей.
+
+    Замкнутый `natural=water, water=river` раньше мерился как русло: получал вход и выход
+    воды, изгиб, направление, и у него могла «найтись» петля (у контура начало совпадает с
+    концом). Теперь у площади только площадь, сторона, ближайшая точка и вход русла.
+    """
+    lat, lon = 51.5000, -0.1000
+    payload = {"elements": [
+        {"type": "way", "id": 1, "tags": {"natural": "water", "water": "river",
+                                          "name": "Test River"}, "geometry": _ring(lat, lon, 0.002)},
+        {"type": "way", "id": 2, "tags": {"waterway": "river", "name": "Test River"},
+         "geometry": [{"lat": lat, "lon": lon - 0.006}, {"lat": lat, "lon": lon},
+                      {"lat": lat, "lon": lon + 0.006}]},
+    ]}
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+                                  payload=payload, allow_network=False)
+
+    area = next(m for m in metrics if m.geom == "area")
+    assert area.kind in {"lake", "dock"}, area.kind
+    for field in ("in_mountain", "out_mountain", "bend", "bend_kind", "loop", "site_position",
+                  "flow_chosen", "flow_rule", "flow_confidence", "flow_agree", "flow_ways_share",
+                  "water_mouth", "outflow_visible", "tidal", "tidal_source",
+                  "crossing_angle_deg", "between_branches"):
+        assert getattr(area, field) is None, (field, getattr(area, field))
+    assert area.crossings_2km == 0                       # у водоёма пересечений с кругом нет
+
+    # поля водоёма есть
+    assert area.area_m2 and area.area_m2 > 1000.0
+    assert area.nearest_mountain and area.nearest_azimuth_deg is not None
+    assert area.site_inside is True                       # участок внутри контура
+    # берег привязан к линии с тем же именем, отдельной «рекой» не выводится
+    line = next(m for m in metrics if m.geom == "line")
+    assert area.riverbank_of == line.id, (area.riverbank_of, line.id)
+
+
+def test_flow_share_ignores_area_contours():
+    """E-018: контур не участвует в доле совпадения направления течения.
+
+    У замкнутого контура первая и последняя точки совпадают, поэтому «конец ниже начала»
+    для него всегда ложно: каждая площадь тянула долю вниз. Высоты здесь монотонны по
+    широте, поэтому линия идёт вниз, а у контура перепад нулевой.
+    """
+    class Grid:
+        def point_value(self, x, y):
+            return -float(y)
+
+    epsg = geo.utm_epsg(51.5, -0.1)
+    line = Feature(1, "way", "Test Brook", "river", {"waterway": "river"},
+                   [(0.0, 0.0), (0.0, 0.001)], False)
+    ring = [(0.0, 0.0), (0.001, 0.0), (0.001, 0.001), (0.0, 0.001), (0.0, 0.0)]
+    area = Feature(2, "way", None, "lake", {"natural": "water", "water": "river"}, ring, True)
+    area.geom = "area"
+
+    assert water.flow_convention_share([line], Grid(), epsg) == 1.0
+    assert water.flow_convention_share([line, area], Grid(), epsg) == 1.0
