@@ -1402,6 +1402,30 @@
           "default": null,
           "title": "Crossing Angle Deg"
         },
+        "length_2km_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Length 2Km M"
+        },
+        "same_mountain_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Mountain Reason"
+        },
         "flow_osm_dir": {
           "anyOf": [
             {

@@ -728,10 +728,11 @@ def test_closed_waterway_with_area_no_stays_a_line():
     assert feats[0].geom == "line"
 
 
-def test_confluence_found_in_short_arm_real_data_severn():
-    """E-015 на реальных линиях: Северн у Глостера, 51.8620, -2.2500.
+def test_confluence_found_in_short_arm_real_data_gloucester_streams():
+    """E-015 на реальных линиях: ручьи у Глостера, 51.8620, -2.2500.
 
-    Фикстура `tests/fixtures/horseshoe-severn.json` — два `waterway=stream` из OSM. Сток
+    Фикстура `tests/fixtures/horseshoe-gloucester-streams.json` — два безымянных
+    `waterway=stream` из OSM; Северна в фикстуре нет, ручьи лежат в ~8 км от точки. Сток
     `#41965525` входит в круг 8 км **двумя** куском (2 и 4 вершины), и слияние с `#84733745`
     на 7974.5 м лежит на меньшем куске. Пока перебирался только самый длинный кусок, этой
     записи не было ни у одной из двух рек: проверяется ниже подменой `clip_near`.
@@ -742,7 +743,7 @@ def test_confluence_found_in_short_arm_real_data_severn():
     from geosite import geo
 
     lat, lon = 51.8620, -2.2500
-    fixture = Path(__file__).parent / "fixtures" / "horseshoe-severn.json"
+    fixture = Path(__file__).parent / "fixtures" / "horseshoe-gloucester-streams.json"
     payload = json.loads(fixture.read_text(encoding="utf-8"))
     epsg = geo.utm_epsg(lat, lon)
     site = water.to_utm([(lon, lat)], epsg)[0]
@@ -833,3 +834,20 @@ def test_flow_share_ignores_area_contours():
 
     assert water.flow_convention_share([line], Grid(), epsg) == 1.0
     assert water.flow_convention_share([line, area], Grid(), epsg) == 1.0
+
+
+def test_loop_confidence_margins():
+    """E-021: у петли видно, насколько она превышает каждый порог, и её уверенность.
+
+    Петля Темзы в Сити проходит по ratio 3.05 при пороге 3 — запас 1.7 %, это `low`.
+    Настоящая излучина с запасом вдвое — `high`; между 10 и 30 % — `medium`.
+    """
+    margin, confidence = water.loop_confidence(3.05, 183.2, 1.16)
+    assert confidence == "low", (margin, confidence)
+    assert margin["ratio"] < 0.02 and margin["turn"] < 0.10, margin
+
+    margin, confidence = water.loop_confidence(6.0, 400.0, 0.5)
+    assert confidence == "high", (margin, confidence)
+
+    margin, confidence = water.loop_confidence(3.6, 200.0, 0.06)
+    assert confidence == "medium", (margin, confidence)

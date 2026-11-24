@@ -162,6 +162,9 @@ class WaterObject(BaseModel):
     flow_ways_share: float | None = None
     crossings_2km: int | None = None
     crossing_angle_deg: float | None = None
+    # длина русла внутри круга 2 км и причина совпадения гор входа и выхода (E-020)
+    length_2km_m: float | None = None
+    same_mountain_reason: str | None = None
     flow_osm_dir: str | None = None
     flow_dem_dir: str | None = None
     flow_chosen: str | None = None

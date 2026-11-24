@@ -42,6 +42,10 @@ CONFIDENCE_PAIRS = {
 LOOP_MIN_RATIO = 3.0
 LOOP_MIN_TURN_DEG = 180.0
 LOOP_MIN_AREA_K = 0.05
+# I-07a/I-07b (E-020): нарушение — только длинный кусок с пологим входом; короче или
+# касательнее — предупреждение с причиной.
+I07_MIN_LENGTH_M = 500.0
+I07_MIN_ANGLE_DEG = 30.0
 
 
 def _violation(code: str, path: str, message: str, **extra: Any) -> dict:
@@ -137,14 +141,22 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
                                           f"дубль слияния с {other} на {dist} м", id=wid))
             seen.append((other, dist))
 
-        # I-07: видимая проходящая река не может входить и выходить из одной горы.
-        # Исключения (docs/calc/invariants.md): скрытая вода, петля, меньше двух пересечений.
+        # I-07a: видимая проходящая река не может входить и выходить из одной горы.
+        # Разделение на I-07a/I-07b (E-020): нарушение — только длинный кусок с пологим
+        # входом; короткий кусок, касательная и петля получают причину и предупреждение,
+        # а не нарушение. Старые пакеты без `length_2km_m` проверяются по числу пересечений.
+        length = _num(water.get("length_2km_m"))
+        if length is not None:
+            long_enough = length >= I07_MIN_LENGTH_M
+        else:
+            long_enough = (water.get("crossings_2km") or 0) >= 2
         if (nearest is not None and nearest < 3000
+                and water.get("geom", "line") == "line"
                 and water.get("visible") is not False
                 and not water.get("hidden_share")
                 and not water.get("loop")
-                and (water.get("crossings_2km") or 0) >= 2
-                and (water.get("crossing_angle_deg") or 0) >= 30.0):
+                and long_enough
+                and (water.get("crossing_angle_deg") or 0) >= I07_MIN_ANGLE_DEG):
             if water.get("in_mountain") and water.get("in_mountain") == water.get("out_mountain"):
                 out.append(_violation("I-07", f"{base}.in_mountain",
                                       "вход и выход в одной горе у видимой проходящей реки", id=wid))
@@ -207,9 +219,38 @@ def validate_file(path: str | Path, **kwargs) -> list[dict]:
     return validate(data, **kwargs)
 
 
+def warnings(pack: dict) -> list[str]:
+    """I-07b (E-020): объяснимые совпадения гор входа и выхода — предупреждения, не нарушения.
+
+    Причина пишется в самом объекте (`same_mountain_reason`), а здесь она превращается в строку
+    `quality.warnings`, чтобы читатель отчёта видел исключение и его основание, а не молчание.
+    """
+    out: list[str] = []
+    for water in pack.get("water") or []:
+        reason = water.get("same_mountain_reason")
+        if not reason or water.get("geom", "line") != "line":
+            continue
+        if reason == "вне круга выборки":
+            # Это не исключение, а граница замера: русла в круге 2 км нет вовсе. Пишем в
+            # объекте, но в предупреждения не тащим — иначе десяток далёких каналов
+            # заполняет список тем, что про них ничего не считалось.
+            continue
+        nearest = _num(water.get("nearest_m"))
+        if nearest is None or nearest >= 3000:
+            continue
+        out.append(f"I-07b: {water.get('id') or '?'} — вход и выход в одной горе ({reason})")
+    return out
+
+
 def apply_to_pack(pack: dict, violations: list[dict]) -> dict:
     """Записать результат проверки в quality пакета (используется в geosite pack)."""
     quality = pack.setdefault("quality", {})
     quality["valid"] = not violations
     quality["violations"] = violations
+    warns = warnings(pack)
+    if warns:
+        existing = quality.setdefault("warnings", [])
+        for item in warns:
+            if item not in existing:
+                existing.append(item)
     return pack
