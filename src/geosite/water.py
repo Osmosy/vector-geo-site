@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "7.0.0"
+ALGO_VERSION = "7.1.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -758,6 +758,9 @@ class WaterMetrics:
     between_pair_deg: list[int] | None = None
     crossings_2km: int = 0
     crossing_angle_deg: float | None = None
+    # длина русла внутри круга 2 км и причина, если вход и выход попали в одну гору (E-020)
+    length_2km_m: float | None = None
+    same_mountain_reason: str | None = None
     flow_ways_share: float | None = None
     discharge_m3s: float | None = None
     hydro_distance_m: float | None = None
@@ -964,6 +967,24 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
             bend_kind = "bend"
     between = site_between_branches(pts) if len(pts) > 2 else {"between_branches": False}
 
+    # I-07b (E-020): одноимённые горы входа и выхода у видимой воды объясняются причиной.
+    # Проверка I-07 молчала, если ручей мало пересекал круг 2 км, и короткий ручей проходил
+    # её насквозь. Теперь нарушение отделено от предупреждения: нарушение — только длинный
+    # кусок с пологим входом, остальное получает причину и пониженную уверенность.
+    length_2km = _coverage_m(feature.coords, site_xy, epsg, in_radius_m)
+    same_reason = None
+    if in_m and in_m == out_m and (feature.hidden_share or 0.0) < 0.8:
+        if loop:
+            same_reason = "петля"
+        elif length_2km <= 0.0:
+            same_reason = "вне круга выборки"
+        elif length_2km < 500.0:
+            same_reason = "короткий кусок"
+        elif crossing_angle < 30.0:
+            same_reason = "касательная"
+        if same_reason and flow_chosen and kind in {"river", "stream"}:
+            flow_conf = "low"
+
     return WaterMetrics(
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
         name=feature.name,
@@ -1000,6 +1021,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         between_pair_deg=between.get("pair_deg"),
         crossings_2km=len(cross),
         crossing_angle_deg=round(crossing_angle, 1),
+        length_2km_m=round(length_2km, 1) if length_2km is not None else None,
+        same_mountain_reason=same_reason,
         coords=list(feature.coords),
     )
 

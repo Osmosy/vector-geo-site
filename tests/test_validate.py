@@ -209,3 +209,50 @@ def test_i07_same_mountains():
 
     pack["water"][0]["visible"] = False      # подземная вода — исключение
     assert "I-07" not in codes(pack)
+
+def test_i07a_long_course_with_same_mountain_is_violation():
+    """E-020: длинный видимый водоток, вход и выход в одной горе — нарушение I-07a."""
+    pack = base_pack()
+    water = pack["water"][0]
+    water["visible"] = True
+    water["out_mountain"] = water["in_mountain"]
+    water["length_2km_m"] = 800.0
+    water["crossing_angle_deg"] = 90.0
+    assert "I-07" in codes(pack)
+
+
+def test_i07b_short_course_is_warning_not_violation():
+    """E-020: короткий кусок и касательная — предупреждение с причиной, а не нарушение."""
+    pack = base_pack()
+    water = pack["water"][0]
+    water["visible"] = True
+    water["out_mountain"] = water["in_mountain"]
+    water["length_2km_m"] = 120.0
+    water["crossing_angle_deg"] = 90.0
+    water["same_mountain_reason"] = "короткий кусок"
+    assert "I-07" not in codes(pack)
+    warns = V.warnings(pack)
+    assert any("короткий кусок" in item for item in warns), warns
+
+    water["length_2km_m"] = 900.0
+    water["crossing_angle_deg"] = 4.0
+    water["same_mountain_reason"] = "касательная"
+    assert "I-07" not in codes(pack)
+    assert any("касательная" in item for item in V.warnings(pack))
+
+
+def test_i07_ignores_area_and_far_water():
+    """E-020: у контура водоёма и у далёкой воды проверки нет — сравнивать нечего."""
+    pack = base_pack()
+    water = pack["water"][0]
+    water["visible"] = True
+    water["out_mountain"] = water["in_mountain"]
+    water["length_2km_m"] = 900.0
+    water["geom"] = "area"
+    assert "I-07" not in codes(pack)
+
+    water["geom"] = "line"
+    water["nearest_m"] = 5000.0
+    assert "I-07" not in codes(pack)
+    assert V.warnings(pack) == []
+
