@@ -12,7 +12,7 @@ from . import terrain, water, worldnames
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.9.0"      # версия сборки пакета
+ALGO_VERSION = "2.10.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -340,6 +340,11 @@ def _near_ring_layers(measured: dict, mountain: str, index: int) -> dict:
     dsm = (measured.get("dsm_near_ring") or {}).get(mountain)
     dtm_info = measured.get("dtm_info") or {}
     if not dsm or not dtm_info.get("source"):
+        return {}
+    # кольца секторов строятся по макро-сетке. Если земля есть только в ближнем кольце
+    # (`scope: near_ring`), то кольцо посчитано по DSM — второй слой был бы тем же числом
+    # под другим именем. Такой пары не публикуем: пусть лучше не будет, чем двойник.
+    if (dtm_info.get("scope") or "all") != "all":
         return {}
     dtm_ring = next((s["rings"][0] for s in measured.get("sectors") or []
                      if s["mountain"] == mountain), None)

@@ -20,9 +20,9 @@ from pathlib import Path
 
 import numpy as np
 
-from . import dem
+from . import dem, geo
 
-ALGO_VERSION = "1.0.0"
+ALGO_VERSION = "1.1.0"
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "data" / "dtm_sources.json"
 CACHE_DIR = dem.CACHE_DIR / "dtm"
@@ -76,10 +76,118 @@ def _mask_heights(array: np.ndarray) -> np.ndarray:
     return out
 
 
+def _wcs2_window(source: dict, lat: float, lon: float, radius_km: float,
+                 resolution_m: float, *, timeout: int = 300) -> dict | None:
+    """Окно из WCS 2.0.1: подмножества `subset=E(…)&subset=N(…)` в нативной сетке источника.
+
+    У EA LIDAR (Англия) другого способа нет: сервис отдаёт только 2.0.1, осей «широта/долгота»
+    не признаёт (`InvalidAxisLabel`), а `scaleFactor` масштабирует всё покрытие целиком — на
+    Англию это 30.9 ГБ против лимита сервера 10 ГБ. Ответ при этом ограничен 50 МБ, поэтому
+    окно режется на куски и собирается в один массив: один запрос «всё кольцо 8 км» сервер
+    отвергает (`too much data … 244.14MB`).
+    """
+    from pyproj import Transformer
+    from rasterio.io import MemoryFile
+
+    if offline():
+        raise RuntimeError("offline: сеть запрещена")
+
+    native = source.get("crs") or "EPSG:27700"
+    axes = source.get("axes") or ["E", "N"]
+    native_res = float(source.get("resolution_m") or 1.0)
+    cache = CACHE_DIR / f"{source['id']}_{lat:.4f}_{lon:.4f}_{radius_km:g}_{resolution_m:g}.npz"
+    cached = _read_npz(cache)
+    if cached is not None:
+        return cached
+
+    # окно шире радиуса: квадрат в OSGB, повёрнутый в UTM, иначе оставляет пустые углы
+    # (1 − π/4 ≈ 21 % площади) — это дырка от проекции, а не отсутствие данных
+    radius_km = radius_km * float(source.get("window_factor") or 1.45)
+    dlat = radius_km / 111.32
+    dlon = radius_km / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(native), always_xy=True)
+    xs, ys = [], []
+    for f_lat in (lat - dlat, lat, lat + dlat):
+        for f_lon in (lon - dlon, lon, lon + dlon):
+            x, y = tr.transform(f_lon, f_lat)
+            xs.append(x)
+            ys.append(y)
+    x_min, x_max, y_min, y_max = min(xs), max(xs), min(ys), max(ys)
+
+    # сервер пишет ответ целиком, лимит по умолчанию 50 МБ → кусок ≈ 3.3×3.3 тыс. px
+    max_bytes = float(source.get("max_bytes") or 45_000_000)
+    side_limit = max(256, int(math.floor(math.sqrt(max_bytes / 4.0))))
+    cols = max(1, int(math.ceil((x_max - x_min) / native_res / side_limit)))
+    rows = max(1, int(math.ceil((y_max - y_min) / native_res / side_limit)))
+    width = int(round((x_max - x_min) / native_res))
+    height = int(round((y_max - y_min) / native_res))
+    total_limit = float(source.get("max_total_pixels") or 80_000_000)
+    if width * height > total_limit:
+        raise RuntimeError(
+            f"окно {width}x{height} px ({width * height / 1e6:.0f} Мпикс) больше лимита источника "
+            f"{total_limit / 1e6:.0f} Мпикс: радиус {radius_km:g} км при сетке {native_res:g} м — "
+            f"это {width * height * 4 / 1e6:.0f} МБ перекачки")
+    mosaic = np.full((height, width), np.nan, dtype="float32")
+    got = 0
+    errors: list[str] = []
+    for row in range(rows):
+        for col in range(cols):
+            cx0 = x_min + (x_max - x_min) * col / cols
+            cx1 = x_min + (x_max - x_min) * (col + 1) / cols
+            cy1 = y_max - (y_max - y_min) * row / rows
+            cy0 = y_max - (y_max - y_min) * (row + 1) / rows
+            query = [
+                ("service", "WCS"), ("request", "GetCoverage"), ("version", "2.0.1"),
+                ("CoverageId", source["coverage"]),
+                ("subset", f"{axes[0]}({cx0:.2f},{cx1:.2f})"),
+                ("subset", f"{axes[1]}({cy0:.2f},{cy1:.2f})"),
+                ("format", "image/tiff"),
+            ]
+            url = f"{source['url']}?{urllib.parse.urlencode(query)}"
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    payload = resp.read()
+            except Exception as exc:                     # кусок мог не отдаться — остальное берём
+                errors.append(f"{type(exc).__name__}")
+                continue
+            if payload[:5] == b"<?xml" or payload[:4] == b"<ows":
+                text = payload.decode("utf-8", "replace")
+                reason = text.split("<ows:ExceptionText>")[1].split("<")[0] if "<ows:ExceptionText>" in text else text[:120]
+                errors.append(reason)
+                continue
+            with MemoryFile(payload) as mem, mem.open() as ds:
+                band = _mask_heights(ds.read(1))
+                ctransform = ds.transform
+                ccrs = str(ds.crs)
+            # кусок кладём по его собственному углу: сервер вправе сдвинуть сетку на пиксель
+            left = int(round((ctransform.c - x_min) / native_res))
+            top = int(round((y_max - ctransform.f) / native_res))
+            h, w = band.shape
+            r0, c0 = max(0, top), max(0, left)
+            r1, c1 = min(height, top + h), min(width, left + w)
+            if r1 <= r0 or c1 <= c0:
+                errors.append("кусок вне окна")
+                continue
+            mosaic[r0:r1, c0:c1] = band[r0 - top:r1 - top, c0 - left:c1 - left]
+            got += 1
+    if got == 0:
+        raise RuntimeError("WCS 2.0.1: ни один кусок не отдан — " + "; ".join(sorted(set(errors))[:2]))
+    from rasterio.transform import from_origin
+    transform = from_origin(x_min, y_max, native_res, native_res)
+    result = {"array": mosaic, "transform": tuple(transform)[:6], "crs": ccrs if got else geo.crs_str(native)}
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(cache, array=mosaic, transform=np.array(result["transform"]), crs=result["crs"])
+    return result
+
+
 def _wcs_window(source: dict, lat: float, lon: float, radius_km: float,
                 resolution_m: float, *, timeout: int = 120) -> np.ndarray | None:
     """Окно из WCS 1.0.0 в EPSG:4326: сервер сам пересчитывает сетку под WIDTH/HEIGHT."""
     from rasterio.io import MemoryFile
+
+    if (source.get("protocol") or "").startswith("wcs-2"):
+        return _wcs2_window(source, lat, lon, radius_km, resolution_m)
 
     dlat = radius_km / 111.32
     dlon = radius_km / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
@@ -188,7 +296,8 @@ def grid(lat: float, lon: float, *, crs: int | str, radius_km: float, resolution
         grid_obj.vertical_datum = source.get("vertical_datum")
         grid_obj.datum_shift_m = source.get("datum_shift_m")
         grid_obj.license = source.get("license")
-        grid_obj.resolution_m = float(source.get("resolution_m") or resolution_m)
+        grid_obj.resolution_m = float(resolution_m)          # сетка пакета, не родная сетка источника
+        grid_obj.source_resolution_m = float(source.get("resolution_m") or resolution_m)
         info.update({"source": source["id"], "name": source["name"], "kind": "dtm",
                      "license": source.get("license"), "vertical_datum": source.get("vertical_datum"),
                      "datum_shift_m": source.get("datum_shift_m"),
@@ -229,6 +338,8 @@ def file_block(info: dict) -> dict | None:
     if not info.get("source"):
         return None
     return {"source": info["source"], "kind": "dtm", "resolution_m": info.get("resolution_m"),
+            "source_resolution_m": info.get("source_resolution_m"),
+            "scope": info.get("scope") or "all",
             "license": info.get("license"), "vertical_datum": info.get("vertical_datum"),
             "datum_shift_m": info.get("datum_shift_m")}
 

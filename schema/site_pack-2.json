@@ -148,6 +148,34 @@
           "default": null,
           "title": "Resolution M"
         },
+        "source_resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Resolution M"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "near_ring"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
         "license": {
           "anyOf": [
             {

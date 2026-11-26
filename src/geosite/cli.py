@@ -123,10 +123,14 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
     if not getattr(args, "no_dtm", False):
         macro_dtm, macro_info = dtm.grid(r.lat, r.lon, crs=crs, radius_km=macro_km,
                                          resolution_m=max(90.0, 30.0))
-        if macro_dtm is not None:
-            meso_dtm, _ = dtm.grid(r.lat, r.lon, crs=crs, radius_km=8.0, resolution_m=30.0)
-            dtm_grid = macro_dtm
-            dtm_info = macro_info
+        # ближнее кольцо считается отдельно: национальный лидар часто отдаёт землю только
+        # на 8 км (EA LIDAR в Англии — 2 м, на 20 км это 1.6 ГБ и отказ по лимиту), а макро
+        # остаётся по DSM. Тогда в паспорте честно стоит область: `scope: near_ring`.
+        meso_dtm, meso_info = dtm.grid(r.lat, r.lon, crs=crs, radius_km=8.0, resolution_m=30.0)
+        if macro_dtm is not None or meso_dtm is not None:
+            dtm_grid = macro_dtm if macro_dtm is not None else meso_dtm
+            dtm_info = dict(macro_info if macro_dtm is not None else meso_info)
+            dtm_info["scope"] = "all" if macro_dtm is not None else "near_ring"
             dtm_out = _pass(macro_grid=macro_dtm, meso_grid=meso_dtm or macro_dtm)
             # ближнее кольцо остаётся в двух видах: поверхность (здания) и земля
             dtm_out["dsm_near_ring"] = {s["mountain"]: s["rings"][0] for s in dsm["sectors"]}
@@ -139,6 +143,10 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
                     % (dtm_info["vertical_datum"],
                        "не применён" if dtm_info.get("datum_shift_m") is None
                        else f"{dtm_info['datum_shift_m']:+.2f} м"))
+            if dtm_info.get("scope") == "near_ring":
+                out.setdefault("dtm_notes", []).append(
+                    "земля (DTM) есть только в ближнем кольце 8 км (%s): точка, уклон и аспект "
+                    "считаны по земле, кольца секторов — по DSM" % dtm_info.get("name"))
         else:
             out["dtm_info"] = macro_info
     else:
