@@ -401,3 +401,23 @@
 - Тесты: `tests/test_sun.py` (6), `test_axis_does_not_depend_on_hemisphere`,
   `test_pack_roundtrip` следит за именами сторон; всего **157 passed, 2 deselected**.
 - Документация: `docs/calc/sun.md`, схема `site_pack-2.json`.
+
+## water 8.0.0 + pack 2.1.0 — 26.11.2026
+
+**Площадные отношения OSM (E-022, W1 ТЗ world).** Поверхность рек и озёр, размеченная
+отношениями, попадала в расчёт нулём; у Лондона Темза не давала ни метра воды.
+
+- Запрос: `out body geom` вместо `out geom tags` (у отношений `out geom` отдаёт членов без
+  геометрии), добавлены `relation[waterway=riverbank]` и `relation[landuse=reservoir|basin]`.
+- `_assemble_relation`: `outer` через `polygonize`, `inner` — дыры, `buffer(0)`, обрезка кругом
+  8 км + 5 % до пересечений; площадь за вычетом дыр; `source: osm_relation` в пакете.
+- `riverbank_of` для берега без имени — по геометрии (ближайшая видимая осевая в пределах
+  300 м), имя контур берёт у линии.
+- `merge_by_name` не сшивает контуры между собой; ключ куска отношения — `rel…`.
+- Фикстура Лондона переснята новым запросом и сжата: `osm-water.json.gz` (386 КБ вместо 1.8 МБ).
+- Пересчёт: Сити 0.24 % → 7.88 % в кольце 0.5–2 км, 2.0 % → 4.41 % в кольце 2–8 км,
+  полигонов 136 → 177; Стрелка и Санкт-Гоар без изменений.
+- Тесты: `test_relation_multipolygon_becomes_one_area`, `test_multipolygon_area_excludes_holes`,
+  `test_multipolygon_is_clipped_to_sampling_circle`, `test_relation_surface_counts_in_water_share`,
+  `test_unnamed_riverbank_links_to_named_line`; всего **162 passed, 2 deselected**.
+- Документация: `docs/calc/water_share.md` (правила и «Границы метода»), errata E-022.

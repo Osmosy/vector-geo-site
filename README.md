@@ -206,10 +206,10 @@ python -m pytest -q          # 157 passed, сеть не нужна
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
-  --osm-file tests/golden/london-city/fixtures/osm-water.json --out /tmp/pack
+  --osm-file tests/golden/london-city/fixtures/osm-water.json.gz --out /tmp/pack
 # приливность по руслу: широкая выгрузка (файлы бывают сжатыми — gzip определяется по магии)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
-  --osm-file tests/golden/london-city/fixtures/osm-water.json \
+  --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \
   --osm-file-wide tests/golden/london-city/fixtures/osm-water-wide.json.gz --out /tmp/pack-wide
 ```
 

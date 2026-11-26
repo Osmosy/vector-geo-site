@@ -8,7 +8,7 @@ from pyproj import Transformer
 
 from geosite import cli
 
-FIXTURE = Path(__file__).parent / "golden" / "london-city" / "fixtures" / "osm-water.json"
+FIXTURE = Path(__file__).parent / "golden" / "london-city" / "fixtures" / "osm-water.json.gz"
 
 
 class _Resolved:

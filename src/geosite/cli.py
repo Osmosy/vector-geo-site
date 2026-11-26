@@ -167,7 +167,7 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
     # Линии русла площадь не дают — река, нарисованная осевой, в долю не попадает, и это
     # оговорено в предупреждении; в городах реки обычно нарисованы полигонами.
     try:
-        features = water.parse_features(payload)
+        features = water.parse_features(payload, lat=r.lat, lon=r.lon, radius_m=8000.0)
         inner = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
                                               ring_m=(500.0, 2000.0))
         middle = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,

@@ -27,7 +27,8 @@ DEM вырезается из кеша тайлов Copernicus (`~/.cache/vector
 Вода в фикстуре — это уже собранный ответ: `way(around:8 км)` **плюс** члены отношений рек
 (иначе у реки нет продолжения за окно, и офлайн-пакет отличается от собранного из кеша)
 (`water 6.1.0+`, см. `docs/calc/rivers.md`). Отдельная выгрузка отношений не нужна: она внутри
-`osm-water.json` (у таких элементов в тегах есть `_rel`).
+`osm-water.json.gz` (в Лондоне; у остальных — без сжатия). Запрос с 26.11.2026 оканчивается
+`out body geom`: только так у площадных отношений приходят члены с геометрией (E-022).
 
 ## Почему 30-километровая выгрузка
 
@@ -39,7 +40,7 @@ DEM вырезается из кеша тайлов Copernicus (`~/.cache/vector
 
 | Эталон | OSM-выгрузка | DEM |
 |---|---|---|
-| london-city, london-isle-of-dogs, kingston-upon-thames | 22.11.2026, Overpass (osm-water.json) | 22.11.2026, Copernicus GLO-30 |
+| london-city, london-isle-of-dogs, kingston-upon-thames | 26.11.2026, Overpass (`out body geom`) | 22.11.2026, Copernicus GLO-30 |
 | nizhny-novgorod-strelka | 23.11.2026, Overpass + отношения OSM | — (без DEM) |
 | moscow-kremlin | 23.11.2026, maps.mail.ru:Overpass | 23.11.2026, Copernicus GLO-30 |
 | sankt-goar-rhine | 23.11.2026, Overpass | 23.11.2026, Copernicus GLO-30 N50/E007 |
@@ -58,7 +59,7 @@ DEM вырезается из кеша тайлов Copernicus (`~/.cache/vector
 
 ```bash
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
-  --osm-file tests/golden/london-city/fixtures/osm-water.json --out /tmp/pack
+  --osm-file tests/golden/london-city/fixtures/osm-water.json.gz --out /tmp/pack
 geosite validate /tmp/pack/site_pack.json
 ```
 

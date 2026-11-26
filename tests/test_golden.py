@@ -51,7 +51,7 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
     payload = yaml.safe_load("{}") or None
     import json
 
-    payload = json.loads((fixtures / "osm-water.json").read_text(encoding="utf-8"))
+    payload = _load_osm_payload(fixtures)
     import gzip
 
     wide_file = fixtures / "osm-water-wide.json.gz"
@@ -73,13 +73,19 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
                    for r in saved.get("reaches", [])]
         reach = hydro.site_reach(lat, lon, reaches=reaches)
         hydro.assign(metrics, reach)
-    # одна и та же река бывает склеена в несколько линий: берём ближайшую к участку
+    # одна и та же река бывает склеена в несколько линий: берём ближайшую к участку.
+    # С E-022 у «River Thames» есть ещё и контур берега с тем же именем — русло главнее:
+    # факты expect.yaml (порядок, изгиб, петля) описывают линию, а не площадь.
+    def rank(metric) -> tuple[int, float]:
+        return (0 if getattr(metric, "geom", "line") == "line" else 1,
+                metric.nearest_m if metric.nearest_m is not None else 1e9)
+
     by_name: dict[str, object] = {}
     for metric in metrics:
         if not metric.name:
             continue
         current = by_name.get(metric.name)
-        if current is None or metric.nearest_m < current.nearest_m:
+        if current is None or rank(metric) < rank(current):
             by_name[metric.name] = metric
     climate_facts = {}
     wind_file = fixtures / "wind.json"
@@ -94,13 +100,24 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
             "climate": climate_facts}
 
 
+def _load_osm_payload(fixtures: Path) -> dict:
+    """Фикстура OSM: gzip или plain — решает магия файла, а не расширение."""
+    from geosite.cli import _load_osm_file
+
+    for name in ("osm-water.json.gz", "osm-water.json"):
+        path = fixtures / name
+        if path.exists():
+            return _load_osm_file(str(path))
+    raise FileNotFoundError(fixtures)
+
+
 @pytest.mark.skipif(not SITES, reason="нет эталонов")
 @pytest.mark.parametrize("name", SITES)
 def test_golden_site(name: str):
     site, expect, fixtures = load(name)
     if expect is None:
         pytest.skip(f"{name}: нет expect.yaml — факты ещё не сверены")
-    if not (fixtures / "osm-water.json").exists():
+    if not any((fixtures / name).exists() for name in ("osm-water.json.gz", "osm-water.json")):
         pytest.skip(f"{name}: нет OSM-фикстуры, соберите её scripts/make_golden.py")
     has_dem = (fixtures / "dem.tif").exists()
     if not has_dem and (expect.get("water_mouth") or "closure_index_min" in str(expect)):
