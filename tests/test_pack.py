@@ -165,6 +165,7 @@ def test_i13_confluence_participants_are_lines():
 def test_algo_is_built_from_module_versions():
     """P0: в ALGO нет ручных строк — все версии берутся из констант модулей."""
     from geosite import calibrate, climate, dtm, geo as geo_mod, geocode, landcover, pack as pack_mod
+    from geosite import worldnames
     from geosite import sun, terrain, water
 
     assert pack_mod.ALGO == {
@@ -172,6 +173,7 @@ def test_algo_is_built_from_module_versions():
         "terrain": terrain.ALGO_VERSION,
         "geocode": geocode.ALGO_VERSION,
         "geo": geo_mod.ALGO_VERSION,
+        "worldnames": worldnames.ALGO_VERSION,
         "climate": climate.ALGO_VERSION,
         "sun": sun.ALGO_VERSION,
         "landcover": landcover.ALGO_VERSION,

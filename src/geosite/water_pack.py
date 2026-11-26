@@ -21,7 +21,9 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             mouth = WaterMouth(**{k: v for k, v in m.water_mouth.items() if not k.startswith("_")})
         area = not is_watercourse(m)
         out.append(WaterObject(
-            id=m.id, name=m.name, kind=m.kind if m.kind in
+            id=m.id, name=m.name, names=list(getattr(m, "names", []) or []),
+            seasonal=getattr(m, "seasonal", None),
+            kind=m.kind if m.kind in
             {"river", "stream", "canal", "lake", "sea", "dock", "culvert", "road"} else "lake",
             order=None if area else m.order,
             discharge_m3s=None if area else m.discharge_m3s,

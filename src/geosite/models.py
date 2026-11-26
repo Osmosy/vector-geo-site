@@ -170,6 +170,10 @@ class WaterObject(BaseModel):
     dem_layer: str | None = None      # течение по рельефу: уклон русла снят с этого слоя
     id: str
     name: str | None = None
+    # G3: остальные имена (name:en, name:zh, int_name, alt_name) — навыку нужны оба
+    names: list[str] = Field(default_factory=list)
+    # G3: временная вода (intermittent / seasonal / wadi): факт о воде, а не оценка
+    seasonal: bool | None = None
     pieces: int = 1
     hidden_share: float | None = None
     visible: bool | None = None
@@ -298,6 +302,9 @@ class Quality(BaseModel):
     valid: bool | None = None
     violations: list[dict] = Field(default_factory=list)
     partial: bool = False
+    # G3: ответ Overpass обрезан (плотный город) и OSM размечен не полностью
+    partial_overpass: bool | None = None
+    partial_osm: bool | None = None
 
 
 class Algo(BaseModel):
