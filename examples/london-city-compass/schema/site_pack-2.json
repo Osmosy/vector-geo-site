@@ -891,6 +891,30 @@
           "default": false,
           "title": "Partial",
           "type": "boolean"
+        },
+        "partial_overpass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Partial Overpass"
+        },
+        "partial_osm": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Partial Osm"
         }
       },
       "required": [
@@ -1736,6 +1760,25 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Names",
+          "type": "array"
+        },
+        "seasonal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seasonal"
         },
         "pieces": {
           "default": 1,

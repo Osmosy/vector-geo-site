@@ -37,7 +37,7 @@ MIN_ELEV, MAX_ELEV = -430.0, 8850.0
 
 # P0 (I-11): версии модулей, с которыми сверяется пакет.
 from . import calibrate as _calibrate, climate as _climate, dtm as _dtm
-from . import geo as _geo, geocode as _geocode, landcover as _landcover
+from . import geo as _geo, geocode as _geocode, landcover as _landcover, worldnames as _worldnames
 from . import sun as _sun, terrain as _terrain
 from . import water as _water
 CODE_VERSIONS = {
@@ -50,6 +50,7 @@ CODE_VERSIONS = {
     "landcover": _landcover.ALGO_VERSION,
     "calibrate": _calibrate.ALGO_VERSION,
     "dtm": _dtm.ALGO_VERSION,
+    "worldnames": _worldnames.ALGO_VERSION,
 }
 
 # I-10: поля с эвристикой обязаны нести парную уверенность. Список пополняется на каждом этапе.

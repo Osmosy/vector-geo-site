@@ -1,0 +1,197 @@
+{
+  "version": "1.0.0",
+  "note": "Родовые слова воды по языкам. Слово говорит, что это за вода, даже когда тега нет: «黃河» — река, «Sungai Klang» — река, «نهر النيل» — река, «Rio Negro» — река, «Kâğıthane Deresi» — ручей. Артикли (la, the, el…) отбрасываются до разбора. Список пополняется по мере эталонов.",
+  "suffix_cjk": {
+    "河": "river",
+    "江": "river",
+    "川": "river",
+    "水": "river",
+    "湖": "lake",
+    "海": "sea",
+    "運河": "canal",
+    "运河": "canal",
+    "渠": "canal",
+    "溪": "stream",
+    "塘": "pond",
+    "池": "pond",
+    "灣": "bay",
+    "湾": "bay",
+    "港": "harbour",
+    "澤": "wetland",
+    "泽": "wetland"
+  },
+  "prefix": {
+    "ar": {
+      "نهر": "river",
+      "بحيرة": "lake",
+      "بحر": "sea",
+      "وادي": "wadi",
+      "خور": "creek"
+    },
+    "id": {
+      "sungai": "river",
+      "danau": "lake",
+      "kali": "river",
+      "laut": "sea",
+      "teluk": "bay"
+    },
+    "ms": {
+      "sungai": "river",
+      "tasik": "lake",
+      "laut": "sea",
+      "teluk": "bay"
+    },
+    "tr": {
+      "nehir": "river",
+      "ırmak": "river",
+      "çay": "stream",
+      "dere": "stream",
+      "göl": "lake",
+      "deniz": "sea"
+    },
+    "es": {
+      "río": "river",
+      "rio": "river",
+      "lago": "lake",
+      "laguna": "lake",
+      "canal": "canal",
+      "arroyo": "stream",
+      "mar": "sea",
+      "bahía": "bay"
+    },
+    "pt": {
+      "rio": "river",
+      "lago": "lake",
+      "lagoa": "lake",
+      "canal": "canal",
+      "ribeiro": "stream",
+      "mar": "sea",
+      "baía": "bay"
+    },
+    "en": {
+      "river": "river",
+      "lake": "lake",
+      "canal": "canal",
+      "brook": "stream",
+      "stream": "stream",
+      "creek": "stream",
+      "sea": "sea",
+      "bay": "bay",
+      "harbour": "harbour",
+      "harbor": "harbour"
+    },
+    "fr": {
+      "rivière": "river",
+      "fleuve": "river",
+      "lac": "lake",
+      "canal": "canal",
+      "ruisseau": "stream",
+      "mer": "sea",
+      "baie": "bay"
+    },
+    "de": {
+      "fluss": "river",
+      "bach": "stream",
+      "see": "lake",
+      "kanal": "canal",
+      "meer": "sea",
+      "bucht": "bay"
+    }
+  },
+  "contains": {
+    "ru": {
+      "река": "river",
+      "речка": "river",
+      "ручей": "stream",
+      "озеро": "lake",
+      "озёра": "lake",
+      "озера": "lake",
+      "канал": "canal",
+      "пруд": "pond",
+      "море": "sea",
+      "залив": "bay",
+      "болото": "wetland"
+    },
+    "en": {
+      "river": "river",
+      "lake": "lake",
+      "canal": "canal",
+      "sea": "sea"
+    }
+  },
+  "seasonal_words": {
+    "ar": [
+      "وادي"
+    ],
+    "en": [
+      "wadi",
+      "wash",
+      "arroyo"
+    ],
+    "es": [
+      "rambla"
+    ],
+    "ru": [
+      "пересыхающая",
+      "сухое русло"
+    ]
+  },
+  "seasonal_tags": {
+    "intermittent": [
+      "yes",
+      "intermittent",
+      "seasonal",
+      "ephemeral"
+    ],
+    "seasonal": [
+      "yes",
+      "intermittent",
+      "seasonal",
+      "ephemeral"
+    ],
+    "waterway": [
+      "wadi"
+    ],
+    "water": [
+      "intermittent",
+      "wadi"
+    ]
+  },
+  "articles": [
+    "the",
+    "la",
+    "le",
+    "les",
+    "l",
+    "el",
+    "los",
+    "las",
+    "il",
+    "lo",
+    "o",
+    "os",
+    "as",
+    "al",
+    "der",
+    "die",
+    "das",
+    "de",
+    "du",
+    "des"
+  ],
+  "suffix_words": {
+    "tr": {
+      "deresi": "stream",
+      "çayı": "stream",
+      "ırmağı": "river",
+      "nehri": "river",
+      "gölü": "lake"
+    },
+    "es": {
+      "arroyo": "stream"
+    },
+    "id": {
+      "kecil": "stream"
+    }
+  }
+}

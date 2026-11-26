@@ -8,11 +8,11 @@ from pathlib import Path
 import hashlib
 
 from . import calibrate, climate, dem, dtm, figures, geo, geocode, landcover, sun
-from . import terrain, water
+from . import terrain, water, worldnames
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.6.0"      # версия сборки пакета
+ALGO_VERSION = "2.7.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -26,6 +26,7 @@ ALGO = {
     "landcover": landcover.ALGO_VERSION,
     "calibrate": calibrate.ALGO_VERSION,
     "dtm": dtm.ALGO_VERSION,
+    "worldnames": worldnames.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -295,6 +296,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         water_share_rule=calibrate.RULE if measured.get("water_calibration") else None,
         quality={"dem": dem_label, "dem_source": dem_source, "dem_kind": layer,
                  "dem_resolution_m": dem_resolution_m, "dem_confidence": dem_confidence,
+                 "partial_overpass": True if measured.get("water_partial") else None,
+                 "partial_osm": True if measured.get("partial_osm") else None,
                  "warnings": warnings, "notes": notes},
         summary=summary,
         files=_files_block(geojson_name, sha, measured.get("land_cover_layer"),

@@ -181,15 +181,34 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
     site_xy = np.array([measured["x0"], measured["y0"]])
     grid = measured["grid_macro"]
     result: dict = {"water": [], "roads": []}
+    from_file = payload is not None          # эталон: сети не трогаем вообще
     if payload is None:
         try:
-            payload = water.fetch_raw(r.lat, r.lon, 8000)
+            # G3.5: плотный город — один around упирается в лимит; сервер сам скажет remark,
+            # и тогда запрос повторяется плитками, а в пакете поднимается partial
+            payload = water.fetch_payload(r.lat, r.lon, 8000,
+                                          allow_network=not getattr(args, "offline", False))
+            if payload.get("tiled"):
+                result["water_tiled"] = True
         except Exception as exc:
             result["water_error"] = str(exc)
             return result
+    if water.truncated(payload):
+        result["water_partial"] = True
+    # G3.4: берег нужен, чтобы отличить приливную воду от речной; офлайн без кеша — None
+    coast_payload = None
+    if payload is not None:
+        try:
+            coast_payload = water.fetch_coast(
+                r.lat, r.lon, 8000,
+                allow_network=not from_file and not getattr(args, "offline", False))
+        except Exception as exc:
+            result.setdefault("water_warnings", []).append(f"берег: {exc}")
+    result["coast_seen"] = coast_payload is not None
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
                                   radius_m=8000, payload=payload, wide_payload=wide_payload,
+                                  coast_payload=coast_payload,
                                   allow_network=payload is None and not getattr(args, "offline", False))
     # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
     # Источник необязателен: без shapefile пакет собирается, поле остаётся None с предупреждением.
@@ -266,6 +285,30 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
         result["land_cover_layer"] = {"tile": cover["tile"], "cached": cover["cached"],
                                       "resolution_m": cover["resolution_m"],
                                       "license": cover["license"]}
+
+        # G3.2: разреженная разметка. Снимок видит воду, OSM её почти не видит — значит, OSM
+        # здесь размечен не полностью, и это факт о данных, а не о местности. Тогда в пакет
+        # добавляются реки HydroRIVERS с явным `source: hydrorivers`.
+        osm_share = (result.get("land_cover") or {}).get("water")
+        wc_share = share.get("water_wc")
+        if (osm_share is not None and wc_share is not None and wc_share >= 0.01
+                and osm_share < 0.5 * wc_share):
+            result["partial_osm"] = True
+            try:
+                reaches = hydro.reaches_within(r.lat, r.lon, max_km=8.0, with_geometry=True)
+                added = water.hydrorivers_metrics(reaches, site_xy=site_xy, lat=r.lat, lon=r.lon,
+                                                  crs=crs, grid=grid, max_km=8.0)
+            except Exception as exc:
+                added = []
+                result.setdefault("water_warnings", []).append(f"hydrorivers: {exc}")
+            if added:
+                metrics.extend(added)
+                result["water"] = water_pack.to_objects(metrics)
+                result["water_geometry"] = {item.id: item.coords for item in metrics if item.coords}
+                result.setdefault("water_notes", []).append(
+                    "OSM разрежен: вода по снимку %s, по OSM %s — добавлены русла HydroRIVERS "
+                    "(source: hydrorivers), они без имён, но с порядком и расходом"
+                    % (format(wc_share, ".2%"), format(osm_share, ".2%")))
 
         # W3/W4: калибровка по клиньям кольца 0.5–2 км — оба значения, выбор и причина
         osm_inner = (result.get("water_share") or {}).get("inner") or {}

@@ -5,6 +5,17 @@
     "limit_lat": 51.431,
     "limit_lon": -0.308,
     "tidal_side": "east",
-    "source": "Port of London Authority: приливная граница Темзы — шлюз Теддингтон"
+    "source": "Port of London Authority: приливная граница Темзы — шлюз Теддингтон",
+    "verified": "2026-11-26"
+  },
+  {
+    "river_name_contains": "Parramatta",
+    "limit_name": "Charles Street Weir, Parramatta",
+    "limit_lat": -33.8197,
+    "limit_lon": 151.0092,
+    "tidal_side": "east",
+    "source": "Transport for NSW: приливная граница реки Парраматта — плотина Чарльз-стрит",
+    "verified": "2026-11-26",
+    "confidence": "high"
   }
 ]

@@ -20,10 +20,10 @@ from pathlib import Path
 
 import numpy as np
 
-from . import geo, hydronym, tides
+from . import geo, hydronym, tides, worldnames
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.2.0"
+ALGO_VERSION = "8.3.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -75,7 +75,17 @@ class Feature:
     # дыры мультиполигона: остров внутри озера, суша внутри речного разлива (E-022).
     # Площадь считается за вычетом дыр, иначе «озеро с островом» — это озеро плюс остров.
     holes: list[list[tuple[float, float]]] = field(default_factory=list)
-    source: str = "osm_way"        # osm_way / osm_relation
+    source: str = "osm_way"
+    # G3: имена и сезонность переживают склейку — иначе у реки остаётся только `name`,
+    # а `name:zh` и `int_name` теряются вместе с кусками, из которых она собрана
+    names: list[str] = field(default_factory=list)
+    seasonal: bool | None = None        # osm_way / osm_relation / hydrorivers
+    # G3: остальные имена из тегов (name:en, name:zh, int_name, alt_name) — навыку нужны оба
+    names: list[str] = field(default_factory=list)
+    # G3: временная вода (intermittent / seasonal / wadi) — это факт о воде, а не оценка
+    seasonal: bool | None = None
+    # доля скрытого участка: у одиночного куска её считает склейка, у прямого вызова — None
+    hidden_share: float | None = None
 
 
 def _query(lat: float, lon: float, radius_m: int) -> str:
@@ -166,6 +176,150 @@ def fetch_raw(lat: float, lon: float, radius_m: int = 8000, *, allow_network: bo
         elements.append(el)
     return {"version": base.get("version", 0.6), "generator": base.get("generator", ""),
             "osm3s": base.get("osm3s", {}), "elements": elements}
+
+
+COAST_MAX_M = 1000.0        # ближе километра к берегу вода приливная, дальше — не решаем
+TILE_SIDE = 2               # плотный город: запрос плитками 2×2
+
+
+def _query_bbox(south: float, west: float, north: float, east: float) -> str:
+    """Тот же набор слоёв, но в прямоугольнике: так режется плотный город."""
+    box = f"{south:.5f},{west:.5f},{north:.5f},{east:.5f}"
+    return (
+        "[out:json][timeout:180];"
+        f'(way["waterway"~"^(river|stream|canal|drain|ditch|riverbank)$"]({box});'
+        f'way["natural"="water"]({box});'
+        f'relation["natural"="water"]({box});'
+        f'relation["waterway"="riverbank"]({box});'
+        f'relation["landuse"~"^(reservoir|basin)$"]({box});'
+        f'way["waterway"="dam"]({box});'
+        ");out body geom;"
+    )
+
+
+def _query_coast(lat: float, lon: float, radius_m: int) -> str:
+    """Береговая линия в круге: нужна только как признак приливной воды (G3)."""
+    r = int(radius_m)
+    return ("[out:json][timeout:120];"
+            f'way(around:{r},{lat},{lon})["natural"="coastline"];out body geom;')
+
+
+def truncated(payload: dict | None) -> bool:
+    """Ответ Overpass обрезан: сервер пишет об этом в `remark` (таймаут, память, лимит)."""
+    if not payload:
+        return False
+    remark = str(payload.get("remark") or "").lower()
+    return bool(remark)
+
+
+def merge_payloads(parts: list[dict]) -> dict:
+    """Склейка плиток: элементы по (type, id), без повторов."""
+    seen = set()
+    elements = []
+    for part in parts:
+        for el in part.get("elements") or []:
+            key = (el.get("type"), el.get("id"))
+            if key in seen:
+                continue
+            seen.add(key)
+            elements.append(el)
+    out = {"version": 0.6, "generator": "merge", "elements": elements}
+    if any(truncated(part) for part in parts):
+        out["remark"] = "часть плиток пришла обрезанной"
+    return out
+
+
+def _tile_boxes(lat: float, lon: float, radius_m: int) -> list[tuple[float, float, float, float]]:
+    """Круг делится на плитки по bbox: у плотного города один `around` упирается в лимит."""
+    from .dem import bbox_for_radius
+
+    lat_min, lat_max, lon_min, lon_max = bbox_for_radius(lat, lon, radius_m / 1000.0)
+    lat_step = (lat_max - lat_min) / TILE_SIDE
+    lon_step = (lon_max - lon_min) / TILE_SIDE
+    boxes = []
+    for i in range(TILE_SIDE):
+        for j in range(TILE_SIDE):
+            boxes.append((lat_min + i * lat_step, lon_min + j * lon_step,
+                          lat_min + (i + 1) * lat_step, lon_min + (j + 1) * lon_step))
+    return boxes
+
+
+def fetch_payload(lat: float, lon: float, radius_m: int = 8000, *, allow_network: bool = True,
+                  retries: int = 3, dense: bool | None = None) -> dict:
+    """Вода вокруг участка: один запрос, а у плотного города — плитками (G3.5).
+
+    `dense=None` — решает сервер: если ответ пришёл с `remark` (таймаут, память), запрос
+    повторяется плитками 2×2, и в пакете поднимается `partial`.
+    """
+    base = fetch_raw(lat, lon, radius_m, allow_network=allow_network, retries=retries)
+    if dense is None and not truncated(base):
+        return base
+    if dense is False:
+        return base
+    parts = []
+    for south, west, north, east in _tile_boxes(lat, lon, radius_m):
+        query = _query_bbox(south, west, north, east)
+        try:
+            parts.append(_ask(query, retries=retries))
+        except RuntimeError:
+            parts.append({"elements": [], "remark": "плитка недоступна"})
+    merged = merge_payloads(parts)
+    merged["tiled"] = True
+    # в плиточной склейке остаются и отношения — но их члены берём отдельно, как и раньше
+    extra = relation_ways(lat, lon, radius_m, allow_network=allow_network, retries=retries)
+    if extra:
+        seen = {(el.get("type"), el.get("id")) for el in merged["elements"]}
+        for el in extra:
+            key = (el.get("type"), el.get("id"))
+            if key not in seen:
+                seen.add(key)
+                merged["elements"].append(el)
+    return merged
+
+
+def fetch_coast(lat: float, lon: float, radius_m: int = 8000, *, allow_network: bool = True,
+                retries: int = 2) -> dict | None:
+    """Береговая линия с кешем; `None` — не смотрели (офлайн без кеша)."""
+    path = _cache_path(lat, lon, radius_m, kind="coast")
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError:
+            pass
+    if not allow_network or os.environ.get("GEOSITE_OFFLINE") == "1":
+        return None
+    try:
+        payload = _ask(_query_coast(lat, lon, radius_m), retries=retries)
+    except RuntimeError:
+        return None
+    if payload.get("elements"):
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload))
+    return payload
+
+
+def coast_lines(payload: dict | None) -> list[list[tuple[float, float]]]:
+    """Линии берега в градусах (lon, lat)."""
+    out: list[list[tuple[float, float]]] = []
+    for el in (payload or {}).get("elements") or []:
+        geom = el.get("geometry") or []
+        line = [(float(p["lon"]), float(p["lat"])) for p in geom if p.get("lon") is not None]
+        if len(line) >= 2:
+            out.append(line)
+    return out
+
+
+def _coast_distance_m(coast: list[list[tuple[float, float]]],
+                      points: list[tuple[float, float]]) -> float | None:
+    """Ближайшее расстояние от воды до берега: точки в градусах (lon, lat)."""
+    best = None
+    for line in coast:
+        for lon, lat in points:
+            for clon, clat in line[:: max(1, len(line) // 40)]:
+                dist = geo.haversine_m(lat, lon, clat, clon)
+                if best is None or dist < best:
+                    best = dist
+    return best
 
 
 RELATION_KINDS = "^(river|stream|canal)$"
@@ -328,12 +482,28 @@ def _geom_of(tags: dict, closed: bool) -> str:
 
 
 def _name_of(tags: dict) -> str | None:
-    """Имя водотока: основное, иначе английское, иначе альтернативное."""
-    for key in ("name", "name:en", "alt_name", "name:ru"):
-        value = (tags.get(key) or "").strip()
-        if value:
-            return value.split(";")[0].strip() or None
-    return None
+    """Имя водотока: основное, иначе английское/китайское/русское, иначе альтернативное.
+
+    G3: имя любой письменности. Нормализация NFKC и разбор списка — в `worldnames`.
+    """
+    return worldnames.primary_name(tags)
+
+
+def _names_of(tags: dict) -> list[str]:
+    return worldnames.names_of(tags)
+
+
+def _kind_with_name(tags: dict, name: str | None) -> str:
+    """Вид воды по тегам, а если тег молчит — по родовому слову имени (G3)."""
+    kind = _kind_of(tags)
+    if kind != "other":
+        return kind
+    guess = worldnames.kind_from_name(name)
+    if not guess:
+        return "other"
+    # в пакете свой короткий список видов: пруд и болото — стоячая вода, бухта и порт — море
+    return {"pond": "lake", "wetland": "lake", "harbour": "sea", "bay": "sea"}.get(
+        guess["kind"], guess["kind"])
 
 
 CLIP_MARGIN = 1.05          # обрезаем по кругу с запасом: клин кольца начинается внутри
@@ -424,7 +594,9 @@ def _assemble_relation(el: dict, *, lat: float, lon: float, radius_m: float,
             if len(ring) < 4:
                 continue
             out.append(Feature(int(el.get("id") or 0) * 1000 + len(out), "relation", name,
-                               _kind_of(tags), tags, ring, True, "area",
+                               _kind_with_name(tags, name), tags, ring, True, "area",
+                               names=_names_of(tags),
+                               seasonal=worldnames.is_seasonal(tags),
                                holes=[[(float(x), float(y)) for x, y in hole.coords]
                                       for hole in poly.interiors],
                                source="osm_relation"))
@@ -445,7 +617,8 @@ def parse_features(payload: dict, *, lat: float | None = None, lon: float | None
                 continue
             closed = len(coords) > 3 and abs(coords[0][0] - coords[-1][0]) < 1e-9 and abs(coords[0][1] - coords[-1][1]) < 1e-9
             out.append(Feature(el.get("id", 0), "way", _name_of(tags), kind, tags, coords, closed,
-                               _geom_of(tags, closed)))
+                               _geom_of(tags, closed), names=_names_of(tags),
+                               seasonal=worldnames.is_seasonal(tags)))
         elif el.get("type") == "relation" and el.get("members"):
             # E-022: площадь отношения собирается целиком (outer + inner), а не по членам:
             # берег Темзы приходит десятком незамкнутых кусков и без сборки не даёт площади.
@@ -462,8 +635,11 @@ def parse_features(payload: dict, *, lat: float | None = None, lon: float | None
                               and abs(geom[0][1] - geom[-1][1]) < 1e-9)
                     # член отношения с `natural=water` — часть контура водоёма, площадью он
                     # становится по тому же правилу, что и отдельный замкнутый way
-                    out.append(Feature(el.get("id", 0) * 1000 + idx, "relation", _name_of(tags),
-                                       _kind_of(tags), tags, geom, closed, _geom_of(tags, closed)))
+                    name_r = _name_of(tags)
+                    out.append(Feature(el.get("id", 0) * 1000 + idx, "relation", name_r,
+                                       _kind_with_name(tags, name_r), tags, geom, closed,
+                                       _geom_of(tags, closed), names=_names_of(tags),
+                                       seasonal=worldnames.is_seasonal(tags)))
     return out
 
 
@@ -626,6 +802,10 @@ class MergedLine:
     # считается за вычетом дыр, и в пакете видно `source: osm_relation` (E-022)
     holes: list[list[tuple[float, float]]] = field(default_factory=list)
     source: str = "osm_way"
+    # G3: имена и сезонность переживают склейку — иначе у реки остаётся только `name`,
+    # а `name:zh` и `int_name` теряются вместе с кусками, из которых она собрана
+    names: list[str] = field(default_factory=list)
+    seasonal: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.uid:
@@ -635,6 +815,24 @@ class MergedLine:
 # одна река бывает размечена и river, и stream: тип куска берётся по старшему, а не по самому
 # длинному way — иначе один старый кусок waterway=stream переименовывает Волгу в ручей
 KIND_RANK = {"river": 5, "canal": 4, "stream": 3, "lake": 2, "dock": 1, "sea": 0}
+
+
+def _union_names(items: list[Feature]) -> list[str]:
+    """Имена всех кусков без повторов: `name:zh` бывает только у одного из десяти ways."""
+    out: list[str] = []
+    for item in items:
+        for value in getattr(item, "names", []) or []:
+            if value not in out:
+                out.append(value)
+    return out
+
+
+def _any_seasonal(items: list[Feature]) -> bool | None:
+    """Сезонность — свойство реки: если хоть один кусок помечен временным, вода временная."""
+    flags = [getattr(item, "seasonal", None) for item in items]
+    if any(flag is True for flag in flags):
+        return True
+    return False if any(flag is False for flag in flags) else None
 
 
 def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
@@ -703,7 +901,9 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
                                          (1.0 if item_hidden else 0.0) if length > 0 else None,
                                          tags=dict(item.tags), geom="area",
                                          holes=[list(h) for h in item.holes],
-                                         source=item.source))
+                                         source=item.source,
+                                         names=list(item.names or []),
+                                         seasonal=item.seasonal))
             continue
         for comp in _components(pieces, max_gap_m):
             items_count = len(comp)
@@ -715,7 +915,9 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
                     chain = chain[::-1]
                 merged.append(MergedLine(f"osm-{name}-{kind}", display, kind, chain,
                                          items_count, hidden, hidden_share,
-                                         tags=dict(common), geom=items[0].geom))
+                                         tags=dict(common), geom=items[0].geom,
+                                         names=_union_names(items),
+                                         seasonal=_any_seasonal(items)))
     # ключ куска неуникален: у одной реки их несколько, и словарь слияний молча терял все,
     # кроме последнего. uid различает куски, key остаётся именем реки для потребителя.
     for idx, line in enumerate(merged):
@@ -934,6 +1136,9 @@ class WaterMetrics:
     riverbank_of: str | None = None
     # линия канала внутри дока: отдельной рекой не выводится (E-020 п.1)
     dock_channel_of: str | None = None
+    # G3: имена любой письменности и признак временной воды
+    names: list[str] = field(default_factory=list)
+    seasonal: bool | None = None
 
 
 def is_watercourse(obj) -> bool:
@@ -959,6 +1164,8 @@ def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int, nearest_m:
     x, y = float(pts[nearest_seg][0]), float(pts[nearest_seg][1])
     bearing = geo.azimuth_xy(x, y, offset_deg)
     return WaterMetrics(
+        names=list(getattr(feature, "names", []) or []),
+        seasonal=getattr(feature, "seasonal", None),
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
         name=feature.name, kind=feature.kind, order=None,
         nearest_m=round(nearest_m, 1),
@@ -1169,6 +1376,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, crs
     return WaterMetrics(
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
         name=feature.name,
+        names=list(getattr(feature, "names", []) or []),
+        seasonal=getattr(feature, "seasonal", None),
         kind=kind,
         order=None,
         nearest_m=round(nearest_m, 1),
@@ -1195,7 +1404,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, crs
         dem_reason=dem_reason,
         tidal=tide["tidal"],
         tidal_source=tide["tidal_source"],
-        source="openstreetmap",
+        source=getattr(feature, "source", "osm_way"),
         loop=loop,
         site_position=site_position,
         between_branches=between.get("between_branches"),
@@ -1680,10 +1889,38 @@ def flow_convention_share(features: list[Feature], grid, crs: int | str, *,
     return None if total == 0 else round(agree / total, 2)
 
 
+def hydrorivers_metrics(reaches: list[dict] | None, *, site_xy: np.ndarray, lat: float,
+                        lon: float, crs: int | str, grid=None,
+                        max_km: float = 2.0) -> list["WaterMetrics"]:
+    """Реки HydroRIVERS как объекты воды, когда OSM разрежен (G3.2).
+
+    HydroRIVERS не знает имён, зато знает порядок и расход: это второй источник, который
+    отвечает на вопрос «какая это река по величине», а не «как она называется». Каждый участок
+    проходит те же измерения, что и линия OSM, и помечен `source: hydrorivers` — подмены
+    источника в пакете не бывает незаметной.
+    """
+    out: list[WaterMetrics] = []
+    for reach in reaches or []:
+        points = [(float(a), float(b)) for a, b in (reach.get("_points") or [])]
+        if len(points) < 2:
+            continue
+        feature = Feature(int(reach.get("HYRIV_ID") or 0), "hydrorivers", None, "river", {},
+                          points, False, "line", source="hydrorivers")
+        metrics = measure_feature(feature, site_xy=site_xy, lat=lat, lon=lon, crs=crs, grid=grid,
+                                  meso_radius_m=int(max_km * 1000))
+        if metrics is None:
+            continue
+        metrics.order = reach.get("ORD_STRA")
+        metrics.discharge_m3s = reach.get("DIS_AV_CMS")
+        metrics.hydro_distance_m = reach.get("distance_m")
+        out.append(metrics)
+    return out
+
+
 def measure_water(lat: float, lon: float, *, crs: int | str, grid=None, site_xy: np.ndarray,
                   radius_m: int = 8000, allow_network: bool = True,
                   max_features: int = 2000, payload: dict | None = None,
-                  wide_payload: dict | None = None,
+                  wide_payload: dict | None = None, coast_payload: dict | None = None,
                   window_factor: float = 1.5, window_min_m: float = 12000.0) -> list[WaterMetrics]:
     """Вода в радиусе: линии склеены по имени, затем измерены.
 
@@ -1720,7 +1957,8 @@ def measure_water(lat: float, lon: float, *, crs: int | str, grid=None, site_xy:
                                      list(line.coords[i0:i1 + 1]), line.ways, line.hidden,
                                      line.hidden_share, uid=f"{line.uid}-{idx}",
                                      tags=dict(line.tags), geom=line.geom,
-                                     holes=[list(h) for h in line.holes], source=line.source))
+                                     holes=[list(h) for h in line.holes], source=line.source,
+                                     names=list(line.names), seasonal=line.seasonal))
 
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу
     near = []
@@ -1760,6 +1998,24 @@ def measure_water(lat: float, lon: float, *, crs: int | str, grid=None, site_xy:
             metrics.flow_ways_share = flow_share
         out.append(metrics)
     out = _one_entry_per_name(out, site_xy=site_xy, crs=crs, radius_m=radius_m)
+    # G3.4: вода ближе километра к берегу приливная. Это не догадка: измеряется расстояние
+    # до `natural=coastline`, и если берега в выборке нет — поле остаётся None, а не False.
+    coast = coast_lines(coast_payload)
+    if coast:
+        for metric in out:
+            if metric.tidal is not None:
+                continue
+            points = list(getattr(metric, "coords", []) or [])
+            if not points:
+                continue
+            dist = _coast_distance_m(coast, points)
+            if dist is not None and dist <= COAST_MAX_M:
+                metric.tidal = True
+                metric.tidal_source = "coastline"
+                metric.tidal_reason = (f"берег в {dist:.0f} м: море рядом, вода следует приливу")
+            elif dist is not None:
+                metric.tidal_reason = (f"до берега {dist / 1000:.1f} км — прилив по берегу "
+                                       "не подтверждён")
     # Берег реки (`natural=water, water=river` или `waterway=riverbank`) привязывается к линии
     # русла с тем же именем: отдельной «рекой» он не выводится, у него только поля водоёма (E-018).
     area_tags = {line.key: dict(getattr(line, "tags", {}) or {}) for line in merged
