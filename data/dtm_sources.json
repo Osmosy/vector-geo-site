@@ -6,7 +6,12 @@
       "id": "ahn4",
       "country": "NL",
       "name": "Actueel Hoogtebestand Nederland 4, DTM 0.5 м (Rijkswaterstaat / PDOK)",
-      "bbox": [50.70, 3.30, 53.65, 7.30],
+      "bbox": [
+        50.7,
+        3.3,
+        53.65,
+        7.3
+      ],
       "kind": "wcs",
       "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0",
       "coverage": "dtm_05m",
@@ -23,27 +28,46 @@
     {
       "id": "ea-lidar",
       "country": "GB",
-      "name": "Environment Agency LIDAR Composite DTM 1 м",
-      "bbox": [49.90, -6.50, 55.90, 2.10],
+      "name": "Environment Agency LIDAR Composite DTM 2 м",
+      "bbox": [
+        49.9,
+        -6.5,
+        55.9,
+        2.1
+      ],
       "kind": "wcs",
-      "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-dtm-1m/wcs",
-      "coverage": "dtm",
-      "protocol": "wcs-1.0.0",
-      "resolution_m": 1.0,
+      "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-2m/wcs",
+      "coverage": "09ea3b37-df3a-4e8b-ac69-fb0842227b04__Lidar_Composite_Elevation_DTM_2m",
+      "protocol": "wcs-2.0.1",
+      "resolution_m": 2.0,
       "license": "Open Government Licence v3 (EA LIDAR)",
       "license_class": "open",
       "vertical_datum": "ODN",
       "datum_shift_m": null,
       "datum_note": "ODN → EGM2008: сдвиг не применён; расхождение порядка ±0.3 м",
       "verified": "2026-11-26",
-      "verified_note": "не подключён: environment.data.gov.uk отдаёт 429 на любой запрос с этой машины — запись оставлена, подключение проверять при первом успешном ответе",
-      "active": false
+      "verified_note": "через VPN (GB): GetCapabilities 200, CoverageId …DTM_2m, окно 16×16 км отдано за ~1 мин; без VPN сервер отвечал 429 на корень сайта",
+      "crs": "EPSG:27700",
+      "axes": [
+        "E",
+        "N"
+      ],
+      "max_pixels": 64000000,
+      "window_note": "WCS 2.0.1 отдаёт окно в нативной сетке OSGB; 2 м выбраны потому, что 1 м на кольцо 8 км — 256 Мпикс и 1 ГБ перекачки, а масштабирование сервером (`scaleFactor`) читает всё покрытие Англии (30.9 ГБ против лимита 10 ГБ)",
+      "max_total_pixels": 90000000,
+      "max_bytes": 45000000,
+      "window_factor": 1.05
     },
     {
       "id": "gedtm30",
       "country": "*",
       "name": "GEDTM30 (OpenGeoHub, v1.2.0), глобальный DTM 30 м",
-      "bbox": [-60.0, -180.0, 84.0, 180.0],
+      "bbox": [
+        -60.0,
+        -180.0,
+        84.0,
+        180.0
+      ],
       "kind": "cog-tiles",
       "url": "https://data.opengeohub.org/gedtm30",
       "tile_pattern": "GEDTM30_v1.2.0/{name}.tif",

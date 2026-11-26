@@ -125,6 +125,9 @@ class DemFile(BaseModel):
     source: str
     kind: Literal["dsm", "dsm_smoothed", "dtm"]
     resolution_m: float | None = None
+    source_resolution_m: float | None = None   # родная сетка источника (AHN 0.5, EA 2, GEDTM30 30)
+    # область действия слоя: `all` — весь участок, `near_ring` — только ближнее кольцо 8 км
+    scope: Literal["all", "near_ring"] | None = None
     license: str | None = None
     vertical_datum: str | None = None
     datum_shift_m: float | None = None

@@ -31,10 +31,19 @@ def test_lidar_lookup_by_bbox():
     assert dtm.lidar_for(48.8566, 2.3522) is None                  # Париж: покрытия нет
 
 
-def test_inactive_source_is_skipped_in_auto_but_kept_in_registry():
-    """EA отдаёт 429: запись есть, в цепочку не идёт, пока не проверена."""
-    assert dtm.lidar_for(51.5138, -0.0984) is None                  # в цепочке его нет
-    assert dtm.lidar_for(51.5138, -0.0984, only_active=False)["id"] == "ea-lidar"
+def test_ea_lidar_is_active_after_verified_response():
+    """EA LIDAR проверен через VPN (GB) и стоит первым для Англии; Париж по-прежнему вне покрытия."""
+    assert dtm.lidar_for(51.5138, -0.0984)["id"] == "ea-lidar"
+    assert dtm.lidar_for(48.8566, 2.3522) is None                    # Париж: покрытия нет
+
+
+def test_wcs2_window_refuses_window_over_limit():
+    """Окно 20 км при сетке 2 м — 1.6 ГБ перекачки; источник обязан отказаться, а не тянуть."""
+    source = next(s for s in dtm.registry() if s["id"] == "ea-lidar")
+    assert source["protocol"] == "wcs-2.0.1"
+    with pytest.raises(RuntimeError) as exc:
+        dtm._wcs2_window(source, 51.5138, -0.0984, 20.0, 90.0)
+    assert "лимита источника" in str(exc.value)
 
 
 def test_mode_switch(monkeypatch):
@@ -85,11 +94,14 @@ def test_nodata_is_masked():
 
 
 def test_file_block_matches_dem_passport():
-    block = dtm.file_block({"source": "ahn4", "resolution_m": 0.5,
-                            "license": "CC BY 4.0", "vertical_datum": "NAP",
+    block = dtm.file_block({"source": "ahn4", "resolution_m": 30.0, "source_resolution_m": 0.5,
+                            "scope": "all", "license": "CC BY 4.0", "vertical_datum": "NAP",
                             "datum_shift_m": None})
-    assert block == {"source": "ahn4", "kind": "dtm", "resolution_m": 0.5,
+    assert block == {"source": "ahn4", "kind": "dtm", "resolution_m": 30.0,
+                     "source_resolution_m": 0.5, "scope": "all",
                      "license": "CC BY 4.0", "vertical_datum": "NAP", "datum_shift_m": None}
+    # паспорт без области по умолчанию — весь участок, а не «неизвестно»
+    assert dtm.file_block({"source": "x"})["scope"] == "all"
     assert dtm.file_block({}) is None
 
 

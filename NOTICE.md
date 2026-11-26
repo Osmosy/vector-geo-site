@@ -12,7 +12,7 @@
 | Гидрография (этап 3) | HydroRIVERS (HydroSHEDS) | свободно, в том числе коммерчески | по требованию HydroSHEDS |
 | Рельеф — земля (DTM) | AHN4 (Rijkswaterstaat / PDOK), Нидерланды | CC BY 4.0 | «AHN4, Rijkswaterstaat» |
 | Рельеф — земля (DTM) | GEDTM30, OpenGeoHub (не подключён: домен недоступен с машины) | CC BY 4.0 | «GEDTM30, OpenGeoHub» |
-| Рельеф — земля (DTM) | Environment Agency LIDAR, Англия (не подключён: 429) | Open Government Licence v3 | «© Environment Agency» |
+| Рельеф — земля (DTM) | Environment Agency LIDAR Composite DTM, Англия (подключён: WCS 2.0.1, доступен из Великобритании) | Open Government Licence v3 | «© Environment Agency» |
 | Покров (этап 3) | ESA WorldCover 2021 v200, 10 м, тайлы 3° | CC BY 4.0 | «ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium» |
 
 Требования, которые модуль соблюдает сам:
