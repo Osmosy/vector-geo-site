@@ -34,7 +34,9 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             area_m2=m.area_m2, site_inside=m.site_inside, riverbank_of=m.riverbank_of,
             dock_channel_of=m.dock_channel_of,
             tidal=m.tidal, tidal_source=m.tidal_source,
-            tidal_reason=(None if m.tidal is not None else m.tidal_reason),
+            # E-028: причина нужна и у положительного ответа — «берег в 420 м» объясняет
+            # не отсутствие прилива, а его источник
+            tidal_reason=m.tidal_reason,
             confluences=[{"with": c["with"], "dist_m": c["dist_m"],
                                          "mountain": c["mountain"]} for c in m.confluences],
             waterbody_links=list(m.waterbody_links),

@@ -422,10 +422,13 @@ def test_relation_ways_take_name_from_relation(monkeypatch, tmp_path):
                                            {"lon": 44.01, "lat": 56.335}]}]}
 
     monkeypatch.setattr(w, "_ask", fake_ask)
-    ways = w.relation_ways(56.33, 44.01, 8000)
-    assert len(ways) == 1
-    assert ways[0]["tags"]["name"] == "Тест"
-    assert ways[0]["tags"]["_rel"] == "99"
+    rels = w.relation_ways(56.33, 44.01, 8000)
+    # E-027: ответ — отношение с членами, а не отдельные ways: иначе мультиполигон теряет дыры,
+    # а озеро из десяти кусков не даёт площади
+    assert len(rels) == 1 and rels[0]["type"] == "relation" and rels[0]["id"] == 99
+    assert rels[0]["tags"]["name"] == "Тест"
+    assert rels[0]["members"][0]["role"] == "main_stream"
+    assert rels[0]["members"][0]["geometry"]
 
 
 def test_relation_ways_drop_far_members(monkeypatch, tmp_path):
@@ -449,7 +452,7 @@ def test_relation_ways_drop_far_members(monkeypatch, tmp_path):
 
     monkeypatch.setattr(w, "_ask", fake_ask)
     ways = w.relation_ways(56.33, 44.01, 8000)
-    assert [el["id"] for el in ways] == [1]
+    assert [m["ref"] for m in ways[0]["members"]] == [1]
 
 
 # --- теги склейки: приливность и правило течения (water 6.1.1) ---

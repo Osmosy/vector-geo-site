@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-ALGO_VERSION = "1.0.0"
+ALGO_VERSION = "1.1.0"
 
 # Допуски W3, в долях (1 п.п. кольца, 3 п.п. сектора)
 RING_TOLERANCE = 0.01
@@ -27,6 +27,9 @@ REASONS: dict[str, str] = {
     "tidal_flat": "осушка",
     "stale_osm": "устаревший OSM",
     "shadow": "тень или тёмная крыша в WorldCover",
+    # E-028: в OSM море задано береговой линией, а снимок красит его классом 80. Расхождение
+    # не про разметку и не про снимок, а про то, что две модели данных по-разному описывают море.
+    "sea_in_ring": "море в кольце: в OSM оно задано береговой линией, снимок считает его водой",
 }
 
 RULE = ("основа — OSM; WorldCover заменяет её, когда OSM воды почти не видит "
@@ -50,7 +53,8 @@ def _diff(osm: float, wc: float) -> float:
 
 
 def reason_for(osm: float, wc: float, *, linear_km: float | None = None,
-               tidal: bool = False, built_share: float | None = None) -> str | None:
+               tidal: bool = False, built_share: float | None = None,
+               sea: bool = False) -> str | None:
     """Причина расхождения в клине. `None` — расхождение в допуске, объяснять нечего.
 
     `tidal` — в кольце есть приливная река (свойство места, а не клина). Коды `bridge` и
@@ -60,6 +64,10 @@ def reason_for(osm: float, wc: float, *, linear_km: float | None = None,
     diff = _diff(osm, wc)
     if abs(diff) <= SECTOR_TOLERANCE:
         return None
+    if sea:
+        # порядок причин важнее точности: море объясняет расхождение целиком, и подписывать
+        # его «устаревшим OSM» значит отправлять человека искать несуществующую ошибку
+        return "sea_in_ring"
     if osm < BLIND_OSM and wc >= BLIND_WC:
         # река осевой линией: длина линии есть, площади нет
         return "axis_line" if (linear_km or 0.0) >= AXIS_LINEAR_KM else "stale_osm"
@@ -76,7 +84,13 @@ def reason_for(osm: float, wc: float, *, linear_km: float | None = None,
 
 
 def confidence_for(osm: float, wc: float, *, ring_diff: float, reason: str | None) -> str:
-    """Уверенность в выбранном значении: high — кольцо и клин в допуске, low — клин вне нормы."""
+    """Уверенность в выбранном значении: high — кольцо и клин в допуске, low — клин вне нормы.
+
+    Море в кольце (`sea_in_ring`) уверенность не снижает: OSM и снимок расходятся не в оценке
+    воды, а в способе её описать, и к доле пресной воды это отношения не имеет.
+    """
+    if reason == "sea_in_ring":
+        return "high" if abs(ring_diff) <= RING_TOLERANCE else "medium"
     if abs(_diff(osm, wc)) > SECTOR_TOLERANCE or reason is not None:
         return "low"
     if abs(ring_diff) > RING_TOLERANCE:
@@ -85,7 +99,13 @@ def confidence_for(osm: float, wc: float, *, ring_diff: float, reason: str | Non
 
 
 def choose(osm: float, wc: float, *, reason: str | None) -> float:
-    """Выбранное значение доли: OSM, кроме случая, когда OSM воды почти не видит."""
+    """Выбранное значение доли: OSM, кроме случая, когда OSM воды почти не видит.
+
+    `sea_in_ring` — исключение из правила замены: снимок видит море, а не воду участка.
+    Заменить OSM снимком значило бы записать в долю воды 42 % моря в Рио.
+    """
+    if reason == "sea_in_ring":
+        return round(float(osm), 4)
     blind = osm < BLIND_OSM or osm < BLIND_RATIO * wc
     if reason in {"axis_line", "stale_osm"} and blind and wc >= BLIND_WC:
         return round(float(wc), 4)
