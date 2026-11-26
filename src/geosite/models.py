@@ -326,6 +326,21 @@ class Algo(BaseModel):
     pack: str | None = None
 
 
+class GswBlock(BaseModel):
+    """JRC Global Surface Water: второе мнение по воде, не замена OSM (W2)."""
+    source: str | None = None
+    version: str | None = None
+    license: str | None = None
+    tile: str | None = None
+    resolution_m: float | None = None
+    radius_km: float | None = None
+    share_any: float | None = None
+    share_permanent: float | None = None
+    share_seasonal: float | None = None
+    months_water_median: float | None = None
+    compare: dict | None = None
+
+
 class Files(BaseModel):
     water_geojson: str | None = None
     sha256: dict[str, str] = Field(default_factory=dict)
@@ -351,6 +366,7 @@ class SitePack(BaseModel):
     exposure: Exposure | None = None
     land_cover: LandCover | None = None
     water_share_rule: str | None = None
+    water_gsw: GswBlock | None = None
     quality: Quality
     algo: Algo = Field(default_factory=Algo)
     files: Files = Field(default_factory=Files)

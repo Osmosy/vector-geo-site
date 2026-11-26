@@ -1640,6 +1640,26 @@
   ]
  },
  "water_share_rule": "основа — OSM; WorldCover заменяет её, когда OSM воды почти не видит (osm < 0.5 % или меньше четверти показанного снимком при wc ≥ 1 %); при прочих расхождениях остаётся OSM с понижением уверенности и причиной",
+ "water_gsw": {
+  "source": "jrc-gsw",
+  "version": "v1_4_2021",
+  "license": "JRC Global Surface Water v1.4 — Copernicus, свободно с указанием (Pekel et al., 2016)",
+  "tile": "10W_60N",
+  "resolution_m": 30.0,
+  "radius_km": 8.0,
+  "share_any": 0.0423,
+  "share_permanent": 0.0288,
+  "share_seasonal": 0.0007,
+  "months_water_median": 12.0,
+  "compare": {
+   "status": "ok",
+   "osm_share": 0.0461,
+   "gsw_share": 0.0288,
+   "delta": -0.0173,
+   "tolerance": 0.03,
+   "note": "OSM и снимок сходятся в пределах допуска"
+  }
+ },
  "quality": {
   "dem": "Copernicus DEM GLO-30 (DSM)",
   "dem_source": "copernicus",
@@ -1670,7 +1690,7 @@
   "calibrate": "1.1.0",
   "dtm": "1.1.0",
   "worldnames": "1.0.0",
-  "pack": "2.10.0"
+  "pack": "2.11.0"
  },
  "files": {
   "water_geojson": "water.geojson",

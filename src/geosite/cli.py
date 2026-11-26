@@ -11,7 +11,8 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import calibrate, climate, dem, dtm, geo, hydro, landcover, sun, terrain, water
+from . import (calibrate, climate, dem, dtm, geo, gsw, hydro, landcover, sun, terrain,
+               water)
 from . import water_pack
 from .models import SitePack, json_schema
 
@@ -396,6 +397,35 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
     if lows:
         result["flow_low"] = [m.name or m.id for m in lows][:5]
     result["water_count"] = len(metrics)
+
+    # W2/JRC: второй голос по воде — снимок Global Surface Water. Он ничего не заменяет:
+    # в пакет идёт отдельным блоком, а расхождение с OSM звучит как замечание с причиной.
+    # Радиус берём ближнего кольца (8 км) — там приливные реки и стоят.
+    try:
+        from_file_dtm = False
+        allow = not (from_file or args is not None and getattr(args, "offline", False))
+        gsw_metrics = gsw.metrics(r.lat, r.lon, radius_km=8.0, allow_network=allow)
+    except Exception:
+        gsw_metrics = None
+    if gsw_metrics is not None:
+        # доля OSM по тем же 8 км: кольца секторов площадь-взвешены, клинья равны по площади,
+        # поэтому среднее по клиньям и есть доля в круге
+        # OSM по тем же 8 км: доли по кольцам 0.5–2 и 2–8 км уже посчитаны (`water_share`),
+        # складываем их с весами площадей — π сокращается, остаётся r²
+        weights = 0.0
+        weighted = 0.0
+        for block, (lo, hi) in (("inner", (0.5, 2.0)), ("middle", (2.0, 8.0))):
+            values = list((((result.get("water_share") or {}).get(block) or {})
+                           .get("by_mountain") or {}).values())
+            values = [float(v) for v in values if v is not None]
+            if not values:
+                continue
+            area = hi * hi - lo * lo
+            weighted += area * (sum(values) / len(values))
+            weights += area
+        osm_ring = (weighted / weights) if weights else None
+        result["water_gsw"] = dict(gsw_metrics)
+        result["water_gsw"]["compare"] = gsw.compare(osm_ring, gsw_metrics)
     return result
 
 
