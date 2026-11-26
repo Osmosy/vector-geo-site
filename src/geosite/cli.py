@@ -62,10 +62,10 @@ def cmd_resolve(args) -> int:
 
 def cmd_frame(args) -> int:
     r = _resolve(args.place)
-    epsg = geo.utm_epsg(r.lat, r.lon)
+    crs = geo.utm_epsg(r.lat, r.lon)
     macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
     _print({"site": {"lat": r.lat, "lon": r.lon, "precision": r.precision},
-            "utm_epsg": epsg,
+            "utm_epsg": crs,
             "extents": {"macro": {"radius_km": macro_km, "resolution_m": 90},
                         "meso": {"radius_km": 8.0, "resolution_m": 30},
                         "micro": {"radius_km": 0.5, "resolution_m": 10}}})
@@ -86,14 +86,16 @@ def cmd_fetch(args) -> int:
 
 
 def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = None) -> dict:
-    epsg = geo.utm_epsg(r.lat, r.lon)
     macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
+    # G2: сетка выбирается по точке и радиусу — UTM, пока участок внутри зоны, иначе азимутальная
+    grid_choice = geo.grid_crs(r.lat, r.lon, macro_km)
+    crs = grid_choice["crs"]
     facing = args.facing
     # в городе микрорельеф — это крыши: для уклона и формы берём сглаживание 300 м
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
 
     def _pass(macro_grid=None, meso_grid=None) -> dict:
-        return terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0,
+        return terrain.measure_site(r.lat, r.lon, crs=crs, resolution_m=30.0,
                                     macro_km=macro_km, meso_km=8.0, facing_deg=facing,
                                     point_smooth_m=point_smooth,
                                     macro_grid=macro_grid, meso_grid=meso_grid)
@@ -107,10 +109,10 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
                       "vertical_datum": dsm.get("dem_vertical_datum")}
     dtm_grid, dtm_info = (None, {"reason": "выключено флагом --no-dtm"})
     if not getattr(args, "no_dtm", False):
-        macro_dtm, macro_info = dtm.grid(r.lat, r.lon, epsg=epsg, radius_km=macro_km,
+        macro_dtm, macro_info = dtm.grid(r.lat, r.lon, crs=crs, radius_km=macro_km,
                                          resolution_m=max(90.0, 30.0))
         if macro_dtm is not None:
-            meso_dtm, _ = dtm.grid(r.lat, r.lon, epsg=epsg, radius_km=8.0, resolution_m=30.0)
+            meso_dtm, _ = dtm.grid(r.lat, r.lon, crs=crs, radius_km=8.0, resolution_m=30.0)
             dtm_grid = macro_dtm
             dtm_info = macro_info
             dtm_out = _pass(macro_grid=macro_dtm, meso_grid=meso_dtm or macro_dtm)
@@ -130,16 +132,17 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
     else:
         out["dtm_info"] = dtm_info
 
+    out["grid_choice"] = dict(grid_choice)
     if with_water:
-        out.update(_measure_water(r, out, epsg, payload=osm_payload, args=args))
+        out.update(_measure_water(r, out, crs, payload=osm_payload, args=args))
     return out
 
 
-def _xy(point: tuple[float, float], epsg: int) -> np.ndarray:
+def _xy(point: tuple[float, float], crs: int | str) -> np.ndarray:
     """lon/lat → UTM: одна точка, без батча."""
     from pyproj import Transformer
 
-    transformer = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    transformer = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
     x, y = transformer.transform(point[0], point[1])
     return np.array([x, y])
 
@@ -169,7 +172,7 @@ def _load_osm_file(path: str | None) -> dict | None:
     return data
 
 
-def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, args=None) -> dict:
+def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = None, args=None) -> dict:
     """Вода: OSM + метрики. Сеть нужна один раз — дальше кеш.
 
     `payload` — готовый ответ Overpass (файл): тогда сети не нужно вовсе, и пакет
@@ -185,7 +188,7 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
             result["water_error"] = str(exc)
             return result
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
-    metrics = water.measure_water(r.lat, r.lon, epsg=epsg, grid=grid, site_xy=site_xy,
+    metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
                                   radius_m=8000, payload=payload, wide_payload=wide_payload,
                                   allow_network=payload is None and not getattr(args, "offline", False))
     # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
@@ -206,9 +209,11 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
     # оговорено в предупреждении; в городах реки обычно нарисованы полигонами.
     try:
         features = water.parse_features(payload, lat=r.lat, lon=r.lon, radius_m=8000.0)
-        inner = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
+        inner = water_pack.sector_water_share(features, crs=crs, site_xy=site_xy,
+                                              lat=r.lat, lon=r.lon,
                                               ring_m=(500.0, 2000.0))
-        middle = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
+        middle = water_pack.sector_water_share(features, crs=crs, site_xy=site_xy,
+                                               lat=r.lat, lon=r.lon,
                                                ring_m=(2000.0, 8000.0))
         result["water_share"] = {"inner": inner, "middle": middle}
         # вода по секторам: у какой горы ближайшая точка воды — имя туда. Только именованная
@@ -218,8 +223,8 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
             if not metric.coords or not metric.name:
                 continue
             near = min(metric.coords, key=lambda c: float(np.hypot(
-                *(_xy(c, epsg) - site_xy))))
-            x, y = _xy(near, epsg) - site_xy
+                *(_xy(c, crs) - site_xy))))
+            x, y = _xy(near, crs) - site_xy
             dist = float(np.hypot(x, y))
             if dist > 2000.0:
                 continue
@@ -241,7 +246,7 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
     # W2: независимая сверка по ESA WorldCover 10 м. Считается всегда, когда есть слой:
     # это не украшение, а второй источник по воде и первый — по застройке, деревьям и открытому.
     try:
-        cover = landcover.measure(r.lat, r.lon, epsg=epsg, site_xy=site_xy,
+        cover = landcover.measure(r.lat, r.lon, crs=crs, site_xy=site_xy,
                                   path=getattr(args, "worldcover_file", None),
                                   offline=bool(getattr(args, "offline", False)))
     except Exception as exc:                      # слой не должен ронять пакет
@@ -383,8 +388,20 @@ def cmd_pack(args) -> int:
     dem_layer = dem.SOURCE_INFO.get(dem_source, {}).get("kind", "dsm_smoothed")
     built_share = (m.get("land_cover") or {}).get("built")
     dem_conf = dem.relief_confidence(dem_layer, built_share)
-    warnings.append("рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, "
-                    "в плотной застройке возможны искажения")
+    # G4.4: пустоты в ближних кольцах — числам верить нельзя, и это не «плоско»
+    voids = [r.get("void_share") for s_ in m.get("sectors") or []
+             for r in s_["rings"] if r["r_km"][1] <= 2.0 and r.get("void_share")]
+    worst_void = max(voids) if voids else 0.0
+    ring_v = [r["r_km"] for s_ in m.get("sectors") or [] for r in s_["rings"]
+              if r["r_km"][1] <= 2.0 and (r.get("void_share") or 0) > 0.05]
+    if dem_conf != "low":
+        warnings.append("рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, "
+                        "в плотной застройке возможны искажения")
+    if worst_void > 0.05:
+        dem_conf = "low"
+        warnings.append("рельеф: пустоты в кольцах %s до %s — уверенность low (G4.4): пустоты "
+                        "(море, дыры съёмки) не интерполируются, и ноль там означает «не измерено»"
+                        % (", ".join("%g–%g км" % tuple(v) for v in ring_v[:3]), format(worst_void, ".0%")))
     if dem_conf != "high":
         warnings.append(f"рельеф: уверенность полей по рельефу {dem_conf} (П7): слой "
                         f"{dem_layer}, застройка в кольце "
@@ -405,6 +422,11 @@ def cmd_pack(args) -> int:
         m["wind"] = wind
     except Exception as exc:
         warnings.append(f"ветер не рассчитан: {exc}")
+    if decl is not None and decl.get("confidence") == "low":
+        warnings.append("компас ненадёжен: горизонтальная составляющая поля "
+                        f"{decl.get('horizontal_nt')} нТл ниже {climate.HORIZONTAL_MIN_NT:.0f} — "
+                        "у магнитного полюса стрелка не держит север, склонение оставлено "
+                        "справочно (G4)")
     if wind is not None:
         m["exposure"] = {**(m.get("exposure") or {}), "wind": wind,
                          "cold_wind": wind.get("cold_wind")}
@@ -419,6 +441,8 @@ def cmd_pack(args) -> int:
     orientation = {
         "facing_true_deg": round(facing, 1),
         "declination_deg": None if decl is None else decl["deg"],
+        "declination_horizontal_nt": None if decl is None else decl.get("horizontal_nt"),
+        "declination_confidence": None if decl is None else decl.get("confidence"),
         "facing_mag_deg": None if decl is None else climate.magnetic_bearing(facing, decl["deg"]),
         "facing_mountain": geo.mountain_name(facing),
         "sitting_mountain": geo.mountain_name(facing + 180.0),
@@ -431,7 +455,13 @@ def cmd_pack(args) -> int:
             "boundary": None,
             # H1: полушарие — факт; «около экватора» = солнце в зените в пределах 1°
             "hemisphere": "S" if r.lat < 0 else "N",
-            "equatorial": abs(r.lat) <= 1.0}
+            "equatorial": abs(r.lat) <= 1.0,
+            # G2: сетка и поправка на сходимость меридианов — часть метода, а не деталь
+            "grid_crs": (m.get("grid_choice") or {}).get("crs"),
+            "grid_crs_kind": (m.get("grid_choice") or {}).get("kind"),
+            "grid_crs_reason": (m.get("grid_choice") or {}).get("reason"),
+            "convergence_deg": round(geo.convergence_deg(
+                r.lat, r.lon, (m.get("grid_choice") or {}).get("crs") or geo.utm_epsg(r.lat, r.lon)), 3)}
     out_dir = Path(args.out or f"site-{abs(r.lat):.3f}-{abs(r.lon):.3f}")
     dem_source = m.get("dem_source") or "copernicus"
     dem_label = m.get("dem_label") or "Copernicus DEM GLO-30 (DSM)"
@@ -463,12 +493,12 @@ def cmd_run(args) -> int:
 
 def cmd_water(args) -> int:
     r = _resolve(args.place)
-    epsg = geo.utm_epsg(r.lat, r.lon)
+    crs = geo.utm_epsg(r.lat, r.lon)
     macro_km = 50.0 if r.precision in {"district", "settlement"} else 20.0
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
-    m = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
+    m = terrain.measure_site(r.lat, r.lon, crs=crs, resolution_m=30.0, macro_km=macro_km,
                             meso_km=8.0, facing_deg=None, point_smooth_m=point_smooth)
-    w = _measure_water(r, m, epsg, payload=_load_osm_file(getattr(args, "osm_file", None)), args=args)
+    w = _measure_water(r, m, crs, payload=_load_osm_file(getattr(args, "osm_file", None)), args=args)
     rows = [{"id": o.id, "name": o.name, "kind": o.kind, "nearest_m": o.nearest_m,
              "in": o.in_mountain, "out": o.out_mountain, "bend": o.bend,
              "curvature_km": None if o.curvature_radius_m is None else round(o.curvature_radius_m / 1000, 2),

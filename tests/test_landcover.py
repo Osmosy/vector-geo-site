@@ -46,7 +46,7 @@ def _site(lat: float, lon: float):
     site = np.array([0.0, 0.0])
     from pyproj import Transformer
 
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(lon, lat))
     return epsg, site
 
@@ -63,7 +63,7 @@ def test_tile_names_follow_three_degree_grid():
 def test_all_water_gives_share_one(tmp_path):
     path = _tif(tmp_path, 51.5138, -0.0984, default=80)
     epsg, site = _site(51.5138, -0.0984)
-    data = landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site, path=path,
+    data = landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site, path=path,
                              radius_m=2000.0, rings=((0.0, 2000.0),))
     assert data is not None
     assert data["rings"]["0-2"]["share"] == pytest.approx(1.0, abs=0.01)
@@ -75,7 +75,7 @@ def test_wetland_is_not_open_water(tmp_path):
     объяснялось бы своей же ошибкой."""
     path = _tif(tmp_path, 51.5138, -0.0984, default=90)
     epsg, site = _site(51.5138, -0.0984)
-    data = landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site, path=path,
+    data = landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site, path=path,
                              radius_m=2000.0, rings=((0.0, 2000.0),))
     assert data["groups"]["water"] == 0.0
     assert data["rings"]["0-2"]["share"] == 0.0
@@ -85,7 +85,7 @@ def test_groups_split_by_class(tmp_path):
     """Застройка, дерево и открытое считаются по своим классам, а не «всё не вода»."""
     path = _tif(tmp_path, 51.5138, -0.0984, classes={50: 0.5, 10: 0.3, 30: 0.2})
     epsg, site = _site(51.5138, -0.0984)
-    data = landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site, path=path,
+    data = landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site, path=path,
                              radius_m=2000.0, rings=((0.0, 2000.0),))
     assert data["groups"]["built"] == pytest.approx(0.5, abs=0.03)
     assert data["groups"]["tree"] == pytest.approx(0.3, abs=0.03)
@@ -99,7 +99,7 @@ def test_offline_without_cache_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(landcover, "CACHE_DIR", tmp_path / "cache")
     epsg, site = _site(51.5138, -0.0984)
     assert landcover.window(51.5138, -0.0984, 8000.0, offline=True) is None
-    assert landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site,
+    assert landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site,
                              offline=True) is None
 
 
@@ -107,7 +107,7 @@ def test_offline_without_cache_returns_none(tmp_path, monkeypatch):
 def test_london_fixture_matches_satellite():
     """Лондон по снимкам: застройка доминирует, воды в кольце 0.5–2 км около 7 %."""
     epsg, site = _site(51.5138, -0.0984)
-    data = landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site, path=FIXTURE)
+    data = landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site, path=FIXTURE)
     assert data["source"] == landcover.SOURCE
     assert data["groups"]["built"] > 0.55
     assert 0.02 < data["groups"]["water"] < 0.12, data["groups"]
@@ -120,6 +120,6 @@ def test_london_fixture_matches_satellite():
 def test_river_sector_seen_by_both_sources():
     """Южные сектора у Темзы видны обоими источниками: и OSM, и снимки дают десятки процентов."""
     epsg, site = _site(51.5138, -0.0984)
-    data = landcover.measure(51.5138, -0.0984, epsg=epsg, site_xy=site, path=FIXTURE)
+    data = landcover.measure(51.5138, -0.0984, crs=epsg, site_xy=site, path=FIXTURE)
     south = data["rings"]["0.5-2"]["by_mountain"]
     assert south["申"] > 0.3 and south["辰"] > 0.2, south

@@ -54,7 +54,7 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
     return out
 
 
-def water_mask(features, *, epsg: int, site_xy: np.ndarray, grid, radius_px: int = 1) -> np.ndarray:
+def water_mask(features, *, crs: int | str, site_xy: np.ndarray, grid, radius_px: int = 1) -> np.ndarray:
     """Растр воды по сетке рельефа: залитые водоёмы и линии водотоков.
 
     Многие полигоны OSM невалидны (самопересечения) — rasterio молча их пропускает,
@@ -68,7 +68,7 @@ def water_mask(features, *, epsg: int, site_xy: np.ndarray, grid, radius_px: int
     for f in features:
         if len(f.coords) < 2:
             continue
-        pts = to_utm(f.coords, epsg)
+        pts = to_utm(f.coords, crs)
         closed = len(pts) > 3 and abs(pts[0][0] - pts[-1][0]) < 1e-9 and abs(pts[0][1] - pts[-1][1]) < 1e-9
         geom = Polygon(pts) if closed else LineString(pts)
         if not geom.is_valid:
@@ -119,8 +119,9 @@ def polygon_features(features) -> list:
     return out
 
 
-def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tuple[float, float],
-                       min_area_m2: float = 2000.0) -> dict:
+def sector_water_share(features, *, crs: int | str, site_xy: np.ndarray, ring_m: tuple[float, float],
+                       min_area_m2: float = 2000.0,
+                       lat: float | None = None, lon: float | None = None) -> dict:
     """Доля площади воды в каждом из 24 секторов кольца — по полигонам OSM, без растяжения.
 
     Считается аналитически в UTM: полигон пересекается с сектором-клином, площадь делится на
@@ -140,8 +141,8 @@ def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tupl
     polys = []
     invalid = 0
     for f in polygon_features(features):
-        pts = to_utm([(lon, lat) for lon, lat in f.coords], epsg) - site_xy
-        holes = [to_utm([(lon, lat) for lon, lat in hole], epsg) - site_xy
+        pts = to_utm([(lon, lat) for lon, lat in f.coords], crs) - site_xy
+        holes = [to_utm([(lon, lat) for lon, lat in hole], crs) - site_xy
                  for hole in (getattr(f, "holes", None) or [])]
         poly = Polygon(pts, holes) if holes else Polygon(pts)
         if not poly.is_valid:
@@ -151,7 +152,8 @@ def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tupl
             continue
         polys.append(poly)
     shares: dict[str, float] = {name: 0.0 for name in geo.MOUNTAINS}
-    linear = linear_water_by_sector(features, epsg=epsg, site_xy=site_xy, ring_m=(r0, r1))
+    linear = linear_water_by_sector(features, crs=crs, site_xy=site_xy, ring_m=(r0, r1),
+                                    lat=lat, lon=lon)
     basis = ("polygons: water=*, natural=water, landuse=reservoir/basin; "
              "осевые линии — в linear_km")
     if not polys:
@@ -182,7 +184,8 @@ def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tupl
             "skipped_invalid": invalid, "linear_km": linear, "basis": basis}
 
 
-def linear_water_by_sector(features, *, epsg: int, site_xy: np.ndarray,
+def linear_water_by_sector(features, *, crs: int | str, site_xy: np.ndarray,
+                           lat: float | None = None, lon: float | None = None,
                            ring_m: tuple[float, float]) -> dict[str, float]:
     """Длина линейной воды (река осевой, ручей) в каждом секторе кольца, км.
 
@@ -193,12 +196,13 @@ def linear_water_by_sector(features, *, epsg: int, site_xy: np.ndarray,
     from . import geo
 
     r0, r1 = float(ring_m[0]), float(ring_m[1])
+    offset = geo.convergence_deg(lat, lon, crs) if lat is not None and lon is not None else 0.0
     out: dict[str, float] = {name: 0.0 for name in geo.MOUNTAINS}
     for f in features:
         coords = getattr(f, "coords", None) or []
         if len(coords) < 2 or f in polygon_features([f]):
             continue
-        pts = to_utm(coords, epsg) - site_xy
+        pts = to_utm(coords, crs) - site_xy
         for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
             seg = math.hypot(x1 - x0, y1 - y0)
             if seg <= 0:
@@ -207,7 +211,7 @@ def linear_water_by_sector(features, *, epsg: int, site_xy: np.ndarray,
             dist = math.hypot(mx, my)
             if not (r0 <= dist < r1):
                 continue
-            bearing = (math.degrees(math.atan2(mx, my))) % 360.0
+            bearing = (math.degrees(math.atan2(mx, my)) + offset) % 360.0
             out[geo.mountain_name(bearing)] += seg / 1000.0
     return {k: round(v, 3) for k, v in out.items()}
 

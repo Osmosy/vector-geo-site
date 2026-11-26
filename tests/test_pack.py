@@ -78,7 +78,7 @@ def test_london_sectors_are_reproducible():
     """Критерий приёмки этапа 2: сектора повторяются при перезапуске."""
     runs = []
     for _ in range(2):
-        m = terrain.measure_site(LONDON[0], LONDON[1], epsg=EPSG, resolution_m=30.0, macro_km=50.0)
+        m = terrain.measure_site(LONDON[0], LONDON[1], crs=EPSG, resolution_m=30.0, macro_km=50.0)
         runs.append([(s["mountain"], [r["max_rel_elev_m"] for r in s["rings"]]) for s in m["sectors"]])
     assert runs[0] == runs[1]
 
@@ -89,7 +89,7 @@ def test_london_terrain_matches_known_ground():
     from geosite.dem import load_dem, smooth
     from pyproj import Transformer
 
-    g = smooth(load_dem(*LONDON, radius_km=20, epsg=EPSG, resolution_m=90.0), 300.0)
+    g = smooth(load_dem(*LONDON, radius_km=20, crs=EPSG, resolution_m=90.0), 300.0)
     tr = Transformer.from_crs("EPSG:4326", f"EPSG:{EPSG}", always_xy=True)
     city = g.point_value(*tr.transform(-0.0984, 51.5138))
     thames = g.point_value(*tr.transform(-0.1278, 51.5074))
@@ -101,7 +101,7 @@ def test_london_terrain_matches_known_ground():
 
 @pytest.mark.skipif(not HAS_TILES, reason="нет тайлов Copernicus DEM в кеше")
 def test_london_vein_goes_uphill():
-    m = terrain.measure_site(*LONDON, epsg=EPSG, resolution_m=30.0, macro_km=50.0, facing_deg=180.0)
+    m = terrain.measure_site(*LONDON, crs=EPSG, resolution_m=30.0, macro_km=50.0, facing_deg=180.0)
     vein = m["dragon_vein"]
     assert vein["length_km"] > 2
     assert vein["drop_m"] > 20
@@ -164,13 +164,14 @@ def test_i13_confluence_participants_are_lines():
 
 def test_algo_is_built_from_module_versions():
     """P0: в ALGO нет ручных строк — все версии берутся из констант модулей."""
-    from geosite import calibrate, climate, dtm, geocode, landcover, pack as pack_mod
+    from geosite import calibrate, climate, dtm, geo as geo_mod, geocode, landcover, pack as pack_mod
     from geosite import sun, terrain, water
 
     assert pack_mod.ALGO == {
         "water": water.ALGO_VERSION,
         "terrain": terrain.ALGO_VERSION,
         "geocode": geocode.ALGO_VERSION,
+        "geo": geo_mod.ALGO_VERSION,
         "climate": climate.ALGO_VERSION,
         "sun": sun.ALGO_VERSION,
         "landcover": landcover.ALGO_VERSION,

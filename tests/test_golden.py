@@ -35,12 +35,12 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
 
     lat, lon = float(site["lat"]), float(site["lon"])
     epsg = geo.utm_epsg(lat, lon)
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site_xy = np.array(tr.transform(lon, lat))
 
     if with_dem:
         grid_measured = terrain.measure_site(
-            lat, lon, epsg=epsg, resolution_m=90.0, macro_km=float(site.get("radius_km", 20.0)),
+            lat, lon, crs=epsg, resolution_m=90.0, macro_km=float(site.get("radius_km", 20.0)),
             facing_deg=site.get("facing"), dem_path=fixtures / "dem.tif")
         grid = grid_measured["grid_macro"]
     else:
@@ -59,7 +59,7 @@ def measure(site: dict, fixtures: Path, *, with_dem: bool = True) -> dict:
     if wide_file.exists():
         with gzip.open(wide_file, "rt", encoding="utf-8") as fh:
             wide = json.load(fh)
-    metrics = water.measure_water(lat, lon, epsg=epsg, grid=grid, site_xy=site_xy,
+    metrics = water.measure_water(lat, lon, crs=epsg, grid=grid, site_xy=site_xy,
                                   payload=payload, radius_m=8000, wide_payload=wide,
                                   allow_network=False)
     # порядок реки и расход: HydroRIVERS, офлайн из фикстуры (иначе тест требовал бы 150 МБ шейп-файла)

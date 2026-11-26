@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.1.0"
+ALGO_VERSION = "8.2.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -469,9 +469,9 @@ def parse_features(payload: dict, *, lat: float | None = None, lon: float | None
 
 # ---------- геометрия ----------
 
-def to_utm(coords: list[tuple[float, float]], epsg: int) -> np.ndarray:
+def to_utm(coords: list[tuple[float, float]], crs: int | str) -> np.ndarray:
     from pyproj import Transformer
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
     xs, ys = tr.transform([c[0] for c in coords], [c[1] for c in coords])
     return np.column_stack([xs, ys])
 
@@ -948,7 +948,8 @@ def is_watercourse(obj) -> bool:
 
 
 def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int, nearest_m: float,
-                       hole_pts: list[np.ndarray] | None = None) -> "WaterMetrics":
+                       hole_pts: list[np.ndarray] | None = None,
+                       offset_deg: float = 0.0) -> "WaterMetrics":
     """Контур водоёма: площадь, сторона и ближайшая точка, без речных полей.
 
     `in_mountain`, `out_mountain`, `bend`, `loop`, `flow_*`, `water_mouth` и `tidal_*` не
@@ -956,7 +957,7 @@ def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int, nearest_m:
     тоже не пишем — потребитель должен отличать «не считали» от «посчитали и вышло 0».
     """
     x, y = float(pts[nearest_seg][0]), float(pts[nearest_seg][1])
-    bearing = geo.normalize_deg(math.degrees(math.atan2(x, y)))
+    bearing = geo.azimuth_xy(x, y, offset_deg)
     return WaterMetrics(
         id=getattr(feature, "key", None) or f"osm-{feature.osm_type}-{feature.osm_id}",
         name=feature.name, kind=feature.kind, order=None,
@@ -982,11 +983,11 @@ def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int, nearest_m:
     )
 
 
-def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, epsg: int,
+def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, crs: int | str,
                     grid, in_radius_m: float = 2000.0, meso_radius_m: float = 8000.0) -> WaterMetrics | None:
     if len(feature.coords) < 2:
         return None
-    pts = to_utm(feature.coords, epsg) - site_xy          # координаты относительно участка
+    pts = to_utm(feature.coords, crs) - site_xy          # координаты относительно участка
     dists = _segment_distances(pts, np.zeros(2)) if len(pts) > 1 else np.array([np.hypot(*pts[0])])
     nearest_seg = int(np.argmin(dists))
     nearest_m = float(dists[nearest_seg])
@@ -996,8 +997,9 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     if getattr(feature, "geom", "line") == "area":
         # Контур водоёма: площадь, сторона и ближайшая точка. Речных полей у него нет по
         # смыслу — бассейн не втекает и не вытекает, у него нет ни устья, ни петли (E-018).
-        holes = [to_utm(hole, epsg) - site_xy for hole in (getattr(feature, "holes", None) or [])]
+        holes = [to_utm(hole, crs) - site_xy for hole in (getattr(feature, "holes", None) or [])]
         return _measure_waterbody(feature, pts=pts, nearest_seg=nearest_seg, nearest_m=nearest_m,
+                                  offset_deg=geo.convergence_deg(lat, lon, crs),
                                   hole_pts=holes)
 
     tags = getattr(feature, "tags", {}) or {}
@@ -1017,12 +1019,12 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
 
     # --- приливность (W5): тег OSM, иначе таблица известных границ ---
     from pyproj import Transformer
-    inv = Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
+    inv = Transformer.from_crs(geo.crs_str(crs), "EPSG:4326", always_xy=True)
     nearest_abs = pts[nearest_seg] + site_xy
     # Сторона участка — по ближайшей точке русла: она нужна и тогда, когда вход с выходом
     # не измерить (вне круга 2 км), чтобы в отчёте остались расстояние и сторона.
-    side_bearing = geo.normalize_deg(math.degrees(math.atan2(float(pts[nearest_seg][0]),
-                                                            float(pts[nearest_seg][1]))))
+    offset = geo.convergence_deg(lat, lon, crs)
+    side_bearing = geo.azimuth_xy(float(pts[nearest_seg][0]), float(pts[nearest_seg][1]), offset)
     n_lon, n_lat = inv.transform(nearest_abs[0], nearest_abs[1])
     tide = tides.status(tags, feature.name, n_lon, n_lat)
 
@@ -1084,8 +1086,8 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     else:
         a, b = pts[0], pts[-1]
     upstream, downstream = (a, b) if flow_chosen != "downstream_toward_start" else (b, a)
-    in_bearing = geo.normalize_deg(math.degrees(math.atan2(upstream[0], upstream[1])))
-    out_bearing = geo.normalize_deg(math.degrees(math.atan2(downstream[0], downstream[1])))
+    in_bearing = geo.azimuth_xy(upstream[0], upstream[1], offset)
+    out_bearing = geo.azimuth_xy(downstream[0], downstream[1], offset)
     in_m = geo.mountain_name(in_bearing)
     out_m = geo.mountain_name(out_bearing)
     crossing_angle = geo.angle_distance(in_bearing, out_bearing)
@@ -1115,13 +1117,13 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
         exit_pt = outer[-1] if flow_chosen != "downstream_toward_start" else outer[0]
         if len(outer) == 1:
             exit_pt = outer[0]
-        mouth = _water_mouth(grid, exit_pt, pts[i], site_xy)
+        mouth = _water_mouth(grid, exit_pt, pts[i], site_xy, offset_deg=offset)
 
     visible = None
     if mouth is not None and grid is not None:
         visible = _line_of_sight(grid, np.zeros(2), np.array([mouth.pop("_x"), mouth.pop("_y")]))
 
-    loop_raw = _detect_loop(pts) if len(pts) > 20 else None
+    loop_raw = _detect_loop(pts, offset_deg=offset) if len(pts) > 20 else None
     loop = None
     site_position = None
     bend_kind = "straight" if (radius_m is None or radius_m > 5000.0) else "bend"
@@ -1140,7 +1142,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     # Проверка I-07 молчала, если ручей мало пересекал круг 2 км, и короткий ручей проходил
     # её насквозь. Теперь нарушение отделено от предупреждения: нарушение — только длинный
     # кусок с пологим входом, остальное получает причину и пониженную уверенность.
-    length_2km = _coverage_m(feature.coords, site_xy, epsg, in_radius_m)
+    length_2km = _coverage_m(feature.coords, site_xy, crs, in_radius_m)
     same_reason = None
     if in_m and in_m == out_m and (feature.hidden_share or 0.0) < 0.8:
         if loop:
@@ -1209,6 +1211,7 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
 
 
 def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.ndarray,
+                 offset_deg: float = 0.0,
                  *, max_steps: int = 60, step_m: float = 50.0) -> dict | None:
     """Водные врата: ширина долины, высоты бортов и замкнутость (W1).
 
@@ -1277,7 +1280,7 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
         enclosure = mean_hill / half
         closure_index = round(enclosure / (1.0 + enclosure), 3)
 
-    bearing = geo.normalize_deg(math.degrees(math.atan2(exit_pt[0], exit_pt[1])))
+    bearing = geo.azimuth_xy(exit_pt[0], exit_pt[1], offset_deg)
     return {
         "mountain": geo.mountain_name(bearing),
         "width_m": round(width, 1),
@@ -1365,7 +1368,8 @@ def _site_position(ring: np.ndarray, mid: np.ndarray, far: np.ndarray) -> str:
     return "outside_concave"
 
 
-def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 1500.0,
+def _detect_loop(pts: np.ndarray, *, offset_deg: float = 0.0,
+                 near_m: float = 2000.0, apart_m: float = 1500.0,
                  min_ratio: float = 3.0, min_turn_deg: float = 180.0,
                  area_k: float = 0.05, near_site_m: float = 8000.0) -> dict | None:
     """Петля русла: возврат к себе, поворот не меньше 180° и площадь кольца.
@@ -1427,7 +1431,7 @@ def _detect_loop(pts: np.ndarray, *, near_m: float = 2000.0, apart_m: float = 15
     normal = np.array([-chord_line[1], chord_line[0]]) / norm
     offsets = np.abs((ring[:-1] - pts[i]) @ normal)
     far = ring[int(np.argmax(offsets))]
-    bearing = geo.normalize_deg(math.degrees(math.atan2(mid[0], mid[1])))
+    bearing = geo.azimuth_xy(mid[0], mid[1], offset_deg)
 
     is_loop = (ratio >= min_ratio and turn >= min_turn_deg and area >= area_k * gap * gap)
     margin, confidence = loop_confidence(ratio, turn, area / (gap * gap))
@@ -1498,7 +1502,7 @@ def _confluence_kind(a_kind: str, b_kind: str) -> str:
     return "confluence"
 
 
-def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
+def find_waterbody_links(features, *, site_xy: np.ndarray, crs: int | str,
                          radius_m: float = 8000.0) -> dict[str, list[dict]]:
     """Где линия русла входит в водоём: конец линии лежит внутри контура площади.
 
@@ -1519,7 +1523,7 @@ def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
     for idx, f in enumerate(features):
         if f.geom != "area" or len(f.coords) < 4:
             continue
-        ring = to_utm(f.coords, epsg) - site_xy
+        ring = to_utm(f.coords, crs) - site_xy
         if float(np.hypot(*ring.T).min()) > radius_m:
             continue
         poly = Polygon(ring)
@@ -1535,7 +1539,7 @@ def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
     for idx, f in enumerate(features):
         if f.geom != "line" or f.kind not in {"river", "stream", "canal"} or len(f.coords) < 2:
             continue
-        pts = to_utm(f.coords, epsg) - site_xy
+        pts = to_utm(f.coords, crs) - site_xy
         uid = label(f, idx)
         title = f.name or uid
         for area_label, poly in areas:
@@ -1555,7 +1559,8 @@ def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
     return out
 
 
-def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
+def find_confluences(features, *, site_xy: np.ndarray, crs: int | str,
+                     offset_deg: float = 0.0,
                      radius_m: float = 8000.0, merge_m: float = 50.0,
                      max_per_line: int = 5, clip_m: float = 5000.0) -> dict[str, list[dict]]:
     """Слияния водотоков: точки пересечения, общие узлы, без дублей (W3).
@@ -1582,7 +1587,7 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
         if f.kind in {"river", "stream", "canal"} and len(f.coords) > 1 and f.geom == "line":
             uid = (getattr(f, "uid", None) or getattr(f, "key", None)
                    or f"osm-{f.osm_type}-{f.osm_id}-{idx}")
-            full = to_utm(f.coords, epsg) - site_xy
+            full = to_utm(f.coords, crs) - site_xy
             pieces = clip_near(full, clip_m) or []
             if not pieces:
                 continue
@@ -1638,7 +1643,7 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
                 dist = float(np.hypot(*point))
                 if dist > radius_m:
                     continue
-                bearing = geo.normalize_deg(math.degrees(math.atan2(point[0], point[1])))
+                bearing = geo.azimuth_xy(point[0], point[1], offset_deg)
                 entry = {"dist_m": round(dist, 1), "mountain": geo.mountain_name(bearing),
                          "kind": _confluence_kind(kinds[a_key], kinds[b_key])}
                 result[base[a_key]].append({"with": labels[b_key], **entry})
@@ -1650,7 +1655,7 @@ def find_confluences(features, *, site_xy: np.ndarray, epsg: int,
     return result
 
 
-def flow_convention_share(features: list[Feature], grid, epsg: int, *,
+def flow_convention_share(features: list[Feature], grid, crs: int | str, *,
                           min_drop_m: float = 1.0) -> float | None:
     """Доля кусков реки, где порядок отрисовки OSM совпадает с падением по рельефу.
 
@@ -1664,7 +1669,7 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
     for f in features:
         if f.kind not in {"river", "stream"} or not is_watercourse(f) or len(f.coords) < 2:
             continue
-        pts = to_utm([f.coords[0], f.coords[-1]], epsg)
+        pts = to_utm([f.coords[0], f.coords[-1]], crs)
         z0 = grid.point_value(*pts[0])
         z1 = grid.point_value(*pts[1])
         if math.isnan(z0) or math.isnan(z1):
@@ -1675,7 +1680,7 @@ def flow_convention_share(features: list[Feature], grid, epsg: int, *,
     return None if total == 0 else round(agree / total, 2)
 
 
-def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.ndarray,
+def measure_water(lat: float, lon: float, *, crs: int | str, grid=None, site_xy: np.ndarray,
                   radius_m: int = 8000, allow_network: bool = True,
                   max_features: int = 2000, payload: dict | None = None,
                   wide_payload: dict | None = None,
@@ -1699,7 +1704,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
     window_m = max(window_factor * float(radius_m), window_min_m)
     chunks: list[MergedLine] = []
     for line in merged:
-        pts = to_utm(line.coords, epsg) - site_xy
+        pts = to_utm(line.coords, crs) - site_xy
         runs = clip_runs_near(pts, window_m) if len(pts) > 1 else []
         if not runs:
             continue
@@ -1720,14 +1725,15 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу
     near = []
     for line in chunks:
-        pts_near = to_utm(line.coords, epsg) - site_xy
+        pts_near = to_utm(line.coords, crs) - site_xy
         if float(np.hypot(*pts_near.T).min()) < 3000.0:
             near.append(line)
-    confluences = find_confluences(near, site_xy=site_xy, epsg=epsg, radius_m=radius_m,
+    confluences = find_confluences(near, site_xy=site_xy, crs=crs, radius_m=radius_m,
+                                   offset_deg=geo.convergence_deg(lat, lon, crs),
                                    clip_m=float(radius_m))
     # Входы в водоёмы ищем по целым линиям и целым контурам, а не по нарезанным кускам:
     # кусок кольца — не замкнутый контур, и `Polygon` из него закрывает разрыв хордой (E-017).
-    links = find_waterbody_links(merged, site_xy=site_xy, epsg=epsg, radius_m=radius_m)
+    links = find_waterbody_links(merged, site_xy=site_xy, crs=crs, radius_m=radius_m)
     # одна река — несколько кусков: слияние, найденное на любом из них, относится к реке
     by_name: dict[str, list[dict]] = {}
     links_by_name: dict[str, list[dict]] = {}
@@ -1738,10 +1744,10 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         key = hydronym.normalize_name(line.name) or line.key
         links_by_name.setdefault(key, []).extend(links.get(line.uid, []))
 
-    flow_share = flow_convention_share(features, grid, epsg)
+    flow_share = flow_convention_share(features, grid, crs)
     out: list[WaterMetrics] = []
     for m in chunks:
-        metrics = measure_feature(m, site_xy=site_xy, lat=lat, lon=lon, epsg=epsg, grid=grid,
+        metrics = measure_feature(m, site_xy=site_xy, lat=lat, lon=lon, crs=crs, grid=grid,
                                   meso_radius_m=radius_m)
         if metrics is None:
             continue
@@ -1753,7 +1759,7 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             metrics.flow_agree = flow_share >= 0.6
             metrics.flow_ways_share = flow_share
         out.append(metrics)
-    out = _one_entry_per_name(out, site_xy=site_xy, epsg=epsg, radius_m=radius_m)
+    out = _one_entry_per_name(out, site_xy=site_xy, crs=crs, radius_m=radius_m)
     # Берег реки (`natural=water, water=river` или `waterway=riverbank`) привязывается к линии
     # русла с тем же именем: отдельной «рекой» он не выводится, у него только поля водоёма (E-018).
     area_tags = {line.key: dict(getattr(line, "tags", {}) or {}) for line in merged
@@ -1786,11 +1792,11 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
                 continue
             if metric.visible is False:
                 continue
-            pts = to_utm(metric.coords, epsg) - site_xy
+            pts = to_utm(metric.coords, crs) - site_xy
             if len(pts) > 1:
                 lines_xy.append((metric.id, metric.name, LineString(pts)))
         for metric in unnamed:
-            ring = to_utm(metric.coords, epsg) - site_xy
+            ring = to_utm(metric.coords, crs) - site_xy
             if len(ring) < 4:
                 continue
             border = Polygon(ring).boundary
@@ -1812,8 +1818,8 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         if is_watercourse(metric) and metric.name and metric.geom != "area":
             metric.dock_channel_of = dock_ids.get(hydronym.normalize_name(metric.name) or metric.name)
     out.sort(key=lambda m: m.nearest_m)
-    _resolve_tidal_by_tags(out, features, epsg=epsg, site_xy=site_xy)
-    _resolve_tidal_by_reach(out, lat, lon, epsg=epsg, site_xy=site_xy, radius_m=radius_m,
+    _resolve_tidal_by_tags(out, features, crs=crs, site_xy=site_xy)
+    _resolve_tidal_by_reach(out, lat, lon, crs=crs, site_xy=site_xy, radius_m=radius_m,
                             wide_payload=wide_payload, allow_network=allow_network)
     return out
 
@@ -1841,12 +1847,12 @@ def _dedupe_links(items: list[dict], *, merge_m: float = 50.0) -> list[dict]:
     return out
 
 
-def _coverage_m(coords: list[tuple[float, float]] | None, site_xy: np.ndarray, epsg: int,
+def _coverage_m(coords: list[tuple[float, float]] | None, site_xy: np.ndarray, crs: int | str,
                 radius_m: float) -> float:
     """Сколько метров русла лежит в радиусе участка — мера «это главное русло, а не стаб»."""
     if not coords or len(coords) < 2:
         return 0.0
-    pts = to_utm(coords, epsg) - site_xy
+    pts = to_utm(coords, crs) - site_xy
     total = 0.0
     for a, b in zip(pts[:-1], pts[1:]):
         mid = (a + b) / 2.0
@@ -1856,7 +1862,7 @@ def _coverage_m(coords: list[tuple[float, float]] | None, site_xy: np.ndarray, e
 
 
 def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | None = None,
-                        epsg: int | None = None,
+                        crs: int | str | None = None,
                         radius_m: float = 8000.0) -> list[WaterMetrics]:
     """Одна река — одна запись, даже если русло в OSM разбито на несоприкасающиеся куски.
 
@@ -1875,10 +1881,10 @@ def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | No
 
     out: list[WaterMetrics] = []
     for items in groups.values():
-        if site_xy is not None and epsg is not None:
+        if site_xy is not None and crs is not None:
             # Покрытие считается только для линейной воды: у озера «покрытие» — это периметр
             # замкнутого кольца, и правило выбирало дальний пруд вместо ближнего.
-            items.sort(key=lambda m: (-_coverage_m(m.coords, site_xy, epsg, radius_m)
+            items.sort(key=lambda m: (-_coverage_m(m.coords, site_xy, crs, radius_m)
                                       if is_watercourse(m) else 0.0,
                                       m.nearest_m))
         else:
@@ -1895,7 +1901,7 @@ def _one_entry_per_name(metrics: list[WaterMetrics], *, site_xy: np.ndarray | No
 
 
 def _resolve_tidal_by_tags(metrics: list[WaterMetrics], features: list[Feature], *,
-                           epsg: int, site_xy: np.ndarray) -> None:
+                           crs: int | str, site_xy: np.ndarray) -> None:
     """Приливность по тегу OSM ближайшего куска той же реки.
 
     У склеенной линии теги могут расходиться (граница прилива проходит внутри): берём кусок,
@@ -1911,7 +1917,7 @@ def _resolve_tidal_by_tags(metrics: list[WaterMetrics], features: list[Feature],
             raw = (feature.tags.get("tidal") or "").lower()
             if raw not in {"yes", "no"}:
                 continue
-            pts = to_utm(feature.coords, epsg) - site_xy
+            pts = to_utm(feature.coords, crs) - site_xy
             dist = float(np.hypot(*pts.T).min())
             if best is None or dist < best[0]:
                 best = (dist, raw)
@@ -1921,7 +1927,7 @@ def _resolve_tidal_by_tags(metrics: list[WaterMetrics], features: list[Feature],
 
 
 def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float, *,
-                            epsg: int, site_xy: np.ndarray, radius_m: int,
+                            crs: int | str, site_xy: np.ndarray, radius_m: int,
                             wide_radius_m: int = 30000, wide_payload: dict | None = None,
                             allow_network: bool = True) -> None:
     """Приливность по положению вдоль русла: граница прилива может лежать дальше 8 км.
@@ -1953,7 +1959,7 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
     for line in merge_by_name(parse_features(wide)):
         if not line.name:
             continue
-        pts_line = to_utm(line.coords, epsg) - site_xy
+        pts_line = to_utm(line.coords, crs) - site_xy
         if len(pts_line) < 2:
             continue
         dist_site = float(np.hypot(*pts_line.T).min())
@@ -1964,7 +1970,7 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
             continue
         if line.name not in limit_xy_cache:
             from pyproj import Transformer as _T
-            limit_xy_cache[line.name] = np.array(_T.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+            limit_xy_cache[line.name] = np.array(_T.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
                                                  .transform(float(entry_line["limit_lon"]),
                                                             float(entry_line["limit_lat"]))) - site_xy
         limit_pt = limit_xy_cache[line.name]
@@ -1973,14 +1979,14 @@ def _resolve_tidal_by_reach(metrics: list[WaterMetrics], lat: float, lon: float,
         if current is None or dist_limit < current[0]:
             wide_lines[line.name] = (dist_limit, line)
     from pyproj import Transformer
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
     for metric in pending:
         line = (wide_lines.get(metric.name) or (None, None))[1]
         entry = tides.limit_entry(metric.name)
         if line is None or entry is None:
             metric.tidal_reason = "limit_not_on_line"
             continue
-        pts = to_utm(line.coords, epsg) - site_xy
+        pts = to_utm(line.coords, crs) - site_xy
         if len(pts) < 3:
             continue
         seg = np.hypot(*np.diff(pts, axis=0).T)

@@ -46,10 +46,10 @@ def _class_at(window: dict, lat: float, lon: float) -> int | None:
 
 def compare(lat: float, lon: float, *, radius_km: float, points: int, seed: int = 11) -> dict:
     epsg = geo.utm_epsg(lat, lon)
-    ridge, info = dtm.grid(lat, lon, epsg=epsg, radius_km=radius_km, resolution_m=30.0)
+    ridge, info = dtm.grid(lat, lon, crs=epsg, radius_km=radius_km, resolution_m=30.0)
     if ridge is None:
         return {"error": "DTM недоступен: " + str(info.get("reason"))}
-    surface = dem.load_dem(lat, lon, radius_km, epsg=epsg, resolution_m=30.0)
+    surface = dem.load_dem(lat, lon, radius_km, crs=epsg, resolution_m=30.0)
 
     rng = np.random.default_rng(seed)
     r_max = radius_km * 1000.0 * 0.95

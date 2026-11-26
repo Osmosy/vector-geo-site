@@ -37,13 +37,14 @@ MIN_ELEV, MAX_ELEV = -430.0, 8850.0
 
 # P0 (I-11): версии модулей, с которыми сверяется пакет.
 from . import calibrate as _calibrate, climate as _climate, dtm as _dtm
-from . import geocode as _geocode, landcover as _landcover
+from . import geo as _geo, geocode as _geocode, landcover as _landcover
 from . import sun as _sun, terrain as _terrain
 from . import water as _water
 CODE_VERSIONS = {
     "water": _water.ALGO_VERSION,
     "terrain": _terrain.ALGO_VERSION,
     "geocode": _geocode.ALGO_VERSION,
+    "geo": _geo.ALGO_VERSION,
     "climate": _climate.ALGO_VERSION,
     "sun": _sun.ALGO_VERSION,
     "landcover": _landcover.ALGO_VERSION,
