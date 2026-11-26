@@ -61,6 +61,9 @@ class Ring(BaseModel):
     water_share: float | None = None
     built_share: float | None = None
     peaks: list[str] = Field(default_factory=list)
+    # D3: у ближнего кольца оба вида рельефа — поверхность (крыши как городские 砂) и земля
+    dsm: dict | None = None
+    dtm: dict | None = None
 
 
 class Sector(BaseModel):
@@ -108,6 +111,7 @@ class DemFile(BaseModel):
     resolution_m: float | None = None
     license: str | None = None
     vertical_datum: str | None = None
+    datum_shift_m: float | None = None
 
 
 class PointMetrics(BaseModel):

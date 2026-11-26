@@ -154,6 +154,24 @@ def test_mouth_flat_plane_is_null():
     assert m["width_capped"] is True and m["capped_sides"] == 2
 
 
+def test_mouth_capped_side_has_no_zero_height():
+    """I-12: упёршаяся сторона не знает высоту борта — там null, а не 0 (E-025).
+
+    Ноль читается как «борт ровно нулевой», то есть как измерение. На плоском месте борт
+    просто не нашли в пределах 3 км, и честный ответ — отсутствие значения.
+    """
+    from affine import Affine
+    from geosite.dem import DemGrid
+
+    res, n = 50.0, 141
+    flat = DemGrid(np.full((n, n), 100.0, dtype="float32"), Affine(res, 0, 0, 0, -res, n * res),
+                   "EPSG:32630", res)
+    m = water._water_mouth(flat, np.array([0.0, 0.0]), np.array([0.0, -100.0]),
+                           np.array([n * res / 2, n * res / 2]))
+    assert m["left_hill_m"] is None and m["right_hill_m"] is None
+    assert m["enclosure"] is None
+
+
 def test_mouth_one_side_capped_is_low_confidence():
     g = _valley_grid(10.0)
     m = water._water_mouth(g, np.array([0.0, 0.0]), np.array([0.0, -100.0]),

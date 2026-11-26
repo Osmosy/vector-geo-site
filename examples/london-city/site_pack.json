@@ -1548,6 +1548,7 @@
    "water_share: расхождение OSM и WorldCover выше допуска в 3 клин(ах) из 24 (осушка); причина записана, уверенность low",
    "water.flow: low — конфликт OSM и рельефа у osm-#7833362-river, osm-#446582987-stream",
    "water_share — по полигонам OSM (water=*, natural=water); река, нарисованная осевой, в долю не входит, её длина — sector.water_km",
+   "no_dtm: лидар: точка вне покрытия или источник не активен; gedtm30 помечен недоступным при последней проверке — все поля рельефа посчитаны по поверхности (DSM)",
    "рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, в плотной застройке возможны искажения",
    "рельеф: уверенность полей по рельефу low (П7): слой dsm_smoothed, застройка в кольце 82%; высоты земли в городе по DSM завышены на высоту зданий",
    "I-07b: osm-#436220356-stream — вход и выход в одной горе (короткий кусок)",
@@ -1562,19 +1563,20 @@
   "violations": []
  },
  "algo": {
-  "water": "8.0.0",
+  "water": "8.1.0",
   "terrain": "3.0.0",
   "geocode": "1.0.0",
   "climate": "1.1.0",
   "sun": "1.0.0",
   "landcover": "1.0.0",
   "calibrate": "1.0.0",
-  "pack": "2.4.0"
+  "dtm": "1.0.0",
+  "pack": "2.5.0"
  },
  "files": {
   "water_geojson": "water.geojson",
   "sha256": {
-   "water.geojson": "04ee10fe9fce4eb278bee58cb6b8f30e0f8c63c979be2da342ffcbfed05f6a99"
+   "water.geojson": "69f489a9b6d08cf6ef7b5d2b87d4bed74d465a9c8814f3324dace36f77ddddb6"
   },
   "land_cover": {
    "source": "ESA WorldCover 2021 v200",
@@ -1586,7 +1588,7 @@
   "dem": {
    "source": "copernicus",
    "kind": "dsm_smoothed",
-   "resolution_m": 30.0,
+   "resolution_m": 90.0,
    "license": "Copernicus DEM free licence",
    "vertical_datum": "EGM2008"
   }

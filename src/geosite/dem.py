@@ -78,6 +78,11 @@ class DemGrid:
     source: str = "copernicus"    # id источника: пишется в пакет
     label: str = DEM_LABEL        # человекочитаемое имя
     attribution: str = ATTRIBUTION
+    # D2/D3: паспорт слоя — природа данных, система высот и сдвиг к EGM2008
+    kind: str = "dsm_smoothed"
+    vertical_datum: str | None = "EGM2008"
+    datum_shift_m: float | None = 0.0
+    license: str | None = None
 
     @property
     def shape(self) -> tuple[int, int]:

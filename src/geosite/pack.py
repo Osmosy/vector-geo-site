@@ -7,11 +7,12 @@ from pathlib import Path
 
 import hashlib
 
-from . import calibrate, climate, dem, figures, geo, geocode, landcover, sun, terrain, water
+from . import calibrate, climate, dem, dtm, figures, geo, geocode, landcover, sun
+from . import terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.4.0"      # версия сборки пакета
+ALGO_VERSION = "2.5.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -23,6 +24,7 @@ ALGO = {
     "sun": sun.ALGO_VERSION,
     "landcover": landcover.ALGO_VERSION,
     "calibrate": calibrate.ALGO_VERSION,
+    "dtm": dtm.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -188,6 +190,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                  else _share(r, "middle", s["mountain"])
                  if tuple(r.get("r_km") or ()) == (2.0, 8.0) else None),
                 "peaks": r.get("peaks", []),
+                **_near_ring_layers(measured, s["mountain"], len(rings)),
             })
         wind_share = (measured.get("wind") or {}).get("by_mountain", {}).get(s["mountain"])
         sectors.append({"mountain": s["mountain"], "from_deg": geo.mountain_bounds(s["mountain"])[0],
@@ -212,7 +215,9 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
     warnings = list(warnings) + list(measured.get("hydro_warnings") or [])
 
     # D2/П7: слой рельефа подписывается у каждого поля, которое от него зависит
-    layer = dem.SOURCE_INFO.get(dem_source, {}).get("kind", "dsm_smoothed")
+    dtm_info = measured.get("dtm_info") or {}
+    layer = "dtm" if dtm_info.get("source") else dem.SOURCE_INFO.get(
+        dem_source, {}).get("kind", "dsm_smoothed")
     built = (measured.get("land_cover") or {}).get("built")
     dem_confidence = dem.relief_confidence(layer, built)
 
@@ -283,7 +288,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                  "warnings": warnings, "notes": notes},
         summary=summary,
         files=_files_block(geojson_name, sha, measured.get("land_cover_layer"),
-                           dem.file_block(dem_source, kind=layer, resolution_m=dem_resolution_m)),
+                           _dem_block(measured, dem_source, dem_resolution_m),
+                           dtm.file_block(measured.get("dtm_info") or {})),
         attribution=_attribution(measured.get("land_cover_layer")),
     )
     payload = pack.model_dump(by_alias=True, exclude_none=False)
@@ -314,6 +320,23 @@ def _attribution(cover: dict | None) -> list[str]:
     return ATTRIBUTION if not cover else list(ATTRIBUTION) + [WORLDCOVER_ATTRIBUTION]
 
 
+def _near_ring_layers(measured: dict, mountain: str, index: int) -> dict:
+    """D3: в ближнем кольце оба вида рельефа — поверхность и земля рядом, а не вместо."""
+    if index != 0:
+        return {}
+    dsm = (measured.get("dsm_near_ring") or {}).get(mountain)
+    dtm_info = measured.get("dtm_info") or {}
+    if not dsm or not dtm_info.get("source"):
+        return {}
+    dtm_ring = next((s["rings"][0] for s in measured.get("sectors") or []
+                     if s["mountain"] == mountain), None)
+    if dtm_ring is None:
+        return {}
+    keys = ("max_rel_elev_m", "mean_rel_elev_m", "horizon_deg")
+    return {"dsm": {k: dsm.get(k) for k in keys},
+            "dtm": {k: dtm_ring.get(k) for k in keys}}
+
+
 def _calibration(measured: dict, mountain: str) -> dict:
     """W4: оба значения доли воды, выбранное и цена выбора — на уровне клина."""
     data = (measured.get("water_calibration") or {}).get(mountain) or {}
@@ -322,12 +345,22 @@ def _calibration(measured: dict, mountain: str) -> dict:
              "water_share_confidence", "water_share_reason")}
 
 
+def _dem_block(measured: dict, dem_source: str, dem_resolution_m: float) -> dict:
+    """`files.dem` описывает поверхность, даже когда числа в пакете сняты с земли (DTM)."""
+    meta = measured.get("dem_dsm") or {}
+    return dem.file_block(meta.get("source") or dem_source,
+                          kind=meta.get("kind") or "dsm_smoothed",
+                          resolution_m=meta.get("resolution_m") or dem_resolution_m)
+
+
 def _files_block(geojson_name: str, sha: str, cover: dict | None,
-                 dem_block: dict | None = None) -> dict:
+                 dem_block: dict | None = None, dtm_block: dict | None = None) -> dict:
     """Откуда взяты данные: у недоступного источника это видно в `files`, а не в догадках."""
     block: dict = {"water_geojson": geojson_name, "sha256": sha}
     if dem_block:
         block["dem"] = dem_block
+    if dtm_block:
+        block["dtm"] = dtm_block
     if cover:
         block["land_cover"] = {"source": landcover.SOURCE, "license": landcover.LICENSE,
                                "resolution_m": cover.get("resolution_m"),

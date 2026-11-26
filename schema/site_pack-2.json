@@ -171,6 +171,18 @@
           ],
           "default": null,
           "title": "Vertical Datum"
+        },
+        "datum_shift_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datum Shift M"
         }
       },
       "required": [
@@ -953,6 +965,32 @@
           },
           "title": "Peaks",
           "type": "array"
+        },
+        "dsm": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dsm"
+        },
+        "dtm": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dtm"
         }
       },
       "required": [
