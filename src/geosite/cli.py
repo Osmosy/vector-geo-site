@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import calibrate, climate, geo, hydro, landcover, sun, terrain, water, water_pack
+from . import calibrate, climate, dem, geo, hydro, landcover, sun, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -323,8 +323,17 @@ def cmd_pack(args) -> int:
         warnings.append("вода: слои OSM не получены, water и water_share пусты")
     if m.get("water_error"):
         warnings.append(f"вода: {m['water_error']}")
+    dem_source = m.get("dem_source") or "copernicus"
+    dem_layer = dem.SOURCE_INFO.get(dem_source, {}).get("kind", "dsm_smoothed")
+    built_share = (m.get("land_cover") or {}).get("built")
+    dem_conf = dem.relief_confidence(dem_layer, built_share)
     warnings.append("рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, "
                     "в плотной застройке возможны искажения")
+    if dem_conf != "high":
+        warnings.append(f"рельеф: уверенность полей по рельефу {dem_conf} (П7): слой "
+                        f"{dem_layer}, застройка в кольце "
+                        f"{'—' if built_share is None else format(built_share, '.0%')}; "
+                        "высоты земли в городе по DSM завышены на высоту зданий")
     if r.precision in {"district", "settlement"}:
         warnings.append("точка — историческое ядро/центр по геокодеру, не контур здания")
 

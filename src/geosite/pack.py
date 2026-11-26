@@ -7,11 +7,11 @@ from pathlib import Path
 
 import hashlib
 
-from . import calibrate, climate, figures, geo, geocode, landcover, sun, terrain, water
+from . import calibrate, climate, dem, figures, geo, geocode, landcover, sun, terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.3.0"      # версия сборки пакета
+ALGO_VERSION = "2.4.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -140,6 +140,8 @@ def write_water_geojson(path: Path, objects: list, geometry: dict) -> None:
         if not coords:
             continue
         props = _strip_area_fields(item.model_dump(mode="json"))
+        # dem_layer — свойство пакета, а не геометрии: в geojson он был бы null у всех объектов
+        props.pop("dem_layer", None)
         features.append({
             "type": "Feature",
             "geometry": {"type": "LineString", "coordinates": [[float(x), float(y)] for x, y in coords]},
@@ -209,9 +211,32 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         site = {**site, "hydro": hydro_site}
     warnings = list(warnings) + list(measured.get("hydro_warnings") or [])
 
+    # D2/П7: слой рельефа подписывается у каждого поля, которое от него зависит
+    layer = dem.SOURCE_INFO.get(dem_source, {}).get("kind", "dsm_smoothed")
+    built = (measured.get("land_cover") or {}).get("built")
+    dem_confidence = dem.relief_confidence(layer, built)
+
+    def _with_layer(block):
+        """Поле по рельефу несёт `dem_layer`: иначе не видно, по земле оно или по крышам."""
+        if block is None:
+            return None
+        data = dict(block)
+        data.setdefault("dem_layer", layer)
+        return data
+
+    def _tag_water(items):
+        tagged = []
+        for item in items:
+            update = {"dem_layer": layer}
+            if item.water_mouth is not None:
+                update["water_mouth"] = item.water_mouth.model_copy(update={"dem_layer": layer})
+            tagged.append(item.model_copy(update=update))
+        return tagged
+
     water_all = list(measured.get("water", []))
     geometry = measured.get("water_geometry") or {}
     kept = trim_water(water_all)
+    kept = _tag_water(kept)
     summary = water_summary(water_all, kept)
     geojson_name = None
     sha = {}
@@ -235,6 +260,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
             "wind_seasonal": wind.get("seasonal"),
             "wind_source": wind.get("source"),
         })
+    if exposure:
+        exposure.setdefault("dem_layer", layer)
 
     pack = SitePack(
         query=query,
@@ -242,19 +269,21 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         orientation=orientation,
         chart_year=chart_year,
         sectors=sectors,
-        point=measured.get("point"),
-        four_spirits=measured.get("four_spirits"),
+        point=_with_layer(measured.get("point")),
+        four_spirits=_with_layer(measured.get("four_spirits")),
         sun=measured.get("sun"),
-        dragon_vein=measured.get("dragon_vein"),
+        dragon_vein=_with_layer(measured.get("dragon_vein")),
         water=kept,
         roads=measured.get("roads", []),
         exposure=exposure or None,
         land_cover=measured.get("land_cover"),
         water_share_rule=calibrate.RULE if measured.get("water_calibration") else None,
-        quality={"dem": dem_label, "dem_source": dem_source, "dem_resolution_m": dem_resolution_m,
+        quality={"dem": dem_label, "dem_source": dem_source, "dem_kind": layer,
+                 "dem_resolution_m": dem_resolution_m, "dem_confidence": dem_confidence,
                  "warnings": warnings, "notes": notes},
         summary=summary,
-        files=_files_block(geojson_name, sha, measured.get("land_cover_layer")),
+        files=_files_block(geojson_name, sha, measured.get("land_cover_layer"),
+                           dem.file_block(dem_source, kind=layer, resolution_m=dem_resolution_m)),
         attribution=_attribution(measured.get("land_cover_layer")),
     )
     payload = pack.model_dump(by_alias=True, exclude_none=False)
@@ -293,9 +322,12 @@ def _calibration(measured: dict, mountain: str) -> dict:
              "water_share_confidence", "water_share_reason")}
 
 
-def _files_block(geojson_name: str, sha: str, cover: dict | None) -> dict:
+def _files_block(geojson_name: str, sha: str, cover: dict | None,
+                 dem_block: dict | None = None) -> dict:
     """Откуда взяты данные: у недоступного источника это видно в `files`, а не в догадках."""
     block: dict = {"water_geojson": geojson_name, "sha256": sha}
+    if dem_block:
+        block["dem"] = dem_block
     if cover:
         block["land_cover"] = {"source": landcover.SOURCE, "license": landcover.LICENSE,
                                "resolution_m": cover.get("resolution_m"),

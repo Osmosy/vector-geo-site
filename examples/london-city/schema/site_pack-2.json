@@ -120,8 +120,80 @@
       "title": "Confluence",
       "type": "object"
     },
+    "DemFile": {
+      "description": "D2: паспорт слоя рельефа. `kind` говорит, что это по природе, а не откуда скачано.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "dsm",
+            "dsm_smoothed",
+            "dtm"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution M"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        },
+        "vertical_datum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vertical Datum"
+        }
+      },
+      "required": [
+        "source",
+        "kind"
+      ],
+      "title": "DemFile",
+      "type": "object"
+    },
     "DragonVein": {
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "to_peak": {
           "anyOf": [
             {
@@ -174,6 +246,18 @@
     },
     "Exposure": {
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "enclosure_index": {
           "anyOf": [
             {
@@ -356,36 +440,43 @@
         "dem": {
           "anyOf": [
             {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/$defs/DemFile"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Dem"
+          "default": null
         },
         "dtm": {
           "anyOf": [
             {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/$defs/DemFile"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Dtm"
+          "default": null
         }
       },
       "title": "Files",
       "type": "object"
     },
     "FourSpirits": {
-      "description": "H4: стороны относительно оси участка, без имён школ.\n\nКто из них 玄武, 朱雀, 青龍 и 白虎 — решает навык по школе: в пакете только `back`,\n`front`, `left`, `right`, чтобы зеркальная интерпретация не требовала пересчёта данных.",
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "back": {
           "$ref": "#/$defs/Spirit"
         },
@@ -581,6 +672,18 @@
     },
     "PointMetrics": {
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "slope_deg": {
           "anyOf": [
             {
@@ -663,6 +766,23 @@
           "default": null,
           "title": "Dem Source"
         },
+        "dem_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "dsm",
+                "dsm_smoothed",
+                "dtm"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Kind"
+        },
         "dem_resolution_m": {
           "anyOf": [
             {
@@ -674,6 +794,23 @@
           ],
           "default": null,
           "title": "Dem Resolution M"
+        },
+        "dem_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Confidence"
         },
         "warnings": {
           "items": {
@@ -1295,6 +1432,18 @@
     },
     "WaterMouth": {
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "mountain": {
           "title": "Mountain",
           "type": "string"
@@ -1407,6 +1556,18 @@
     },
     "WaterObject": {
       "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
         "id": {
           "title": "Id",
           "type": "string"
