@@ -29,6 +29,45 @@ USER_AGENT = "vector-geo-site/0.1"
 # оставался без рельефа вовсе — при том что рядом лежит открытый SRTM того же разрешения.
 DEM_SOURCES = ("copernicus", "srtm")
 
+# D2: паспорт слоя. `kind` — природа данных, а не имя файла: и Copernicus, и SRTM — радарная
+# поверхность, то есть DSM, и «землёй без крыш» не являются (E-023). `vertical_datum` нужен,
+# потому что высоты GLO-30 и skadi посчитаны в разных системах.
+SOURCE_INFO: dict[str, dict] = {
+    "copernicus": {"kind": "dsm_smoothed", "resolution_m": 30.0,
+                   "license": "Copernicus DEM free licence",
+                   "vertical_datum": "EGM2008"},
+    "srtm": {"kind": "dsm_smoothed", "resolution_m": 30.0,
+             "license": "public domain (NASA/USGS), AWS Open Data",
+             "vertical_datum": "EGM96"},
+}
+
+# П7: уверенность поля, посчитанного по рельефу. Правило по `kind` и застройке, а не по имени
+# источника: любой DSM видит крыши и кроны, и в плотной застройке высота земли по нему завышена
+# на высоту зданий. DTM — земля, но GEDTM30 в городе и на побережье даёт не выше medium (D3).
+DSM_CITY_MEDIUM = 0.2      # с этой застройки DSM перестаёт быть надёжным
+DSM_CITY_LOW = 0.5         # здесь он врёт уже на высоту дома
+
+
+def relief_confidence(kind: str, built: float | None) -> str:
+    """П7: `high` / `medium` / `low` для поля, зависящего от рельефа."""
+    if kind == "dtm":
+        return "medium" if (built or 0.0) >= DSM_CITY_LOW else "high"
+    density = built or 0.0
+    if density >= DSM_CITY_LOW:
+        return "low"
+    if density >= DSM_CITY_MEDIUM:
+        return "medium"
+    return "high"
+
+
+def file_block(source: str, *, kind: str | None = None,
+               resolution_m: float | None = None) -> dict:
+    """Блок `files.dem`: источник, природа, разрешение, лицензия, система высот."""
+    info = SOURCE_INFO.get(source) or {}
+    return {"source": source, "kind": kind or info.get("kind") or "dsm_smoothed",
+            "resolution_m": resolution_m or info.get("resolution_m"),
+            "license": info.get("license"), "vertical_datum": info.get("vertical_datum")}
+
 
 @dataclass
 class DemGrid:

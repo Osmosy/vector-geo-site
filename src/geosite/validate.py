@@ -237,6 +237,7 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
                                   f"в пакете {got}, в коде {version} — пакет собран другим расчётом"))
 
     out.extend(_check_water_calibration(pack))
+    out.extend(_check_dem_layer(pack))
     return out
 
 
@@ -280,6 +281,43 @@ def _check_water_calibration(pack: dict) -> list[dict]:
     if total > 1.001:
         out.append(_violation("I-15", "land_cover",
                              f"сумма покрова по кольцу больше 1: {total:.3f}"))
+    return out
+
+
+def _check_dem_layer(pack: dict) -> list[dict]:
+    """D2 (I-10): поле, посчитанное по рельефу, обязано назвать слой, а не подразумевать его.
+
+    Раньше «рельеф» означал Copernicus DSM и это знал только автор. В пакете, где рельеф бывает
+    трёх видов (dsm, dsm_smoothed, dtm), поле без `dem_layer` невозможно пересчитать.
+    """
+    out: list[dict] = []
+    kind = (pack.get("quality") or {}).get("dem_kind")
+    if not kind:
+        return out
+    targets = {"point": pack.get("point"), "dragon_vein": pack.get("dragon_vein"),
+               "four_spirits": pack.get("four_spirits"), "exposure": pack.get("exposure")}
+    for name, block in targets.items():
+        if not isinstance(block, dict):
+            continue
+        if not block.get("dem_layer"):
+            out.append(_violation("I-10", f"{name}.dem_layer",
+                                  "поле по рельефу без dem_layer: слой не назван"))
+    for i, water in enumerate(pack.get("water") or []):
+        if water.get("flow_dem_dir") or water.get("dem_slope_m_per_km") is not None:
+            if not water.get("dem_layer"):
+                out.append(_violation("I-10", f"water[{i}].dem_layer",
+                                      "течение по рельефу без dem_layer", id=water.get("id")))
+        mouth = water.get("water_mouth")
+        if isinstance(mouth, dict) and mouth.get("closure_index") is not None \
+                and not mouth.get("dem_layer"):
+            out.append(_violation("I-10", f"water[{i}].water_mouth.dem_layer",
+                                  "врата без dem_layer", id=water.get("id")))
+    confidence = (pack.get("quality") or {}).get("dem_confidence")
+    if confidence in {"medium", "low"}:
+        spoken = any("П7" in str(w) for w in ((pack.get("quality") or {}).get("warnings") or []))
+        if not spoken:
+            out.append(_violation("I-10", "quality.dem_confidence",
+                                  f"уверенность рельефа {confidence} без предупреждения (П7)"))
     return out
 
 

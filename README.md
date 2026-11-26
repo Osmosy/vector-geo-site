@@ -147,6 +147,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 | Прямой участок у участка | радиус кривизны больше 5 км |
 | Слияния | пересечения разных водотоков и общие узлы OSM: расстояние, гора, тип; у реки одна запись, слияния собираются по всем её кускам |
 | Доля воды | по полигонам OSM аналитически в UTM (кольца 0.5–2 и 2–8 км), мелкие пруды отброшены; длина линейной воды — рядом (правило — [docs/calc/water_share.md](docs/calc/water_share.md)) |
+| Рельеф | `files.dem` с `kind` (`dsm_smoothed` сейчас, `dtm` в PR 7), `dem_layer` у каждого поля по рельефу, уверенность по П7 — [docs/calc/dem.md](docs/calc/dem.md) |
 | Калибровка | по клиньям: `water_share` (выбранное), `water_share_osm`, `water_share_wc`, уверенность и причина; допуски 1/3 п.п., правило выбора — [docs/calc/water_share.md](docs/calc/water_share.md) |
 | Покров | ESA WorldCover 10 м: `built`, `tree`, `open`, `water_wc` рядом с OSM-водой; калибровка — [docs/calc/landcover.md](docs/calc/landcover.md), таблица — [water_share_calibration.md](docs/calc/water_share_calibration.md) |
 | Порядок и расход | HydroRIVERS v1.0: `site.hydro` — главный участок в 2 км (порядок по Стралеру, средний расход, расстояние), у реки — `order`/`discharge_m3s` при совпадении геометрии (правило — [docs/calc/hydro.md](docs/calc/hydro.md)) |
@@ -203,7 +204,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 180 passed, сеть не нужна
+python -m pytest -q          # 194 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)

@@ -88,6 +88,7 @@ class Spirit(BaseModel):
 
 
 class FourSpirits(BaseModel):
+    dem_layer: str | None = None      # 砂: относительные высоты хранителей — по этому слою
     """H4: стороны относительно оси участка, без имён школ.
 
     Кто из них 玄武, 朱雀, 青龍 и 白虎 — решает навык по школе: в пакете только `back`,
@@ -100,7 +101,17 @@ class FourSpirits(BaseModel):
     left_vs_right: float
 
 
+class DemFile(BaseModel):
+    """D2: паспорт слоя рельефа. `kind` говорит, что это по природе, а не откуда скачано."""
+    source: str
+    kind: Literal["dsm", "dsm_smoothed", "dtm"]
+    resolution_m: float | None = None
+    license: str | None = None
+    vertical_datum: str | None = None
+
+
 class PointMetrics(BaseModel):
+    dem_layer: str | None = None      # 穴: уклон, аспект и подъём считаны по этому слою
     slope_deg: float | None = None
     aspect_deg: float | None = None
     shape: str | None = None
@@ -109,6 +120,7 @@ class PointMetrics(BaseModel):
 
 
 class DragonVein(BaseModel):
+    dem_layer: str | None = None      #  жила: подъём и перевалы считаны по этому слою
     to_peak: str | None = None
     length_km: float
     drop_m: float
@@ -126,6 +138,7 @@ class Confluence(BaseModel):
 
 
 class WaterMouth(BaseModel):
+    dem_layer: str | None = None      # врата: высоты склонов и замкнутость — по этому слою
     mountain: str
     closure_index: float | None = None
     closure_reason: str | None = None
@@ -139,6 +152,7 @@ class WaterMouth(BaseModel):
 
 
 class WaterObject(BaseModel):
+    dem_layer: str | None = None      # течение по рельефу: уклон русла снят с этого слоя
     id: str
     name: str | None = None
     pieces: int = 1
@@ -226,6 +240,7 @@ class SunBlock(BaseModel):
 
 
 class Exposure(BaseModel):
+    dem_layer: str | None = None      # видимость и замкнутость посчитаны по этому слою
     enclosure_index: float | None = None
     windy_mountains: list[str] = Field(default_factory=list)
     sky_view_factor: float | None = None
@@ -259,7 +274,10 @@ class LandCover(BaseModel):
 class Quality(BaseModel):
     dem: str
     dem_source: str | None = None      # copernicus | srtm: по числу источника видно, чем считали
+    dem_kind: Literal["dsm", "dsm_smoothed", "dtm"] | None = None
     dem_resolution_m: float | None = None
+    # П7: уверенность полей по рельефу — по природе слоя и застройке, не по имени источника
+    dem_confidence: Confidence | None = None
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     valid: bool | None = None
@@ -282,8 +300,8 @@ class Files(BaseModel):
     sha256: dict[str, str] = Field(default_factory=dict)
     # откуда взяты слои: недоступный источник должен быть виден, а не подразумеваться (G5)
     land_cover: dict | None = None
-    dem: dict | None = None
-    dtm: dict | None = None
+    dem: DemFile | None = None
+    dtm: DemFile | None = None
 
 
 class SitePack(BaseModel):

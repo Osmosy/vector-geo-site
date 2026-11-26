@@ -67,7 +67,8 @@ def test_pack_roundtrip(tmp_path):
     assert reloaded.schema_id == "site_pack/2"
     # H4: в пакете нейтральные имена, имена школ присваивает навык
     payload = json.loads((tmp_path / "site_pack.json").read_text())
-    assert set(payload["four_spirits"]) == {"back", "front", "left", "right", "left_vs_right"}
+    assert set(payload["four_spirits"]) == {"back", "front", "left", "right", "left_vs_right",
+                                           "dem_layer"}
     for old_name in ("tortoise", "bird", "dragon", "tiger", "dragon_vs_tiger"):
         assert old_name not in payload["four_spirits"], old_name
 
