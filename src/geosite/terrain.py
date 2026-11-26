@@ -13,7 +13,7 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
-ALGO_VERSION = "3.1.0"
+ALGO_VERSION = "3.2.0"
 
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
@@ -306,8 +306,15 @@ def measure_site(lat: float, lon: float, *, crs: int | str, resolution_m: float,
         "dem_resolution_m": getattr(macro, "resolution_m", None),
         "dem_attribution": getattr(macro, "attribution", ""),
     }
-    if facing_deg is not None:
+    if facing_deg is not None and z0 is not None:
         result["four_spirits"] = four_spirits(macro_s, frame_macro, z0, facing_deg, meso_km=meso_km)
+    # E-031: высота точки не измерена (пустота DEM в самой точке) — относительные высоты
+    # и жила считаются от чего-то, а не от нуля: `null` с причиной честнее выдуманного нуля
+    if z0 is None:
+        result["dragon_vein"] = None
+        result["terrain_notes"] = list(result.get("terrain_notes") or []) + [
+            "рельеф: высота точки не измерена (пустота DEM) — четыре духа и жила не считаются"]
+        return result
     vein = dragon_vein(macro_s, x0, y0, z0)
     result["dragon_vein"] = {
         "to_peak": None,

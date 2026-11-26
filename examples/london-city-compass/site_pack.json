@@ -25,7 +25,7 @@
   "grid_crs": "+proj=aeqd +lat_0=51.513800 +lon_0=-0.098400 +datum=WGS84 +units=m +no_defs",
   "grid_crs_kind": "aeqd",
   "grid_crs_reason": "zone_boundary",
-  "convergence_deg": 0.0
+  "sea_in_ring": false
  },
  "orientation": {
   "facing_true_deg": 180.0,
@@ -1660,17 +1660,17 @@
   "violations": []
  },
  "algo": {
-  "water": "8.3.0",
-  "terrain": "3.1.0",
+  "water": "8.4.0",
+  "terrain": "3.2.0",
   "geocode": "1.0.0",
   "geo": "1.0.0",
   "climate": "1.2.0",
   "sun": "1.0.0",
   "landcover": "1.0.0",
-  "calibrate": "1.0.0",
+  "calibrate": "1.1.0",
   "dtm": "1.0.0",
   "worldnames": "1.0.0",
-  "pack": "2.7.0"
+  "pack": "2.8.0"
  },
  "files": {
   "water_geojson": "water.geojson",

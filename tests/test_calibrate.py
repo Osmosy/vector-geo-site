@@ -99,7 +99,8 @@ def test_i15_shares_and_sum():
 
 def test_reasons_cover_tz_list():
     """Коды причин — закрытый список ТЗ: без выдуманных значений."""
+    # E-028 добавил один код: море в кольце — расхождение моделей данных, а не ошибка разметки
     assert set(calibrate.REASONS) == {"axis_line", "bridge", "dock_lock", "tidal_flat",
-                                      "stale_osm", "shadow"}
+                                      "stale_osm", "shadow", "sea_in_ring"}
     assert calibrate.explain("bridge") == "мост"
     assert calibrate.explain(None) is None

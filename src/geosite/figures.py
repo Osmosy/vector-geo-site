@@ -62,7 +62,7 @@ def rose24_svg(sectors: list[dict], site: dict, path: Path, *, size: int = 640) 
     """Роза 24 гор: длина луча — максимум превышения в кольце 2–8 км, подпись — гора."""
     cx = cy = size / 2
     radius = size * 0.36
-    max_elev = max([s["rings"][2]["max_rel_elev_m"] for s in sectors] + [1.0])
+    max_elev = max([s["rings"][2]["max_rel_elev_m"] or 0.0 for s in sectors] + [1.0])
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}">',
         f'<rect width="{size}" height="{size}" fill="#0f1720"/>',
@@ -75,11 +75,11 @@ def rose24_svg(sectors: list[dict], site: dict, path: Path, *, size: int = 640) 
         idx = geo.MOUNTAINS.index(s["mountain"])
         center = idx * 15.0
         ring = s["rings"][2]
-        length = max(4.0, ring["max_rel_elev_m"] / max_elev * radius)
+        length = max(4.0, (ring["max_rel_elev_m"] or 0.0) / max_elev * radius)
         a = math.radians(90.0 - center)
         x1, y1 = cx + length * math.cos(a), cy - length * math.sin(a)
-        color = "#4f8ff7" if ring["max_rel_elev_m"] > 5 else "#33465c"
-        if ring["horizon_deg"] > 1.0:
+        color = "#4f8ff7" if (ring["max_rel_elev_m"] or 0.0) > 5 else "#33465c"
+        if (ring["horizon_deg"] or 0.0) > 1.0:
             color = "#f7c948"
         parts.append(f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{x1:.1f}" y2="{y1:.1f}" stroke="{color}" stroke-width="6" stroke-linecap="round"/>')
         lx, ly = cx + (radius + 22) * math.cos(a), cy - (radius + 22) * math.sin(a)
@@ -99,13 +99,17 @@ def rose24_svg(sectors: list[dict], site: dict, path: Path, *, size: int = 640) 
 def horizon_svg(sectors: list[dict], path: Path, *, width: int = 900, height: int = 260) -> Path:
     """Профиль горизонта 360°: угол по кольцу 2–8 км."""
     pad = 40
-    max_h = max([s["rings"][2]["horizon_deg"] for s in sectors] + [0.5])
+    # E-029: пустое кольцо — `null`; профиль строится по измеренным, а пустые не рисуются
+    max_h = max([s["rings"][2]["horizon_deg"] or 0.0 for s in sectors] + [0.5]) or 0.5
     scale = (height - 2 * pad) / max_h
     pts = []
     for s in sectors:
         idx = geo.MOUNTAINS.index(s["mountain"])
         x = pad + (idx + 0.5) * (width - 2 * pad) / 24
-        y = height - pad - max(0.0, s["rings"][2]["horizon_deg"]) * scale
+        horizon = s["rings"][2]["horizon_deg"]
+        if horizon is None:            # не измерено — не рисуем: линия через ноль соврала бы
+            continue
+        y = height - pad - max(0.0, horizon) * scale
         pts.append(f"{x:.1f},{y:.1f}")
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',

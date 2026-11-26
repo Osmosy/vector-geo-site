@@ -27,7 +27,8 @@ class Query(BaseModel):
 class Site(BaseModel):
     lat: float
     lon: float
-    elev_m: float
+    # E-031: высота точки может быть не измерена (дыра DEM, точка в воде) — тогда null
+    elev_m: float | None = None
     precision: Precision
     utm_epsg: int
     boundary: str | None = None
@@ -39,20 +40,24 @@ class Site(BaseModel):
     grid_crs: str | None = None
     grid_crs_kind: Literal["utm", "aeqd"] | None = None
     grid_crs_reason: str | None = None
-    convergence_deg: float | None = None
+    convergence_deg: float | None = None      # только для UTM: в aeqd сходимости нет (null)
+    # E-028: море в кольце — OSM задаёт его береговой линией, снимок считает водой
+    sea_in_ring: bool | None = None
+    distance_to_coast_m: float | None = None
 
 
 class Orientation(BaseModel):
-    facing_true_deg: float
+    # E-029: ось может быть не определена (точка в воде, рельеф пуст) — тогда null и причина
+    facing_true_deg: float | None = None
     declination_deg: float | None = None
     declination_horizontal_nt: float | None = None
     declination_confidence: Confidence | None = None
     facing_mag_deg: float | None = None
-    facing_mountain: str
-    sitting_mountain: str
-    source: Literal["user_compass", "osm_building", "model"]
-    confidence: Confidence
-    near_boundary: bool = False
+    facing_mountain: str | None = None
+    sitting_mountain: str | None = None
+    source: Literal["user_compass", "osm_building", "model", "none"]
+    confidence: Literal["high", "medium", "low", "none"]
+    near_boundary: bool | None = False
 
 
 class ChartYear(BaseModel):
@@ -91,7 +96,7 @@ class Sector(BaseModel):
     water_share_wc: float | None = None
     water_share_confidence: Literal["high", "medium", "low"] | None = None
     water_share_reason: Literal["axis_line", "bridge", "dock_lock", "tidal_flat",
-                                "stale_osm", "shadow"] | None = None
+                                "stale_osm", "shadow", "sea_in_ring"] | None = None
 
 
 class Spirit(BaseModel):
@@ -225,6 +230,7 @@ class WaterObject(BaseModel):
     dem_reason: str | None = None
     tidal_source: str | None = None
     source: str | None = None
+    tidal_reason: str | None = None   # почему tidal именно такой: берег в N м, граница прилива
 
 
 class SunNoon(BaseModel):

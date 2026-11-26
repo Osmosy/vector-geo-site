@@ -35,13 +35,25 @@ def _resolve(text: str):
         raise SystemExit(2)
 
 
-def _model_facing(measured: dict) -> tuple[float, str]:
-    """Ось по модели: спина к главной возвышенности мезо-охвата, фасад — в противоположную сторону."""
+def _model_facing(measured: dict) -> tuple[float | None, str]:
+    """Ось по модели: спина к главной возвышенности мезо-охвата, фасад — в противоположную сторону.
+
+    E-029: пустые кольца (точка в воде, вне покрытия DEM) отдают `null`, а не ноль — сравнивать
+    `None` с `None` нельзя. Если возвышенности не измерить, ось остаётся `null` с причиной,
+    а не «спиной на север» по умолчанию.
+    """
     sectors = measured["sectors"]
-    best = max(sectors, key=lambda s: s["rings"][2]["max_rel_elev_m"])
+    seen = [s for s in sectors if isinstance((s["rings"][2] or {}).get("max_rel_elev_m"), (int, float))]
+    if not seen:
+        empty = sum(1 for s in sectors if (s["rings"][2] or {}).get("void_share") == 1.0)
+        why = ("рельеф в кольце 2–8 км пуст: точка в воде или вне покрытия DEM"
+               if empty else "рельеф в кольце 2–8 км не измерен")
+        return None, f"модель: ось не определена — {why}"
+    best = max(seen, key=lambda s: s["rings"][2]["max_rel_elev_m"])
     idx = geo.MOUNTAINS.index(best["mountain"])
     behind = idx * 15.0
-    return geo.normalize_deg(behind + 180.0), f"модель: спина к {best['mountain']} ({best['rings'][2]['max_rel_elev_m']} м)"
+    return (geo.normalize_deg(behind + 180.0),
+            f"модель: спина к {best['mountain']} ({best['rings'][2]['max_rel_elev_m']} м)")
 
 
 def _chart_year(year: int | None) -> dict:
@@ -205,6 +217,16 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
         except Exception as exc:
             result.setdefault("water_warnings", []).append(f"берег: {exc}")
     result["coast_seen"] = coast_payload is not None
+    # E-028: берег в пределах кольца 0–2 км — значит в кольце море, и снимок посчитает его водой
+    coast_m = water.nearest_coast_m(coast_payload, r.lat, r.lon)
+    result["coast_distance_m"] = None if coast_m is None else round(coast_m, 1)
+    result["sea_in_ring"] = bool(coast_m is not None and coast_m <= 2000.0)
+    if result["sea_in_ring"]:
+        result.setdefault("water_warnings", []).append(
+            "море в кольце (берег в %d м): в OSM море задано береговой линией, в снимке — "
+            "классом воды; доля воды считается по пресной воде OSM, расхождение с WorldCover "
+            "помечено кодом sea_in_ring, а не «устаревшим OSM» (E-028)"
+            % round(coast_m))
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
                                   radius_m=8000, payload=payload, wide_payload=wide_payload,
@@ -290,9 +312,13 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
         # здесь размечен не полностью, и это факт о данных, а не о местности. Тогда в пакет
         # добавляются реки HydroRIVERS с явным `source: hydrorivers`.
         osm_share = (result.get("land_cover") or {}).get("water")
+        m_elev = result.get("elev_m")
         wc_share = share.get("water_wc")
+        # точка в воде (высоты нет или она ниже уровня моря): OSM «не видит» не воду участка,
+        # а океан вокруг — разреженной разметки тут нет, и HydroRIVERS не при чём
+        dry = isinstance(m_elev, (int, float)) and m_elev > -100.0
         if (osm_share is not None and wc_share is not None and wc_share >= 0.01
-                and osm_share < 0.5 * wc_share):
+                and osm_share < 0.5 * wc_share and not result.get("sea_in_ring") and dry):
             result["partial_osm"] = True
             try:
                 reaches = hydro.reaches_within(r.lat, r.lon, max_km=8.0, with_geometry=True)
@@ -331,7 +357,8 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
             reason = calibrate.reason_for(osm_share, wc_share,
                                           linear_km=linear.get(mountain),
                                           tidal=tidal_in_ring,
-                                          built_share=share.get("built"))
+                                          built_share=share.get("built"),
+                                          sea=bool(result.get("sea_in_ring")))
             calibration[mountain] = {
                 "water_share": calibrate.choose(osm_share, wc_share, reason=reason),
                 "water_share_osm": round(osm_share, 4),
@@ -386,11 +413,21 @@ def cmd_pack(args) -> int:
     notes = list(m.get("water_notes") or [])
     if facing is None:
         facing, why = _model_facing(m)
-        orientation_source, confidence = "model", "low"
+        orientation_source, confidence = ("model", "low") if facing is not None else ("none", "none")
         notes.append(why)
+        if facing is not None and m.get("elev_m") is None:
+            warnings.append("четыре духа не посчитаны: высота точки не измерена (пустота DEM) — "
+                            "относительные высоты сторон считать не от чего")
+        if facing is None:
+            warnings.append("ориентация не определена: " + why.replace("модель: ", "") + " (E-029)")
         # ось получена по модели — четыре духа надо посчитать от неё же,
         # иначе в пакете не окажется сравнения «спина / фасад» (R3)
-        if not m.get("four_spirits") and m.get("grid_macro") is not None:
+        # E-029: без оси четыре стороны не считаются — строить их от «севера по умолчанию»
+        # значит выдать выдумку за измерение
+        # E-029/E-031: без высоты точки (пустота DEM) относительные высоты не считаются —
+        # «спина на X м» при неизвестной высоте участка было бы числом из воздуха
+        if (facing is not None and m.get("elev_m") is not None
+                and not m.get("four_spirits") and m.get("grid_macro") is not None):
             from .terrain import four_spirits
             m["four_spirits"] = four_spirits(m["grid_macro"], m["frame"], m["elev_m"],
                                              facing, meso_km=8.0)
@@ -450,6 +487,12 @@ def cmd_pack(args) -> int:
                         f"{dem_layer}, застройка в кольце "
                         f"{'—' if built_share is None else format(built_share, '.0%')}; "
                         "высоты земли в городе по DSM завышены на высоту зданий")
+    elev = m.get("elev_m")
+    if elev is not None and elev < -100.0:
+        warnings.append(
+            "точка ниже уровня моря на %.0f м — рельеф может быть дном водоёма, а не землёй; "
+            "высоты и уклоны в этом кольце читать как «дно», не как «берег»" % abs(elev))
+        dem_conf = "low"
     if r.precision in {"district", "settlement"}:
         warnings.append("точка — историческое ядро/центр по геокодеру, не контур здания")
 
@@ -481,17 +524,20 @@ def cmd_pack(args) -> int:
     except Exception as exc:                       # солнце не должно ронять пакет
         warnings.append(f"солнце не рассчитано: {exc}")
 
+    if facing is None:
+        confidence = "none"
     orientation = {
-        "facing_true_deg": round(facing, 1),
+        "facing_true_deg": None if facing is None else round(facing, 1),
         "declination_deg": None if decl is None else decl["deg"],
         "declination_horizontal_nt": None if decl is None else decl.get("horizontal_nt"),
         "declination_confidence": None if decl is None else decl.get("confidence"),
-        "facing_mag_deg": None if decl is None else climate.magnetic_bearing(facing, decl["deg"]),
-        "facing_mountain": geo.mountain_name(facing),
-        "sitting_mountain": geo.mountain_name(facing + 180.0),
+        "facing_mag_deg": None if (decl is None or facing is None)
+                          else climate.magnetic_bearing(facing, decl["deg"]),
+        "facing_mountain": None if facing is None else geo.mountain_name(facing),
+        "sitting_mountain": None if facing is None else geo.mountain_name(facing + 180.0),
         "source": orientation_source,
         "confidence": confidence,
-        "near_boundary": geo.near_boundary(facing),
+        "near_boundary": None if facing is None else geo.near_boundary(facing),
     }
     site = {"lat": round(r.lat, 5), "lon": round(r.lon, 5), "elev_m": m["elev_m"],
             "precision": r.precision, "utm_epsg": geo.utm_epsg(r.lat, r.lon),
@@ -503,8 +549,16 @@ def cmd_pack(args) -> int:
             "grid_crs": (m.get("grid_choice") or {}).get("crs"),
             "grid_crs_kind": (m.get("grid_choice") or {}).get("kind"),
             "grid_crs_reason": (m.get("grid_choice") or {}).get("reason"),
-            "convergence_deg": round(geo.convergence_deg(
-                r.lat, r.lon, (m.get("grid_choice") or {}).get("crs") or geo.utm_epsg(r.lat, r.lon)), 3)}
+            # сходимость меридианов есть только у UTM: в aeqd сетка азимутальная, и ноль
+            # здесь означал бы «поправка не нужна», а не «поправки нет по построению» (G2)
+            "convergence_deg": (None if (m.get("grid_choice") or {}).get("kind") == "aeqd" else
+                                round(geo.convergence_deg(
+                                    r.lat, r.lon,
+                                    (m.get("grid_choice") or {}).get("crs")
+                                    or geo.utm_epsg(r.lat, r.lon)), 3)),
+            # E-028: море в кольце и расстояние до берега — факты, которых не было
+            "sea_in_ring": m.get("sea_in_ring"),
+            "distance_to_coast_m": m.get("coast_distance_m")}
     out_dir = Path(args.out or f"site-{abs(r.lat):.3f}-{abs(r.lon):.3f}")
     dem_source = m.get("dem_source") or "copernicus"
     dem_label = m.get("dem_label") or "Copernicus DEM GLO-30 (DSM)"

@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides, worldnames
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.3.0"
+ALGO_VERSION = "8.4.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -309,6 +309,19 @@ def coast_lines(payload: dict | None) -> list[list[tuple[float, float]]]:
     return out
 
 
+def nearest_coast_m(payload: dict | None, lat: float, lon: float) -> float | None:
+    """Ближайшее расстояние до береговой линии в метрах; `None` — берега не видели.
+
+    Нужно не для воды, а для пакета: у прибрежного участка море задано в OSM береговой линией,
+    а снимок считает его водой (E-028). Без этого числа 42 % моря в Рио попадают в расхождение
+    «устаревший OSM» и в замену OSM снимком.
+    """
+    coast = coast_lines(payload)
+    if not coast:
+        return None
+    return _coast_distance_m(coast, [(lon, lat)])
+
+
 def _coast_distance_m(coast: list[list[tuple[float, float]]],
                       points: list[tuple[float, float]]) -> float | None:
     """Ближайшее расстояние от воды до берега: точки в градусах (lon, lat)."""
@@ -322,14 +335,33 @@ def _coast_distance_m(coast: list[list[tuple[float, float]]],
     return best
 
 
-RELATION_KINDS = "^(river|stream|canal)$"
-RELATION_ROLES = {"", "main_stream", "side_stream", "waterway"}
+RELATION_KINDS = "^(river|stream|canal|riverbank)$"
+# E-027: у площади воды члены отношения помечены `outer` / `inner`; без них мультиполигон
+# (Нил, озеро, залив) не собирался вовсе, даже когда геометрия приходила
+RELATION_ROLES = {"", "main_stream", "side_stream", "waterway", "outer", "inner", "part"}
 
 
 def _relation_query(lat: float, lon: float, radius_m: int) -> str:
+    """Отношения с водой в круге — по площади, а не по имени (E-027).
+
+    Раньше здесь были только `waterway=river|stream|canal` **с именем**. В мире это неверно:
+    Нил в Каире — анонимное отношение `natural=water` + `water=river`, залив Виктории в Гонконге
+    и бухта Гуанабара в Рио заданы береговой линией и частью полигонами без имён. Проверка живьём
+    дала долю воды по OSM 0.0 % в Каире при 11 % по снимку — и причина была не в разметке,
+    а в запросе.
+
+    Теперь три вида отношений (площадь воды, старый тег русла, водохранилище) без требования имени.
+    """
     r = int(radius_m)
-    return ("[out:json][timeout:120];"
-            f'rel(around:{r},{lat},{lon})["waterway"~"{RELATION_KINDS}"]["name"];out body;')
+    around = f"around:{r},{lat},{lon}"
+    # E-027: три условия объединяются скобками. Без объединения Overpass выполняет их
+    # последовательно, и `out` отдаёт только последний набор: у Каира последнее условие
+    # (водохранилища) пусто, и ответ приходил пустым при десяти отношениях воды вокруг.
+    return ("[out:json][timeout:180];("
+            f'rel({around})["natural"="water"];'
+            f'rel({around})["waterway"~"{RELATION_KINDS}"];'
+            f'rel({around})["landuse"~"^(reservoir|basin)$"];'
+            ");out body;")
 
 
 def _ways_query(ids: list[int]) -> str:
@@ -352,17 +384,22 @@ def _near_site(coords: list[dict], lat: float, lon: float, limit_m: float) -> bo
 
 
 def relation_ways(lat: float, lon: float, radius_m: int = 8000, *, allow_network: bool = True,
-                  retries: int = 3, max_relations: int = 8, max_ways: int = 600,
+                  retries: int = 3, max_relations: int = 24, max_ways: int = 600,
                   batch: int = 40, keep_factor: float = 2.5) -> list[dict]:
-    """Куски рек из отношений OSM — с именем отношения как запасным именем куска.
+    """Геометрия отношений OSM, собранная обратно в отношения.
 
-    Отношение `waterway=river` описывает реку целиком: его члены стыкуются узлами, поэтому
-    устье притока не теряется. Геометрия тянется пачками по `batch` ways — `out geom` по
-    отношению целиком отдаёт 0.5–3 МБ и валит перегруженное зеркало в 502.
-    Куски дальше `keep_factor * radius` от участка выбрасываются: они не нужны ни метрикам,
-    ни слияниям, а память и склейка на 3000 км стоят секунд.
+    Отношение описывает объект целиком: река (`waterway=river`) стыкуется узлами, площадь воды
+    (`natural=water`) состоит из `outer` и `inner`. `out body` отдаёт членов без геометрии,
+    поэтому геометрия тянется пачками по ways (`out geom` по отношению целиком — 0.5–3 МБ
+    и 502 от перегруженного зеркала).
+
+    E-027: куски собираются обратно в **отношение** с ролями `outer`/`inner`, а не отдаются
+    как отдельные ways. Иначе мультиполигон терял дыры, а озеро из десяти незамкнутых кусков
+    не давало площади вовсе. Члены дальше `keep_factor * radius` выбрасываются.
     """
-    path = _cache_path(lat, lon, radius_m, kind="relations")
+    # ключ кеша с версией: запрос и форма ответа изменились (E-027), старый кеш отвечал бы
+    # нулевой водой по Нилу, Гонконгу и Рио ещё месяц
+    path = _cache_path(lat, lon, radius_m, kind="relations-v3")
     if path.exists():
         return json.loads(path.read_text()).get("elements", [])
     if not allow_network or os.environ.get("GEOSITE_OFFLINE") == "1":
@@ -371,53 +408,62 @@ def relation_ways(lat: float, lon: float, radius_m: int = 8000, *, allow_network
     try:
         rel = _ask(_relation_query(lat, lon, radius_m), retries=retries)
         relations: list[tuple[int, list[int]]] = []        # (rel_id, его ways)
-        rel_name: dict[int, str] = {}
+        rel_tags: dict[int, dict] = {}
+        rel_role: dict[int, str] = {}                      # way -> outer / inner / ""
         rel_of: dict[int, int] = {}
         for el in rel.get("elements", [])[:max_relations]:
-            name = _name_of(el.get("tags") or {})
-            if not name:
-                continue
+            # E-027: имя не обязательно. Нил в Каире — анонимное отношение `natural=water`;
+            # требование имени и было причиной нулевой доли воды при 11 % по снимку.
+            tags = dict(el.get("tags") or {})
+            rel_id = int(el.get("id") or 0)
             ways: list[int] = []
             for member in el.get("members", []):
                 if member.get("type") != "way" or (member.get("role") or "") not in RELATION_ROLES:
                     continue
                 ref = int(member.get("ref") or 0)
-                if not ref or ref in rel_name:
+                if not ref or ref in rel_of:
                     continue
-                rel_name[ref] = name
-                rel_of[ref] = int(el.get("id") or 0)
+                rel_of[ref] = rel_id
+                rel_role[ref] = member.get("role") or ""
                 ways.append(ref)
                 if len(ways) >= max_ways:
                     break
             if ways:
-                relations.append((int(el.get("id") or 0), ways))
+                rel_tags[rel_id] = tags
+                relations.append((rel_id, ways))
         if not relations:
             return []
 
         keep_m = keep_factor * float(radius_m)
-        out: list[dict] = []
+        geom_of: dict[int, list[dict]] = {}
         try:
             payload = _ask(_relations_ways_query([rel_id for rel_id, _ in relations]), retries=retries)
+            for el in payload.get("elements", []):
+                geom_of[int(el.get("id") or 0)] = el.get("geometry") or []
         except Exception:
-            payload = {"elements": []}
             for rel_id, ways in relations:
                 for start in range(0, len(ways), batch):
-                    payload["elements"].extend(
-                        _ask(_ways_query(ways[start:start + batch]), retries=retries).get("elements", []))
-        for el in payload.get("elements", []):
-            geometry = el.get("geometry") or []
-            if len(geometry) < 2 or not _near_site(geometry, lat, lon, keep_m):
-                continue
-            tags = dict(el.get("tags") or {})
-            tags.setdefault("name", rel_name.get(int(el.get("id") or 0), ""))
-            tags["_rel"] = str(rel_of.get(int(el.get("id") or 0), ""))
-            out.append({"type": "way", "id": el.get("id"), "tags": tags,
-                        "geometry": geometry})
+                    for el in _ask(_ways_query(ways[start:start + batch]),
+                                   retries=retries).get("elements", []):
+                        geom_of[int(el.get("id") or 0)] = el.get("geometry") or []
+
+        out: list[dict] = []
+        for rel_id, ways in relations:
+            members: list[dict] = []
+            for ref in ways:
+                geometry = geom_of.get(ref) or []
+                if len(geometry) < 2 or not _near_site(geometry, lat, lon, keep_m):
+                    continue
+                members.append({"type": "way", "ref": ref, "role": rel_role.get(ref, ""),
+                                "geometry": geometry})
+            if members:
+                out.append({"type": "relation", "id": rel_id, "tags": rel_tags.get(rel_id, {}),
+                            "members": members})
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"elements": out}))
         return out
     except Exception:
-        # без отношений вода всё равно измеряется, просто устье притока может не найтись
+        # без отношений вода всё равно измеряется, просто площадь и устье могут не найтись
         return []
 
 
