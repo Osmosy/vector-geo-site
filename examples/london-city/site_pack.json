@@ -23,7 +23,7 @@
  },
  "orientation": {
   "facing_true_deg": 135.0,
-  "declination_deg": 1.239,
+  "declination_deg": 1.24,
   "facing_mag_deg": 133.8,
   "facing_mountain": "巽",
   "sitting_mountain": "乾",
@@ -1403,8 +1403,8 @@
   "water": "7.4.0",
   "terrain": "2.1.0",
   "geocode": "1.0.0",
-  "pack": "1.9.0",
-  "climate": "1.0.0"
+  "climate": "1.0.0",
+  "pack": "1.7.0"
  },
  "files": {
   "water_geojson": "water.geojson",

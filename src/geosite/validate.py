@@ -33,6 +33,15 @@ CODES = {
 
 MIN_ELEV, MAX_ELEV = -430.0, 8850.0
 
+# P0 (I-11): версии модулей, с которыми сверяется пакет.
+from . import climate as _climate, geocode as _geocode, terrain as _terrain, water as _water
+CODE_VERSIONS = {
+    "water": _water.ALGO_VERSION,
+    "terrain": _terrain.ALGO_VERSION,
+    "geocode": _geocode.ALGO_VERSION,
+    "climate": _climate.ALGO_VERSION,
+}
+
 # I-10: поля с эвристикой обязаны нести парную уверенность. Список пополняется на каждом этапе.
 CONFIDENCE_PAIRS = {
     "flow_chosen": "flow_confidence",
@@ -210,6 +219,13 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
     for module in ("water", "terrain"):
         if (pack.get("water") or pack.get("sectors")) and not algo.get(module):
             out.append(_violation("I-11", f"algo.{module}", "версия модуля не записана"))
+    # P0: версия в пакете обязана совпадать с версией кода, иначе пакет собран старым расчётом.
+    # Сравниваем только то, что пакет записал: у пакетов до 1.7.0 нет climate и geocode.
+    for module, version in CODE_VERSIONS.items():
+        got = algo.get(module)
+        if got and got != version:
+            out.append(_violation("I-11", f"algo.{module}",
+                                  f"в пакете {got}, в коде {version} — пакет собран другим расчётом"))
 
     return out
 
