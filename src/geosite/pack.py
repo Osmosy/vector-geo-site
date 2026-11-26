@@ -7,11 +7,11 @@ from pathlib import Path
 
 import hashlib
 
-from . import climate, figures, geo, geocode, landcover, sun, terrain, water
+from . import calibrate, climate, figures, geo, geocode, landcover, sun, terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.2.0"      # версия сборки пакета
+ALGO_VERSION = "2.3.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -22,6 +22,7 @@ ALGO = {
     "climate": climate.ALGO_VERSION,
     "sun": sun.ALGO_VERSION,
     "landcover": landcover.ALGO_VERSION,
+    "calibrate": calibrate.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -191,7 +192,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                         "to_deg": geo.mountain_bounds(s["mountain"])[1], "rings": rings,
                         "water": (measured.get("water_names") or {}).get(s["mountain"], []),
                         "water_km": _km(s["mountain"]),
-                        "wind_share": wind_share})
+                        "wind_share": wind_share,
+                        **_calibration(measured, s["mountain"])})
 
     # Схемы: роза, профиль горизонта, отмывка макро-охвата
     label = site_label or query.get("input", "")
@@ -248,6 +250,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         roads=measured.get("roads", []),
         exposure=exposure or None,
         land_cover=measured.get("land_cover"),
+        water_share_rule=calibrate.RULE if measured.get("water_calibration") else None,
         quality={"dem": dem_label, "dem_source": dem_source, "dem_resolution_m": dem_resolution_m,
                  "warnings": warnings, "notes": notes},
         summary=summary,
@@ -277,9 +280,17 @@ WORLDCOVER_ATTRIBUTION = ("ESA WorldCover 2021 / Contains modified Copernicus Se
                           "(2021) processed by ESA WorldCover consortium (CC BY 4.0)")
 
 
-def _attribution(cover: dict | None) -> str:
-    """Строка атрибуции пакета: WorldCover добавляется только если слой действительно считан."""
-    return ATTRIBUTION if not cover else ATTRIBUTION + " · " + WORLDCOVER_ATTRIBUTION
+def _attribution(cover: dict | None) -> list[str]:
+    """Строки атрибуции: WorldCover добавляется, только если слой действительно считан."""
+    return ATTRIBUTION if not cover else list(ATTRIBUTION) + [WORLDCOVER_ATTRIBUTION]
+
+
+def _calibration(measured: dict, mountain: str) -> dict:
+    """W4: оба значения доли воды, выбранное и цена выбора — на уровне клина."""
+    data = (measured.get("water_calibration") or {}).get(mountain) or {}
+    return {key: data.get(key) for key in
+            ("water_share", "water_share_osm", "water_share_wc",
+             "water_share_confidence", "water_share_reason")}
 
 
 def _files_block(geojson_name: str, sha: str, cover: dict | None) -> dict:

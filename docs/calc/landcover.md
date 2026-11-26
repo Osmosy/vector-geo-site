@@ -41,6 +41,10 @@
 | `source` | `ESA WorldCover 2021 v200` |
 | `ring_km` | `[0.5, 2.0]` |
 
+По клиньям того же кольца W3/W4 пишут в сектора `water_share_osm`, `water_share_wc`,
+`water_share` (выбранное), `water_share_confidence`, `water_share_reason`; правило выбора —
+в `water_share_rule` и в [water_share.md](water_share.md#калибровка-с-worldcover-w3-w4).
+
 `files.land_cover` — источник, лицензия, разрешение, тайл, признак `cached`.
 `attribution` — строка ESA добавляется только если слой действительно считан.
 

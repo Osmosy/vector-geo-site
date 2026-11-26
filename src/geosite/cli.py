@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import climate, geo, hydro, landcover, sun, terrain, water, water_pack
+from . import calibrate, climate, geo, hydro, landcover, sun, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -208,10 +208,11 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
                                   offline=bool(getattr(args, "offline", False)))
     except Exception as exc:                      # слой не должен ронять пакет
         cover = None
-        warnings.append(f"worldcover: слой не прочитан ({exc})")
+        result.setdefault("water_warnings", []).append(f"worldcover: слой не прочитан ({exc})")
     if cover is None:
-        warnings.append("worldcover: слоя покрова нет — land_cover кроме воды пуст, "
-                        "двери расхождения OSM и снимков не проверены")
+        result.setdefault("water_warnings", []).append(
+            "worldcover: слоя покрова нет — land_cover кроме воды пуст, "
+            "расхождение OSM и снимков не проверено")
     else:
         share = result.get("land_cover") or {}
         share.update({"built": cover["groups"]["built"], "tree": cover["groups"]["tree"],
@@ -222,6 +223,49 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
         result["land_cover_layer"] = {"tile": cover["tile"], "cached": cover["cached"],
                                       "resolution_m": cover["resolution_m"],
                                       "license": cover["license"]}
+
+        # W3/W4: калибровка по клиньям кольца 0.5–2 км — оба значения, выбор и причина
+        osm_inner = (result.get("water_share") or {}).get("inner") or {}
+        wc_inner = (cover["rings"].get("0.5-2") or {})
+        osm_total = share.get("water") or 0.0
+        wc_total = share.get("water_wc") or 0.0
+        ring_diff = float(osm_total) - float(wc_total)
+        # Приливность — свойство реки, а не клина: русло может лежать в одном секторе, а его
+        # поверхность и осушка — в трёх. Берём кольцо целиком, вместе с берегами приливных рек.
+        water_objs = result.get("water") or []
+        tidal_rivers = {getattr(w, "id", None) for w in water_objs
+                        if getattr(w, "tidal", None) is True}
+        tidal_in_ring = bool(tidal_rivers) or any(
+            getattr(w, "riverbank_of", None) in tidal_rivers for w in water_objs)
+        linear = osm_inner.get("linear_km") or {}
+        calibration = {}
+        for mountain in geo.MOUNTAINS:
+            osm_share = float((osm_inner.get("by_mountain") or {}).get(mountain) or 0.0)
+            wc_share = float((wc_inner.get("by_mountain") or {}).get(mountain) or 0.0)
+            reason = calibrate.reason_for(osm_share, wc_share,
+                                          linear_km=linear.get(mountain),
+                                          tidal=tidal_in_ring,
+                                          built_share=share.get("built"))
+            calibration[mountain] = {
+                "water_share": calibrate.choose(osm_share, wc_share, reason=reason),
+                "water_share_osm": round(osm_share, 4),
+                "water_share_wc": round(wc_share, 4),
+                "water_share_confidence": calibrate.confidence_for(
+                    osm_share, wc_share, ring_diff=ring_diff, reason=reason),
+                "water_share_reason": reason,
+            }
+        result["water_calibration"] = calibration
+        low = [m for m, c in calibration.items() if c["water_share_reason"]]
+        if low:
+            codes = sorted({calibration[m]["water_share_reason"] for m in low})
+            result.setdefault("water_warnings", []).append(
+                "water_share: расхождение OSM и WorldCover выше допуска в %d клин(ах) из 24 (%s); "
+                "причина записана, уверенность low"
+                % (len(low), ", ".join(calibrate.explain(c) for c in codes)))
+        if any(c["water_share"] != c["water_share_osm"] for c in calibration.values()):
+            result.setdefault("water_notes", []).append(
+                "water_share: в части клиньев выбрано значение по снимкам — OSM воды там не видит "
+                "(осевая линия); правило: " + calibrate.RULE)
 
     # П6/П4: расхождения источников и низкая уверенность должны звучать в warnings
     conflicts = [m for m in metrics if m.flow_rule == 4]
@@ -252,7 +296,8 @@ def cmd_pack(args) -> int:
     r = _resolve(args.place)
     m = _measure(args, r, osm_payload=_load_osm_file(getattr(args, "osm_file", None)))
     facing = args.facing
-    warnings, notes = [], []
+    warnings = list(m.get("water_warnings") or [])
+    notes = list(m.get("water_notes") or [])
     if facing is None:
         facing, why = _model_facing(m)
         orientation_source, confidence = "model", "low"

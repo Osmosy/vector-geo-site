@@ -71,6 +71,13 @@ class Sector(BaseModel):
     water: list[str] = Field(default_factory=list)
     water_km: float | None = None
     wind_share: float | None = None
+    # W4: доля воды в клине кольца 0.5–2 км по двум источникам, выбранное значение и его цена
+    water_share: float | None = None
+    water_share_osm: float | None = None
+    water_share_wc: float | None = None
+    water_share_confidence: Literal["high", "medium", "low"] | None = None
+    water_share_reason: Literal["axis_line", "bridge", "dock_lock", "tidal_flat",
+                                "stale_osm", "shadow"] | None = None
 
 
 class Spirit(BaseModel):
@@ -294,6 +301,7 @@ class SitePack(BaseModel):
     sun: SunBlock | None = None
     exposure: Exposure | None = None
     land_cover: LandCover | None = None
+    water_share_rule: str | None = None
     quality: Quality
     algo: Algo = Field(default_factory=Algo)
     files: Files = Field(default_factory=Files)

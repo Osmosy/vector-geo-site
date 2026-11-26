@@ -88,7 +88,11 @@
     "City Road Basin",
     "Wenlock Basin"
    ],
-   "wind_share": 0.021
+   "wind_share": 0.021,
+   "water_share": 0.0167,
+   "water_share_osm": 0.0167,
+   "water_share_wc": 0.0107,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "癸",
@@ -139,7 +143,11 @@
    "water": [
     "Barbican Lake"
    ],
-   "wind_share": 0.032
+   "wind_share": 0.032,
+   "water_share": 0.0044,
+   "water_share_osm": 0.0044,
+   "water_share_wc": 0.0001,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "丑",
@@ -187,7 +195,11 @@
      "water_share": null
     }
    ],
-   "wind_share": 0.032
+   "wind_share": 0.032,
+   "water_share": 0.0143,
+   "water_share_osm": 0.0143,
+   "water_share_wc": 0.0031,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "艮",
@@ -238,7 +250,11 @@
    "water": [
     "Waterfall"
    ],
-   "wind_share": 0.038
+   "wind_share": 0.038,
+   "water_share": 0.0003,
+   "water_share_osm": 0.0003,
+   "water_share_wc": 0.0025,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "寅",
@@ -287,7 +303,11 @@
     }
    ],
    "water_km": 0.678,
-   "wind_share": 0.039
+   "wind_share": 0.039,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0031,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "甲",
@@ -336,7 +356,11 @@
     }
    ],
    "water_km": 0.343,
-   "wind_share": 0.045
+   "wind_share": 0.045,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0087,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "卯",
@@ -385,7 +409,11 @@
     }
    ],
    "water_km": 0.208,
-   "wind_share": 0.029
+   "wind_share": 0.029,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0025,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "乙",
@@ -440,7 +468,11 @@
     "Central Basin"
    ],
    "water_km": 0.38,
-   "wind_share": 0.016
+   "wind_share": 0.016,
+   "water_share": 0.0355,
+   "water_share_osm": 0.0355,
+   "water_share_wc": 0.0097,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "辰",
@@ -494,7 +526,12 @@
     "Tower Dock"
    ],
    "water_km": 1.264,
-   "wind_share": 0.015
+   "wind_share": 0.015,
+   "water_share": 0.4918,
+   "water_share_osm": 0.4918,
+   "water_share_wc": 0.3912,
+   "water_share_confidence": "low",
+   "water_share_reason": "tidal_flat"
   },
   {
    "mountain": "巽",
@@ -543,7 +580,11 @@
     }
    ],
    "water_km": 0.619,
-   "wind_share": 0.017
+   "wind_share": 0.017,
+   "water_share": 0.1811,
+   "water_share_osm": 0.1811,
+   "water_share_wc": 0.1871,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "巳",
@@ -595,7 +636,11 @@
     "Queenhithe"
    ],
    "water_km": 0.252,
-   "wind_share": 0.014
+   "wind_share": 0.014,
+   "water_share": 0.0925,
+   "water_share_osm": 0.0925,
+   "water_share_wc": 0.0902,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "丙",
@@ -644,7 +689,11 @@
     }
    ],
    "water_km": 0.08,
-   "wind_share": 0.024
+   "wind_share": 0.024,
+   "water_share": 0.0358,
+   "water_share_osm": 0.0358,
+   "water_share_wc": 0.046,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "午",
@@ -695,7 +744,11 @@
    "water": [
     "River Thames"
    ],
-   "wind_share": 0.037
+   "wind_share": 0.037,
+   "water_share": 0.0273,
+   "water_share_osm": 0.0273,
+   "water_share_wc": 0.0327,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "丁",
@@ -743,7 +796,11 @@
      "water_share": null
     }
    ],
-   "wind_share": 0.057
+   "wind_share": 0.057,
+   "water_share": 0.0319,
+   "water_share_osm": 0.0319,
+   "water_share_wc": 0.041,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "未",
@@ -792,7 +849,11 @@
     }
    ],
    "water_km": 0.141,
-   "wind_share": 0.085
+   "wind_share": 0.085,
+   "water_share": 0.0589,
+   "water_share_osm": 0.0589,
+   "water_share_wc": 0.0383,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "坤",
@@ -841,7 +902,12 @@
     }
    ],
    "water_km": 0.472,
-   "wind_share": 0.113
+   "wind_share": 0.113,
+   "water_share": 0.1922,
+   "water_share_osm": 0.1922,
+   "water_share_wc": 0.1333,
+   "water_share_confidence": "low",
+   "water_share_reason": "tidal_flat"
   },
   {
    "mountain": "申",
@@ -890,7 +956,12 @@
     }
    ],
    "water_km": 1.355,
-   "wind_share": 0.105
+   "wind_share": 0.105,
+   "water_share": 0.6579,
+   "water_share_osm": 0.6579,
+   "water_share_wc": 0.5885,
+   "water_share_confidence": "low",
+   "water_share_reason": "tidal_flat"
   },
   {
    "mountain": "庚",
@@ -942,7 +1013,11 @@
     "River Fleet",
     "Fountain Court Fountain"
    ],
-   "wind_share": 0.087
+   "wind_share": 0.087,
+   "water_share": 0.0503,
+   "water_share_osm": 0.0503,
+   "water_share_wc": 0.0775,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "酉",
@@ -990,7 +1065,11 @@
      "water_share": null
     }
    ],
-   "wind_share": 0.057
+   "wind_share": 0.057,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "辛",
@@ -1038,7 +1117,11 @@
      "water_share": null
     }
    ],
-   "wind_share": 0.038
+   "wind_share": 0.038,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0001,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "戌",
@@ -1087,7 +1170,11 @@
     }
    ],
    "water_km": 0.171,
-   "wind_share": 0.028
+   "wind_share": 0.028,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0001,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "乾",
@@ -1136,7 +1223,11 @@
     }
    ],
    "water_km": 1.147,
-   "wind_share": 0.028
+   "wind_share": 0.028,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0038,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "亥",
@@ -1185,7 +1276,11 @@
     }
    ],
    "water_km": 0.378,
-   "wind_share": 0.023
+   "wind_share": 0.023,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0,
+   "water_share_confidence": "high"
   },
   {
    "mountain": "壬",
@@ -1233,7 +1328,11 @@
      "water_share": null
     }
    ],
-   "wind_share": 0.022
+   "wind_share": 0.022,
+   "water_share": 0.0,
+   "water_share_osm": 0.0,
+   "water_share_wc": 0.0,
+   "water_share_confidence": "high"
   }
  ],
  "point": {
@@ -1434,11 +1533,13 @@
    2.0
   ]
  },
+ "water_share_rule": "основа — OSM; WorldCover заменяет её, когда OSM воды почти не видит (osm < 0.5 % или меньше четверти показанного снимком при wc ≥ 1 %); при прочих расхождениях остаётся OSM с понижением уверенности и причиной",
  "quality": {
   "dem": "Copernicus DEM GLO-30 (DSM)",
   "dem_source": "copernicus",
   "dem_resolution_m": 30.0,
   "warnings": [
+   "water_share: расхождение OSM и WorldCover выше допуска в 3 клин(ах) из 24 (осушка); причина записана, уверенность low",
    "water.flow: low — конфликт OSM и рельефа у osm-#7833362-river, osm-#446582987-stream",
    "water_share — по полигонам OSM (water=*, natural=water); река, нарисованная осевой, в долю не входит, её длина — sector.water_km",
    "рельеф — модель поверхности (DSM): уклоны и форма точки сглажены на 90 м, в плотной застройке возможны искажения",
@@ -1460,7 +1561,8 @@
   "climate": "1.1.0",
   "sun": "1.0.0",
   "landcover": "1.0.0",
-  "pack": "2.2.0"
+  "calibrate": "1.0.0",
+  "pack": "2.3.0"
  },
  "files": {
   "water_geojson": "water.geojson",
@@ -1510,6 +1612,7 @@
  },
  "attribution": [
   "© OpenStreetMap contributors",
-  "produced using Copernicus WorldDEM-30 © DLR e.V."
+  "produced using Copernicus WorldDEM-30 © DLR e.V.",
+  "ESA WorldCover 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)"
  ]
 }
