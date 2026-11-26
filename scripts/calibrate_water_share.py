@@ -23,41 +23,16 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from geosite import geo, landcover, water, water_pack  # noqa: E402
+from geosite import calibrate, geo, landcover, water, water_pack  # noqa: E402
 from geosite.cli import _load_osm_file  # noqa: E402
 
 GOLDEN = ROOT / "tests" / "golden"
 RINGS = ((500.0, 2000.0), (2000.0, 8000.0))
-# Допуски W3: кольцо целиком 1 п.п., сектор 3 п.п.
-RING_TOLERANCE_PP = 1.0
-SECTOR_TOLERANCE_PP = 3.0
+RING_TOLERANCE_PP = calibrate.RING_TOLERANCE * 100.0
+SECTOR_TOLERANCE_PP = calibrate.SECTOR_TOLERANCE * 100.0
 
 
-def _reason(osm: float, wc: float, *, sector: bool = True) -> str:
-    """Подсказка причины расхождения — по знаку и величине, без догадок о содержании.
-
-    Самый частый случай не «ошибка разметки», а разный способ рисования: в OSM крупную реку
-    часто ведут осевой линией, и площади у неё нет вовсе (Стрелка, Санкт-Гоар, Москва).
-    Тогда расхождение в десятки процентных пунктов — не дефект, а разница метода.
-    """
-    tolerance = SECTOR_TOLERANCE_PP if sector else RING_TOLERANCE_PP
-    diff_pp = (osm - wc) * 100.0
-    if abs(diff_pp) <= tolerance:
-        return "—"
-    if osm < 0.005 <= wc:
-        return "вода в OSM осевой линией: поверхность не размечена"
-    if wc - osm > 0.10:
-        return "вода в OSM осевой линией или контуры не замкнуты: снимок видит больше"
-    if osm - wc > 0.10:
-        return "полигон OSM включает не воду: причалы, отливная осушка, разлив"
-    if wc < 0.005 <= osm:
-        return "воды на снимке нет: тень, тёмная крыша или ось"
-    if diff_pp > 0:
-        return "полигон OSM шире воды на снимке: причалы, отливная осушка, разлив"
-    return "на снимке воды больше: мост, осушка или часть контура вне выборки"
-
-
-def calibrate(name: str) -> dict | None:
+def site_calibration(name: str) -> dict | None:
     site_dir = GOLDEN / name
     fixture = site_dir / "fixtures"
     site = yaml.safe_load((site_dir / "site.yaml").read_text(encoding="utf-8"))
@@ -74,6 +49,7 @@ def calibrate(name: str) -> dict | None:
     cover = (landcover.measure(lat, lon, epsg=epsg, site_xy=site_xy, path=cover_path)
              if cover_path.exists() else None)
 
+    tidal = any((f.tags.get("tidal") or "").lower() == "yes" for f in features)
     rows = []
     for r0, r1 in RINGS:
         osm_ring = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
@@ -82,22 +58,34 @@ def calibrate(name: str) -> dict | None:
         key = f"{r0 / 1000:g}-{r1 / 1000:g}"
         if cover is None:
             rows.append({"ring": key, "sector": "кольцо", "osm": osm_total, "wc": None,
-                         "diff_pp": None, "reason": "нет вырезки WorldCover"})
+                         "chosen": None, "diff_pp": None, "confidence": None,
+                         "reason": "нет вырезки WorldCover"})
             continue
         wc_ring = cover["rings"].get(key) or {}
         wc_total = wc_ring.get("share")
+        ring_diff = 0.0 if wc_total is None else osm_total - wc_total
         rows.append({"ring": key, "sector": "кольцо", "osm": osm_total, "wc": wc_total,
-                     "diff_pp": None if wc_total is None else (osm_total - wc_total) * 100.0,
-                     "reason": ("—" if wc_total is None
-                                else _reason(osm_total, wc_total, sector=False))})
+                     "chosen": None, "diff_pp": None if wc_total is None else ring_diff * 100.0,
+                     "confidence": None if wc_total is None else
+                     ("high" if abs(ring_diff) <= calibrate.RING_TOLERANCE else "low"),
+                     "reason": "—" if wc_total is None else
+                     ("в допуске" if abs(ring_diff) <= calibrate.RING_TOLERANCE
+                      else "кольцо вне допуска: разбирать по клиньям")})
         for mountain in geo.MOUNTAINS:
             osm_share = osm_ring["by_mountain"].get(mountain, 0.0)
             wc_share = (wc_ring.get("by_mountain") or {}).get(mountain, 0.0)
             diff = (osm_share - wc_share) * 100.0
             if abs(diff) < 0.5:
                 continue                      # клинья без воды и без расхождения не печатаем
+            reason = calibrate.reason_for(
+                osm_share, wc_share, linear_km=(osm_ring.get("linear_km") or {}).get(mountain),
+                tidal=tidal, built_share=(cover["groups"] or {}).get("built"))
             rows.append({"ring": key, "sector": mountain, "osm": osm_share, "wc": wc_share,
-                         "diff_pp": diff, "reason": _reason(osm_share, wc_share)})
+                         "chosen": calibrate.choose(osm_share, wc_share, reason=reason),
+                         "diff_pp": diff,
+                         "confidence": calibrate.confidence_for(osm_share, wc_share,
+                                                                ring_diff=ring_diff, reason=reason),
+                         "reason": calibrate.explain(reason) or "—"})
     return {"name": name, "rows": rows, "has_cover": cover is not None,
             "tile": None if cover is None else cover["tile"]}
 
@@ -108,21 +96,26 @@ def render(results: list[dict]) -> str:
              "без сети. Доли — по кольцам 0.5–2 и 2–8 км и по клиньям (24 горы).",
              "",
              f"Допуски W3: кольцо целиком ≤ {RING_TOLERANCE_PP:g} п.п., клин ≤ {SECTOR_TOLERANCE_PP:g} п.п.",
-             "Расхождение сверх допуска — не ошибка сама по себе: у него должна быть причина.", ""]
+             "Расхождение сверх допуска — не ошибка сама по себе: у него должна быть причина.",
+             "",
+             "Правило выбора: " + calibrate.RULE + ".", ""]
     for result in results:
         lines.append(f"## {result['name']}")
         lines.append("")
         lines.append(f"Слой: ESA WorldCover 2021 v200, тайл {result['tile'] or '—'}."
                      if result["has_cover"] else "Слой: WorldCover не подключён для этого эталона.")
         lines.append("")
-        lines.append("| Кольцо | Клин | OSM, % | WorldCover, % | Разница, п.п. | Причина |")
-        lines.append("|---|---|---|---|---|---|")
+        lines.append("| Кольцо | Клин | OSM, % | WorldCover, % | Выбрано, % | Разница, п.п. "
+                     "| Уверенность | Причина |")
+        lines.append("|---|---|---|---|---|---|---|---|")
         for row in result["rows"]:
             osm = "—" if row["osm"] is None else f"{row['osm'] * 100:.2f}"
             wc = "—" if row["wc"] is None else f"{row['wc'] * 100:.2f}"
+            chosen = "—" if row.get("chosen") is None else f"{row['chosen'] * 100:.2f}"
             diff = "—" if row["diff_pp"] is None else f"{row['diff_pp']:+.2f}"
-            lines.append(f"| {row['ring']} | {row['sector']} | {osm} | {wc} | {diff} | "
-                         f"{row['reason']} |")
+            conf = row.get("confidence") or "—"
+            lines.append(f"| {row['ring']} | {row['sector']} | {osm} | {wc} | {chosen} | {diff} "
+                         f"| {conf} | {row['reason']} |")
         lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -135,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     names = args.sites or sorted(p.name for p in GOLDEN.iterdir() if (p / "site.yaml").exists())
-    results = [r for r in (calibrate(name) for name in names) if r]
+    results = [r for r in (site_calibration(name) for name in names) if r]
     if not results:
         print("нет эталонов с фикстурами OSM", file=sys.stderr)
         return 1

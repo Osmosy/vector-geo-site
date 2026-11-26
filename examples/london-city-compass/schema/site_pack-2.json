@@ -878,6 +878,79 @@
           ],
           "default": null,
           "title": "Wind Share"
+        },
+        "water_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share"
+        },
+        "water_share_osm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Osm"
+        },
+        "water_share_wc": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Wc"
+        },
+        "water_share_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Confidence"
+        },
+        "water_share_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "axis_line",
+                "bridge",
+                "dock_lock",
+                "tidal_flat",
+                "stale_osm",
+                "shadow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Reason"
         }
       },
       "required": [
@@ -2018,6 +2091,18 @@
         }
       ],
       "default": null
+    },
+    "water_share_rule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Water Share Rule"
     },
     "quality": {
       "$ref": "#/$defs/Quality"

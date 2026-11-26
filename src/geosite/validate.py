@@ -29,12 +29,15 @@ CODES = {
     "I-10": "низкая уверенность без предупреждения",
     "I-11": "версии алгоритмов",
     "I-12": "ноль при флаге предела",
+    "I-14": "превышение допуска калибровки без причины",
+    "I-15": "доли покрова вне [0,1] или сумма больше 1",
 }
 
 MIN_ELEV, MAX_ELEV = -430.0, 8850.0
 
 # P0 (I-11): версии модулей, с которыми сверяется пакет.
-from . import climate as _climate, geocode as _geocode, landcover as _landcover
+from . import calibrate as _calibrate, climate as _climate
+from . import geocode as _geocode, landcover as _landcover
 from . import sun as _sun, terrain as _terrain
 from . import water as _water
 CODE_VERSIONS = {
@@ -44,6 +47,7 @@ CODE_VERSIONS = {
     "climate": _climate.ALGO_VERSION,
     "sun": _sun.ALGO_VERSION,
     "landcover": _landcover.ALGO_VERSION,
+    "calibrate": _calibrate.ALGO_VERSION,
 }
 
 # I-10: поля с эвристикой обязаны нести парную уверенность. Список пополняется на каждом этапе.
@@ -232,6 +236,50 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
             out.append(_violation("I-11", f"algo.{module}",
                                   f"в пакете {got}, в коде {version} — пакет собран другим расчётом"))
 
+    out.extend(_check_water_calibration(pack))
+    return out
+
+
+def _check_water_calibration(pack: dict) -> list[dict]:
+    """I-14/I-15: расхождение двух источников обязано быть объяснено, доли — в [0,1]."""
+    out: list[dict] = []
+    for i, sector in enumerate(pack.get("sectors") or []):
+        base = f"sectors[{i}].water_share"
+        shares = {k: _num(sector.get(k)) for k in
+                  ("water_share", "water_share_osm", "water_share_wc")}
+        for key, val in shares.items():
+            if val is not None and not (0.0 <= val <= 1.0):
+                out.append(_violation("I-15", f"{base}_{key.split('_', 2)[-1]}",
+                                      f"доля вне [0,1]: {val}"))
+        osm, wc = shares["water_share_osm"], shares["water_share_wc"]
+        if osm is None or wc is None:
+            continue
+        reason = sector.get("water_share_reason")
+        conf = sector.get("water_share_confidence")
+        if abs(osm - wc) > _calibrate.SECTOR_TOLERANCE:
+            if not reason:
+                out.append(_violation("I-14", f"{base}_reason",
+                                      f"расхождение {abs(osm - wc) * 100:.1f} п.п. без причины"))
+            if conf == "high":
+                out.append(_violation("I-14", f"{base}_confidence",
+                                      "расхождение выше допуска при уверенности high"))
+        elif reason and conf == "high":
+            out.append(_violation("I-14", f"{base}_confidence",
+                                  f"причина {reason!r} записана, но уверенность high"))
+    cover = pack.get("land_cover") or {}
+    keys = ("water", "water_wc", "built", "tree", "open")
+    total = 0.0
+    for key in keys:
+        val = _num(cover.get(key))
+        if val is None:
+            continue
+        if not (0.0 <= val <= 1.0):
+            out.append(_violation("I-15", f"land_cover.{key}", f"доля вне [0,1]: {val}"))
+        elif key != "water":              # OSM-вода и группы снимка — разные источники,
+            total += val                  # складывать их нельзя: берём ряд WorldCover
+    if total > 1.001:
+        out.append(_violation("I-15", "land_cover",
+                             f"сумма покрова по кольцу больше 1: {total:.3f}"))
     return out
 
 
