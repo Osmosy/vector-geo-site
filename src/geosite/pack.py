@@ -7,11 +7,11 @@ from pathlib import Path
 
 import hashlib
 
-from . import climate, figures, geo, geocode, terrain, water
+from . import climate, figures, geo, geocode, sun, terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "1.7.0"      # версия сборки пакета
+ALGO_VERSION = "2.0.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -20,6 +20,7 @@ ALGO = {
     "terrain": terrain.ALGO_VERSION,
     "geocode": geocode.ALGO_VERSION,
     "climate": climate.ALGO_VERSION,
+    "sun": sun.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -219,6 +220,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
 
     exposure = dict(measured.get("exposure") or {})
     wind = exposure.pop("wind", None)
+    if "cold_wind" in exposure and exposure["cold_wind"] is None:
+        exposure.pop("cold_wind")
     if wind:
         exposure.update({
             "wind_prevailing_deg": wind.get("prevailing_from_deg"),
@@ -238,6 +241,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         sectors=sectors,
         point=measured.get("point"),
         four_spirits=measured.get("four_spirits"),
+        sun=measured.get("sun"),
         dragon_vein=measured.get("dragon_vein"),
         water=kept,
         roads=measured.get("roads", []),
@@ -258,7 +262,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
     (out_dir / "site_pack.json").write_text(_dump_pack(payload), encoding="utf-8")
     schema_dir = out_dir / "schema"
     schema_dir.mkdir(exist_ok=True)
-    (schema_dir / "site_pack-1.json").write_text(
+    # имя файла схемы следует за SCHEMA_ID: site_pack/2 → site_pack-2.json
+    (schema_dir / (SCHEMA_ID.replace("/", "-") + ".json")).write_text(
         json.dumps(json_schema(), ensure_ascii=False, indent=2), encoding="utf-8")
     return pack
 

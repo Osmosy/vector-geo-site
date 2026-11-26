@@ -8,12 +8,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests: 27/27](https://img.shields.io/badge/Tests-27%2F27-green.svg)](#тесты)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-4f8ff7.svg)](#установка)
-[![Schema: site_pack/1](https://img.shields.io/badge/Schema-site__pack%2F1-blueviolet.svg)](schema/site_pack-1.json)
+[![Schema: site_pack/1](https://img.shields.io/badge/Schema-site__pack%2F2-blueviolet.svg)](schema/site_pack-2.json)
 [![Data: DEM + OSM](https://img.shields.io/badge/Data-Copernicus%20DEM%20%2B%20OSM-orange.svg)](#атрибуция)
 
 **Геоданные местности для фэншуй-интерпретации: рельеф, вода, ориентация — измерение без оценок**
 
-**Документы:** [Состояние этапа](PLAN-STATUS.md) · [Схема пакета](schema/site_pack-1.json) · [Пример: Лондон](examples/README.md) · [Журнал расчёта](CHANGELOG-CALC.md) · [Errata](docs/calc/errata.md) · [Навык](https://github.com/Osmosy/vector-fengshui-bazi)
+**Документы:** [Состояние этапа](PLAN-STATUS.md) · [Схема пакета](schema/site_pack-2.json) · [Пример: Лондон](examples/README.md) · [Журнал расчёта](CHANGELOG-CALC.md) · [Errata](docs/calc/errata.md) · [Навык](https://github.com/Osmosy/vector-fengshui-bazi)
 
 </div>
 
@@ -97,7 +97,7 @@ geosite fetch   "Лондон, Сити"                # тайлы DEM в ке
 geosite terrain "51.5138, -0.0984"            # 24 горы, горизонт, четыре духа
 geosite pack    "51.5138, -0.0984" --facing 180 --year 2018
 geosite run     "Лондон, Сити" --facing 180 --year 2018
-geosite schema  > schema/site_pack-1.json
+geosite schema  > schema/site_pack-2.json
 ```
 
 Если фасад не задан, ось считается по модели (спина к главной возвышенности мезо-охвата) и
@@ -154,7 +154,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 | Излучина | минимальный разрыв между двумя частями русла, разнесёнными по длине ≥1.5 км; петля не зависит от участка, положение участка — отдельным полем `site_position` |
 | Направление течения | уклон рельефа регрессией по длине (±2 км) с `dem_slope_snr`; пять правил выбора, в пакете `flow_chosen`, `flow_rule`, `flow_confidence` (приливная река — решает OSM, при расхождении пишется предупреждение `flow_conflict`) |
 
-Лондон, Сити (пакет `examples/london-city`, `water 7.4.0`): 750 объектов воды в
+Лондон, Сити (пакет `examples/london-city`, `water 7.4.0`, `pack 2.0.0`): 750 объектов воды в
 `water.geojson` (471 контур, 25 рек, 74 ручья, 70 каналов, 63 дока, 47 труб), из них 47 в трубе
 и потому невидимы (`kind: culvert`, `visible: false`); в пакет попадают 44
 значимых. Темза — 463.6 м, вход 坤, выход 辰, участок снаружи изгиба (`bend: outer`) и на
@@ -201,7 +201,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 147 passed, сеть не нужна
+python -m pytest -q          # 157 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)

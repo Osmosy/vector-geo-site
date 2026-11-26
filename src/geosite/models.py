@@ -1,4 +1,4 @@
-"""Схема пакета участка `site_pack/1`.
+"""Схема пакета участка `site_pack/2`.
 
 Правило модуля: здесь только измерения. Никаких «благо / неблаго», никаких рекомендаций —
 оценка остаётся навыку vector-fengshui-bazi.
@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SCHEMA_ID = "site_pack/1"
+SCHEMA_ID = "site_pack/2"
 
 Precision = Literal["point", "building", "district", "settlement"]
 Confidence = Literal["high", "medium", "low"]
@@ -32,6 +32,9 @@ class Site(BaseModel):
     utm_epsg: int
     boundary: str | None = None
     hydro: dict | None = None
+    # H1: полушарие и «около экватора» — факты, а не толкование
+    hemisphere: Literal["N", "S"] | None = None
+    equatorial: bool | None = None
 
 
 class Orientation(BaseModel):
@@ -78,11 +81,16 @@ class Spirit(BaseModel):
 
 
 class FourSpirits(BaseModel):
-    tortoise: Spirit
-    bird: Spirit
-    dragon: Spirit
-    tiger: Spirit
-    dragon_vs_tiger: float
+    """H4: стороны относительно оси участка, без имён школ.
+
+    Кто из них 玄武, 朱雀, 青龍 и 白虎 — решает навык по школе: в пакете только `back`,
+    `front`, `left`, `right`, чтобы зеркальная интерпретация не требовала пересчёта данных.
+    """
+    back: Spirit
+    front: Spirit
+    left: Spirit
+    right: Spirit
+    left_vs_right: float
 
 
 class PointMetrics(BaseModel):
@@ -179,6 +187,37 @@ class WaterObject(BaseModel):
     source: str | None = None
 
 
+class SunNoon(BaseModel):
+    event: Literal["june_solstice", "december_solstice", "equinox"]
+    date: str
+    altitude_deg: float
+    azimuth_deg: float
+    mountain: str
+    side8: Literal["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    utc_hour: float | None = None
+
+
+class SunIllumination(BaseModel):
+    dem_layer: str | None = None
+    hours_by_side: dict
+    total_hours: float | None = None
+    blocked_hours: float | None = None
+    step_min: int | None = None
+    source: str | None = None
+
+
+class SunBlock(BaseModel):
+    """H2: солнце как факт — полдни, сторона полудня, счёт дней, освещённость."""
+    source: str
+    latitude_abs: float
+    noons: list[SunNoon] = Field(default_factory=list)
+    noon_side: dict
+    days_noon_north: int
+    days_noon_south: int
+    by_side8: dict = Field(default_factory=dict)
+    illumination: SunIllumination | None = None
+
+
 class Exposure(BaseModel):
     enclosure_index: float | None = None
     windy_mountains: list[str] = Field(default_factory=list)
@@ -191,6 +230,8 @@ class Exposure(BaseModel):
     wind_days: int | None = None
     wind_seasonal: dict | None = None
     wind_source: str | None = None
+    # H3: откуда дует холодный ветер в холодный сезон полушария
+    cold_wind: dict | None = None
 
 
 class LandCover(BaseModel):
@@ -216,6 +257,8 @@ class Algo(BaseModel):
     water: str | None = None
     terrain: str | None = None
     geocode: str | None = None
+    climate: str | None = None
+    sun: str | None = None
     pack: str | None = None
 
 
@@ -236,6 +279,7 @@ class SitePack(BaseModel):
     dragon_vein: DragonVein | None = None
     water: list[WaterObject] = Field(default_factory=list)
     roads: list[WaterObject] = Field(default_factory=list)
+    sun: SunBlock | None = None
     exposure: Exposure | None = None
     land_cover: LandCover | None = None
     quality: Quality

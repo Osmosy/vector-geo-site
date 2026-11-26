@@ -13,7 +13,7 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
-ALGO_VERSION = "2.1.0"
+ALGO_VERSION = "3.0.0"
 
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
@@ -121,13 +121,15 @@ def four_spirits(grid: DemGrid, frame: PolarFrame, z0: float, facing_deg: float,
     bird = _sector_stats(frame, rel, facing_deg, 45.0, meso_km)
     dragon = _sector_stats(frame, rel, facing_deg - 90.0, 45.0, meso_km)   # слева от смотрящего
     tiger = _sector_stats(frame, rel, facing_deg + 90.0, 45.0, meso_km)    # справа
+    # H4: имена нейтральные — «сзади, спереди, слева, справа» от наблюдателя, стоящего в доме
+    # лицом к фасаду. Кто здесь 玄武 и кто 青龍, решает навык по школе.
     return {
-        "tortoise": {"rel_elev_m": tortoise.rel_elev_m, "dist_km": tortoise.dist_km, "continuity": tortoise.continuity},
-        "bird": {"rel_elev_m": bird.rel_elev_m, "dist_km": bird.dist_km, "continuity": bird.continuity,
-                 "open_plain_km": round(bird.dist_km if bird.dist_km else meso_km, 2), "table_hill": None},
-        "dragon": {"rel_elev_m": dragon.rel_elev_m, "dist_km": dragon.dist_km, "continuity": dragon.continuity},
-        "tiger": {"rel_elev_m": tiger.rel_elev_m, "dist_km": tiger.dist_km, "continuity": tiger.continuity},
-        "dragon_vs_tiger": round(dragon.rel_elev_m - tiger.rel_elev_m, 1),
+        "back": {"rel_elev_m": tortoise.rel_elev_m, "dist_km": tortoise.dist_km, "continuity": tortoise.continuity},
+        "front": {"rel_elev_m": bird.rel_elev_m, "dist_km": bird.dist_km, "continuity": bird.continuity,
+                  "open_plain_km": round(bird.dist_km if bird.dist_km else meso_km, 2), "table_hill": None},
+        "left": {"rel_elev_m": dragon.rel_elev_m, "dist_km": dragon.dist_km, "continuity": dragon.continuity},
+        "right": {"rel_elev_m": tiger.rel_elev_m, "dist_km": tiger.dist_km, "continuity": tiger.continuity},
+        "left_vs_right": round(dragon.rel_elev_m - tiger.rel_elev_m, 1),
     }
 
 

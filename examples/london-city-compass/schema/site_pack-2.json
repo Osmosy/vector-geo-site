@@ -39,6 +39,30 @@
           "default": null,
           "title": "Geocode"
         },
+        "climate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Climate"
+        },
+        "sun": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sun"
+        },
         "pack": {
           "anyOf": [
             {
@@ -277,6 +301,19 @@
           ],
           "default": null,
           "title": "Wind Source"
+        },
+        "cold_wind": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cold Wind"
         }
       },
       "title": "Exposure",
@@ -308,30 +345,31 @@
       "type": "object"
     },
     "FourSpirits": {
+      "description": "H4: стороны относительно оси участка, без имён школ.\n\nКто из них 玄武, 朱雀, 青龍 и 白虎 — решает навык по школе: в пакете только `back`,\n`front`, `left`, `right`, чтобы зеркальная интерпретация не требовала пересчёта данных.",
       "properties": {
-        "tortoise": {
+        "back": {
           "$ref": "#/$defs/Spirit"
         },
-        "bird": {
+        "front": {
           "$ref": "#/$defs/Spirit"
         },
-        "dragon": {
+        "left": {
           "$ref": "#/$defs/Spirit"
         },
-        "tiger": {
+        "right": {
           "$ref": "#/$defs/Spirit"
         },
-        "dragon_vs_tiger": {
-          "title": "Dragon Vs Tiger",
+        "left_vs_right": {
+          "title": "Left Vs Right",
           "type": "number"
         }
       },
       "required": [
-        "tortoise",
-        "bird",
-        "dragon",
-        "tiger",
-        "dragon_vs_tiger"
+        "back",
+        "front",
+        "left",
+        "right",
+        "left_vs_right"
       ],
       "title": "FourSpirits",
       "type": "object"
@@ -824,6 +862,34 @@
           ],
           "default": null,
           "title": "Hydro"
+        },
+        "hemisphere": {
+          "anyOf": [
+            {
+              "enum": [
+                "N",
+                "S"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hemisphere"
+        },
+        "equatorial": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Equatorial"
         }
       },
       "required": [
@@ -876,6 +942,203 @@
         "continuity"
       ],
       "title": "Spirit",
+      "type": "object"
+    },
+    "SunBlock": {
+      "description": "H2: солнце как факт — полдни, сторона полудня, счёт дней, освещённость.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "latitude_abs": {
+          "title": "Latitude Abs",
+          "type": "number"
+        },
+        "noons": {
+          "items": {
+            "$ref": "#/$defs/SunNoon"
+          },
+          "title": "Noons",
+          "type": "array"
+        },
+        "noon_side": {
+          "additionalProperties": true,
+          "title": "Noon Side",
+          "type": "object"
+        },
+        "days_noon_north": {
+          "title": "Days Noon North",
+          "type": "integer"
+        },
+        "days_noon_south": {
+          "title": "Days Noon South",
+          "type": "integer"
+        },
+        "by_side8": {
+          "additionalProperties": true,
+          "title": "By Side8",
+          "type": "object"
+        },
+        "illumination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SunIllumination"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source",
+        "latitude_abs",
+        "noon_side",
+        "days_noon_north",
+        "days_noon_south"
+      ],
+      "title": "SunBlock",
+      "type": "object"
+    },
+    "SunIllumination": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "hours_by_side": {
+          "additionalProperties": true,
+          "title": "Hours By Side",
+          "type": "object"
+        },
+        "total_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Hours"
+        },
+        "blocked_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Hours"
+        },
+        "step_min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Min"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "hours_by_side"
+      ],
+      "title": "SunIllumination",
+      "type": "object"
+    },
+    "SunNoon": {
+      "properties": {
+        "event": {
+          "enum": [
+            "june_solstice",
+            "december_solstice",
+            "equinox"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "altitude_deg": {
+          "title": "Altitude Deg",
+          "type": "number"
+        },
+        "azimuth_deg": {
+          "title": "Azimuth Deg",
+          "type": "number"
+        },
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "side8": {
+          "enum": [
+            "N",
+            "NE",
+            "E",
+            "SE",
+            "S",
+            "SW",
+            "W",
+            "NW"
+          ],
+          "title": "Side8",
+          "type": "string"
+        },
+        "utc_hour": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Utc Hour"
+        }
+      },
+      "required": [
+        "event",
+        "date",
+        "altitude_deg",
+        "azimuth_deg",
+        "mountain",
+        "side8"
+      ],
+      "title": "SunNoon",
       "type": "object"
     },
     "WaterMouth": {
@@ -1574,7 +1837,7 @@
   },
   "properties": {
     "schema": {
-      "default": "site_pack/1",
+      "default": "site_pack/2",
       "title": "Schema",
       "type": "string"
     },
@@ -1643,6 +1906,17 @@
       },
       "title": "Roads",
       "type": "array"
+    },
+    "sun": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SunBlock"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "exposure": {
       "anyOf": [

@@ -55,12 +55,12 @@ def test_four_spirits_follow_axis_not_cardinal():
     z0 = g.point_value(cx, cy)
     # фасад на север: слева (запад) — дракон, справа (восток) — тигр
     sp = terrain.four_spirits(g, frame, z0, facing_deg=0.0, meso_km=8.0)
-    assert sp["tiger"]["rel_elev_m"] > 50      # тигр справа = восток
-    assert sp["dragon"]["rel_elev_m"] < 5      # дракон слева = запад, там плоско
+    assert sp["right"]["rel_elev_m"] > 50      # тигр справа = восток
+    assert sp["left"]["rel_elev_m"] < 5      # дракон слева = запад, там плоско
     # фасад на юг: слева уже восток → дракон высокий
     sp2 = terrain.four_spirits(g, frame, z0, facing_deg=180.0, meso_km=8.0)
-    assert sp2["dragon"]["rel_elev_m"] > 50
-    assert sp2["dragon_vs_tiger"] > 40
+    assert sp2["left"]["rel_elev_m"] > 50
+    assert sp2["left_vs_right"] > 40
 
 
 def test_dragon_vein_climbs_cone_to_peak():
