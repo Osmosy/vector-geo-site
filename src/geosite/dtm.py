@@ -162,7 +162,7 @@ def _gedtm30_window(source: dict, lat: float, lon: float, radius_km: float,
     return {"array": _mask_heights(band), "transform": transform, "crs": crs}
 
 
-def grid(lat: float, lon: float, *, epsg: int, radius_km: float, resolution_m: float = 30.0
+def grid(lat: float, lon: float, *, crs: int | str, radius_km: float, resolution_m: float = 30.0
          ) -> tuple[dem.DemGrid | None, dict]:
     """DTM для точки: (грид, паспорт). Если DTM нет — `(None, {reason, tried})`."""
     chosen = mode()
@@ -179,7 +179,7 @@ def grid(lat: float, lon: float, *, epsg: int, radius_km: float, resolution_m: f
             tried.append(f"{source['id']}: пусто")
             return None
         grid_obj = dem._reproject_to_utm(window["array"], window["transform"], window["crs"],
-                                         lat=lat, lon=lon, radius_km=radius_km, epsg=epsg,
+                                         lat=lat, lon=lon, radius_km=radius_km, crs=crs,
                                          resolution_m=resolution_m, resampling=dem.Resampling.bilinear)
         grid_obj.source = source["id"]
         grid_obj.label = source["name"]

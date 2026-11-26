@@ -628,6 +628,35 @@
           "default": null,
           "title": "Declination Deg"
         },
+        "declination_horizontal_nt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Horizontal Nt"
+        },
+        "declination_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Confidence"
+        },
         "facing_mag_deg": {
           "anyOf": [
             {
@@ -908,6 +937,7 @@
       "type": "object"
     },
     "Ring": {
+      "description": "Кольцо сектора. Пустоты вместо чисел — `null`: «не смотрели» не равно «плоско».",
       "properties": {
         "r_km": {
           "maxItems": 2,
@@ -924,16 +954,40 @@
           "type": "array"
         },
         "max_rel_elev_m": {
-          "title": "Max Rel Elev M",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Rel Elev M"
         },
         "mean_rel_elev_m": {
-          "title": "Mean Rel Elev M",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean Rel Elev M"
         },
         "horizon_deg": {
-          "title": "Horizon Deg",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Horizon Deg"
         },
         "water_share": {
           "anyOf": [
@@ -991,13 +1045,22 @@
           ],
           "default": null,
           "title": "Dtm"
+        },
+        "void_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Void Share"
         }
       },
       "required": [
-        "r_km",
-        "max_rel_elev_m",
-        "mean_rel_elev_m",
-        "horizon_deg"
+        "r_km"
       ],
       "title": "Ring",
       "type": "object"
@@ -1217,6 +1280,58 @@
           ],
           "default": null,
           "title": "Equatorial"
+        },
+        "grid_crs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs"
+        },
+        "grid_crs_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "utm",
+                "aeqd"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs Kind"
+        },
+        "grid_crs_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs Reason"
+        },
+        "convergence_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Convergence Deg"
         }
       },
       "required": [

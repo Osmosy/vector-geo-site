@@ -12,7 +12,7 @@ from . import terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.5.0"      # версия сборки пакета
+ALGO_VERSION = "2.6.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -20,6 +20,7 @@ ALGO = {
     "water": water.ALGO_VERSION,
     "terrain": terrain.ALGO_VERSION,
     "geocode": geocode.ALGO_VERSION,
+    "geo": geo.ALGO_VERSION,
     "climate": climate.ALGO_VERSION,
     "sun": sun.ALGO_VERSION,
     "landcover": landcover.ALGO_VERSION,
@@ -190,6 +191,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
                  else _share(r, "middle", s["mountain"])
                  if tuple(r.get("r_km") or ()) == (2.0, 8.0) else None),
                 "peaks": r.get("peaks", []),
+                "void_share": r.get("void_share"),
                 **_near_ring_layers(measured, s["mountain"], len(rings)),
             })
         wind_share = (measured.get("wind") or {}).get("by_mountain", {}).get(s["mountain"])
@@ -220,6 +222,14 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         dem_source, {}).get("kind", "dsm_smoothed")
     built = (measured.get("land_cover") or {}).get("built")
     dem_confidence = dem.relief_confidence(layer, built)
+    # G4.4: больше 5 % пустот в ближнем кольце — числам кольца верить нельзя, что бы ни говорил
+    # паспорт слоя: пустоты не интерполируются, и «плоско» там означает «не измерено»
+    voids = [r.get("void_share") for s_ in measured.get("sectors") or []
+             for r in s_["rings"] if (r.get("r_km") or [0, 0])[1] <= 2.0 and r.get("void_share")]
+    worst_void = max(voids) if voids else 0.0
+    if worst_void > 0.05:
+        dem_confidence = "low"
+        measured.setdefault("void_warning", round(worst_void, 3))
 
     def _with_layer(block):
         """Поле по рельефу несёт `dem_layer`: иначе не видно, по земле оно или по крышам."""

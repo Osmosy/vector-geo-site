@@ -13,6 +13,8 @@ import rasterio
 from rasterio.merge import merge
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
+from . import geo
+
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site"))
 DEM_CACHE = CACHE_DIR / "dem30"
 SRTM_CACHE = CACHE_DIR / "srtm30"
@@ -144,50 +146,95 @@ def bbox_for_radius(lat: float, lon: float, radius_km: float) -> tuple[float, fl
     return lat - dlat, lat + dlat, lon - dlon, lon + dlon
 
 
-def _reproject_to_utm(band: np.ndarray, transform, src_crs: str, *,
-                      lat: float, lon: float, radius_km: float, epsg: int,
-                      resolution_m: float, resampling: Resampling) -> DemGrid:
-    """Мозаика в градусах → локальная UTM, обрезка кругом радиуса."""
+def bbox_parts(lat: float, lon: float, radius_km: float) -> list[tuple[float, float, float, float]]:
+    """bbox участка; у линии перемены дат — две части, иначе запрос уходит за 180°."""
     lat_min, lat_max, lon_min, lon_max = bbox_for_radius(lat, lon, radius_km)
-    dst_crs = f"EPSG:{epsg}"
-    height, width = band.shape
-    dst_transform, dst_width, dst_height = calculate_default_transform(
-        src_crs, dst_crs, width, height, left=lon_min, bottom=lat_min, right=lon_max, top=lat_max,
-        resolution=resolution_m)
-    out = np.full((dst_height, dst_width), np.nan, dtype="float32")
-    reproject(
-        source=band, destination=out,
-        src_transform=transform, src_crs=src_crs,
-        dst_transform=dst_transform, dst_crs=dst_crs,
-        resampling=resampling, src_nodata=None, dst_nodata=np.nan,
-    )
-    rows, cols = np.mgrid[0:dst_height, 0:dst_width]
+    lat_min, lat_max = max(lat_min, -90.0), min(lat_max, 90.0)
+    return [(lat_min, lat_max, west, east)
+            for west, east in geo.split_bbox(lon_min, lon_max)]
+
+
+def _mask_circle(data: np.ndarray, transform, x0: float, y0: float, radius_km: float) -> np.ndarray:
+    rows, cols = data.shape
+    xs = transform.c + (np.arange(cols) + 0.5) * transform.a
+    ys = transform.f + (np.arange(rows) + 0.5) * transform.e
+    xx, yy = np.meshgrid(xs, ys)
+    data[np.hypot(xx - x0, yy - y0) > radius_km * 1000.0] = np.nan
+    return data
+
+
+def target_grid(lat: float, lon: float, radius_km: float, *, crs: int | str,
+                resolution_m: float) -> tuple:
+    """Сетка приёмника строится от центра участка, а не от габаритов исходных тайлов.
+
+    Так она не зависит от того, из скольких кусков пришёл источник: у линии перемены дат их два,
+    и оба ложатся в одну и ту же сетку. Запас 2 % — чтобы круг не упирался в край.
+    """
+    from affine import Affine
+    from pyproj import Transformer
+
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
+    x0, y0 = tr.transform(lon, lat)
+    half = radius_km * 1000.0 * 1.02
+    size = int(math.ceil(2.0 * half / resolution_m))
+    transform = Affine(resolution_m, 0.0, x0 - size * resolution_m / 2.0,
+                       0.0, -resolution_m, y0 + size * resolution_m / 2.0)
+    return transform, size, size, x0, y0
+
+
+def _into_grid(band: np.ndarray, transform, src_crs: str, dst: np.ndarray, dst_transform,
+               dst_crs: str, resampling: Resampling) -> np.ndarray:
+    """Пересчитать кусок источника в общую сетку; уже посчитанные ячейки не затираются."""
+    part = np.full(dst.shape, np.nan, dtype="float32")
+    reproject(source=band, destination=part, src_transform=transform, src_crs=src_crs,
+              dst_transform=dst_transform, dst_crs=dst_crs,
+              resampling=resampling, src_nodata=None, dst_nodata=np.nan)
+    return np.where(np.isnan(dst), part, dst)
+
+
+def _reproject_to_utm(band: np.ndarray, transform, src_crs: str, *,
+                      lat: float, lon: float, radius_km: float, crs: int | str,
+                      resolution_m: float, resampling: Resampling) -> DemGrid:
+    """Мозаика в градусах → локальная сетка (UTM или азимутальная), обрезка кругом радиуса."""
+    dst_transform, width, height, x0, y0 = target_grid(lat, lon, radius_km, crs=crs,
+                                                       resolution_m=resolution_m)
+    out = np.full((height, width), np.nan, dtype="float32")
+    out = _into_grid(band, transform, src_crs, out, dst_transform, geo.crs_str(crs), resampling)
+
+    rows, cols = np.mgrid[0:height, 0:width]
     xs = dst_transform.c + (cols + 0.5) * dst_transform.a
     ys = dst_transform.f + (rows + 0.5) * dst_transform.e
-    cx = dst_transform.c + dst_width * dst_transform.a / 2
-    cy = dst_transform.f + dst_height * dst_transform.e / 2
-    dist = np.hypot(xs - cx, ys - cy)
-    out[dist > radius_km * 1000.0] = np.nan
-    return DemGrid(out, dst_transform, dst_crs, resolution_m)
+    out[np.hypot(xs - x0, ys - y0) > radius_km * 1000.0] = np.nan
+    return DemGrid(out, dst_transform, geo.crs_str(crs), resolution_m)
 
 
-def _load_copernicus(lat: float, lon: float, radius_km: float, *, epsg: int, resolution_m: float,
+def _load_copernicus(lat: float, lon: float, radius_km: float, *, crs: int | str, resolution_m: float,
                      resampling: Resampling) -> DemGrid:
-    lat_min, lat_max, lon_min, lon_max = bbox_for_radius(lat, lon, radius_km)
-    datasets = []
-    try:
-        for la, lo in tiles_for_bbox(lat_min, lat_max, lon_min, lon_max):
-            datasets.append(rasterio.open(ensure_tile(la, lo)))
-        mosaic, mosaic_transform = merge(datasets, bounds=(lon_min, lat_min, lon_max, lat_max))
-        band = mosaic[0].astype("float32")
-        grid = _reproject_to_utm(band, mosaic_transform, str(datasets[0].crs), lat=lat, lon=lon,
-                                 radius_km=radius_km, epsg=epsg, resolution_m=resolution_m,
-                                 resampling=resampling)
-        grid.source, grid.label, grid.attribution = "copernicus", DEM_LABEL, ATTRIBUTION
-        return grid
-    finally:
-        for d in datasets:
-            d.close()
+    dst_transform, width, height, x0, y0 = target_grid(lat, lon, radius_km, crs=crs,
+                                                       resolution_m=resolution_m)
+    out = np.full((height, width), np.nan, dtype="float32")
+    errors = []
+    for lat_min, lat_max, lon_min, lon_max in bbox_parts(lat, lon, radius_km):
+        datasets = []
+        try:
+            for la, lo in tiles_for_bbox(lat_min, lat_max, lon_min, lon_max):
+                datasets.append(rasterio.open(ensure_tile(la, lo)))
+            mosaic, mosaic_transform = merge(datasets,
+                                             bounds=(lon_min, lat_min, lon_max, lat_max))
+            band = mosaic[0].astype("float32")
+            out = _into_grid(band, mosaic_transform, str(datasets[0].crs), out, dst_transform,
+                             geo.crs_str(crs), resampling)
+        except Exception as error:          # одна из двух частей может быть без тайлов
+            errors.append(str(error))
+        finally:
+            for d in datasets:
+                d.close()
+    if not np.isfinite(out).any():
+        raise RuntimeError(errors[0] if errors else "Copernicus: пустая вырезка")
+    grid = DemGrid(_mask_circle(out, dst_transform, x0, y0, radius_km), dst_transform,
+                   geo.crs_str(crs), resolution_m)
+    grid.source, grid.label, grid.attribution = "copernicus", DEM_LABEL, ATTRIBUTION
+    return grid
 
 
 def srtm_tile_name(lat_floor: int, lon_floor: int) -> str:
@@ -238,34 +285,50 @@ def read_hgt(path) -> tuple[np.ndarray, object]:
     return data, Affine(step, 0.0, lon_floor, 0.0, -step, lat_floor + 1.0)
 
 
-def _load_srtm(lat: float, lon: float, radius_km: float, *, epsg: int, resolution_m: float,
-               resampling: Resampling) -> DemGrid:
-    lat_min, lat_max, lon_min, lon_max = bbox_for_radius(lat, lon, radius_km)
-    tiles = tiles_for_bbox(lat_min, lat_max, lon_min, lon_max)
+def _srtm_part(lat_min: float, lat_max: float, lon_min: float, lon_max: float):
+    """Мозаика HGT в пределах одной части bbox: тайлы 1°, все на одной сетке."""
     blocks = []
-    for la, lo in tiles:
-        data, transform = read_hgt(ensure_srtm_tile(la, lo))
-        blocks.append((la, lo, data, transform))
+    for la, lo in tiles_for_bbox(lat_min, lat_max, lon_min, lon_max):
+        data, _ = read_hgt(ensure_srtm_tile(la, lo))
+        blocks.append((la, lo, data))
     if len(blocks) == 1:
-        band, transform = blocks[0][2], blocks[0][3]
-    else:
-        # мозаика вручную: все тайлы одного размера и одной сетки 1°, зазор не нужен
-        side = blocks[0][2].shape[0]
-        lat_lo = min(la for la, *_ in blocks)
-        lat_hi = max(la for la, *_ in blocks)
-        lon_lo = min(lo for _, lo, *_ in blocks)
-        lon_hi = max(lo for _, lo, *_ in blocks)
-        rows, cols = lat_hi - lat_lo + 1, lon_hi - lon_lo + 1
-        band = np.full((rows * side, cols * side), np.nan, dtype="float32")
-        for la, lo, data, _ in blocks:
-            r = (lat_hi - la) * side
-            c = (lo - lon_lo) * side
-            band[r:r + side, c:c + side] = data
+        la, lo, data = blocks[0]
+        step = 1.0 / (data.shape[0] - 1)
         from affine import Affine
-        step = 1.0 / (side - 1)
-        transform = Affine(step, 0.0, lon_lo, 0.0, -step, lat_hi + 1.0)
-    grid = _reproject_to_utm(band, transform, "EPSG:4326", lat=lat, lon=lon, radius_km=radius_km,
-                             epsg=epsg, resolution_m=resolution_m, resampling=resampling)
+        return data, Affine(step, 0.0, lo, 0.0, -step, la + 1.0)
+    from affine import Affine
+    side = blocks[0][2].shape[0]
+    lat_lo = min(la for la, *_ in blocks)
+    lat_hi = max(la for la, *_ in blocks)
+    lon_lo = min(lo for _, lo, *_ in blocks)
+    lon_hi = max(lo for _, lo, *_ in blocks)
+    band = np.full(((lat_hi - lat_lo + 1) * side, (lon_hi - lon_lo + 1) * side), np.nan,
+                   dtype="float32")
+    for la, lo, data in blocks:
+        r = (lat_hi - la) * side
+        c = (lo - lon_lo) * side
+        band[r:r + side, c:c + side] = data
+    step = 1.0 / (side - 1)
+    return band, Affine(step, 0.0, lon_lo, 0.0, -step, lat_hi + 1.0)
+
+
+def _load_srtm(lat: float, lon: float, radius_km: float, *, crs: int | str, resolution_m: float,
+               resampling: Resampling) -> DemGrid:
+    dst_transform, width, height, x0, y0 = target_grid(lat, lon, radius_km, crs=crs,
+                                                       resolution_m=resolution_m)
+    out = np.full((height, width), np.nan, dtype="float32")
+    errors = []
+    for part in bbox_parts(lat, lon, radius_km):
+        try:
+            band, transform = _srtm_part(*part)
+            out = _into_grid(band, transform, "EPSG:4326", out, dst_transform,
+                             geo.crs_str(crs), resampling)
+        except Exception as error:
+            errors.append(str(error))
+    if not np.isfinite(out).any():
+        raise RuntimeError(errors[0] if errors else "SRTM: пустая вырезка")
+    grid = DemGrid(_mask_circle(out, dst_transform, x0, y0, radius_km), dst_transform,
+                   geo.crs_str(crs), resolution_m)
     grid.source, grid.label, grid.attribution = "srtm", SRTM_LABEL, SRTM_ATTRIBUTION
     return grid
 
@@ -276,7 +339,7 @@ def loaders() -> dict:
     return {"copernicus": _load_copernicus, "srtm": _load_srtm}
 
 
-def load_dem(lat: float, lon: float, radius_km: float, *, epsg: int, resolution_m: float,
+def load_dem(lat: float, lon: float, radius_km: float, *, crs: int | str, resolution_m: float,
              resampling: Resampling = Resampling.bilinear, source: str | None = None) -> DemGrid:
     """Рельеф участка: первый доступный источник из `DEM_SOURCES`.
 
@@ -292,7 +355,7 @@ def load_dem(lat: float, lon: float, radius_km: float, *, epsg: int, resolution_
     errors: list[str] = []
     for name in order:
         try:
-            return available[name](lat, lon, radius_km, epsg=epsg, resolution_m=resolution_m,
+            return available[name](lat, lon, radius_km, crs=crs, resolution_m=resolution_m,
                                    resampling=resampling)
         except Exception as exc:                    # нет сети, нет кеша, битый тайл
             errors.append(f"{name}: {exc}")

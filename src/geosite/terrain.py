@@ -13,7 +13,7 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
-ALGO_VERSION = "3.0.0"
+ALGO_VERSION = "3.1.0"
 
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
@@ -28,14 +28,23 @@ class PolarFrame:
     valid: np.ndarray
 
 
-def polar_frame(grid: DemGrid, x0: float, y0: float) -> PolarFrame:
+def polar_frame(grid: DemGrid, x0: float, y0: float, *,
+                offset_deg: float | None = None) -> PolarFrame:
+    """Расстояние и **истинный** азимут каждого пикселя от точки участка.
+
+    В UTM сеточный север повёрнут к центральному меридиану зоны (у Лондона на 2.27°) —
+    без поправки повёрнуты все секторы. Поправка считается по CRS самой сетки, поэтому
+    для азимутальной проекции она нулевая, а для UTM подставляется сама.
+    """
     h, w = grid.data.shape
     rows, cols = np.mgrid[0:h, 0:w]
     xs = grid.transform.c + (cols + 0.5) * grid.transform.a
     ys = grid.transform.f + (rows + 0.5) * grid.transform.e
     dx, dy = xs - x0, ys - y0
     dist = np.hypot(dx, dy)
-    bearing = (np.degrees(np.arctan2(dx, dy))) % 360.0
+    if offset_deg is None:
+        offset_deg = geo.offset_for_grid(grid, x0, y0)
+    bearing = (np.degrees(np.arctan2(dx, dy)) + offset_deg) % 360.0
     valid = ~np.isnan(grid.data)
     return PolarFrame(dist, bearing, valid)
 
@@ -64,11 +73,15 @@ def mountain_sectors(grid: DemGrid, frame: PolarFrame, z0: float,
         mask_sector = sector_slice(frame.bearing, center - geo.HALF_SECTOR, center + geo.HALF_SECTOR)
         rings_out = []
         for r0, r1 in rings:
-            mask = mask_sector & (frame.dist >= r0 * 1000.0) & (frame.dist < r1 * 1000.0) & frame.valid
+            band = mask_sector & (frame.dist >= r0 * 1000.0) & (frame.dist < r1 * 1000.0)
+            mask = band & frame.valid
+            # G4.4: пустоты (море, дыры радарной съёмки) не интерполируются, но и не молчат:
+            # ноль вместо «нет данных» читался бы как «здесь плоско» (как в E-025)
+            void_share = round(float(np.mean(~frame.valid[band])), 4) if band.any() else None
             if not mask.any():
-                rings_out.append({"r_km": [r0, r1], "max_rel_elev_m": 0.0, "mean_rel_elev_m": 0.0,
-                                  "horizon_deg": 0.0, "horizon_azimuth": None, "hill_share": 0.0,
-                                  "peaks": []})
+                rings_out.append({"r_km": [r0, r1], "max_rel_elev_m": None, "mean_rel_elev_m": None,
+                                  "horizon_deg": None, "horizon_azimuth": None, "hill_share": None,
+                                  "peaks": [], "void_share": void_share})
                 continue
             vals = rel[mask]
             dists = frame.dist[mask]
@@ -82,6 +95,7 @@ def mountain_sectors(grid: DemGrid, frame: PolarFrame, z0: float,
                 "horizon_azimuth": round(float(frame.bearing[mask][imax]), 1),
                 "hill_share": round(float(np.mean(vals > HILL_THRESHOLD_M)), 3),
                 "peaks": [],
+                "void_share": void_share,
             })
         out.append(MountainMetrics(name, rings_out))
     return out
@@ -182,7 +196,7 @@ def dragon_vein(grid: DemGrid, x0: float, y0: float, z0: float, *,
             plateau += 1
         else:
             plateau = 0
-        direction = geo.normalize_deg(math.degrees(math.atan2(dx, dy)))
+        direction = geo.azimuth_xy(dx, dy, geo.offset_for_grid(grid, x0, y0))
         if prev_dir is not None:
             turn_accum += geo.angle_distance(direction, prev_dir)
             if turn_accum >= 60.0:
@@ -237,7 +251,7 @@ def point_description(grid: DemGrid, x0: float, y0: float) -> dict:
             "lift_over_200m_m": round(float(lifted), 1)}
 
 
-def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
+def measure_site(lat: float, lon: float, *, crs: int | str, resolution_m: float,
                  macro_km: float = 20.0, meso_km: float = 8.0,
                  facing_deg: float | None = None, smooth_m: float = 300.0,
                  point_smooth_m: float = 90.0, dem_path=None,
@@ -251,7 +265,7 @@ def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
 
     from .dem import load_dem, load_dem_file
 
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
     x0, y0 = tr.transform(lon, lat)
 
     if dem_path is not None:
@@ -260,12 +274,12 @@ def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
     elif macro_grid is not None:
         macro = macro_grid
     else:
-        macro = load_dem(lat, lon, macro_km, epsg=epsg, resolution_m=max(resolution_m, 90.0))
+        macro = load_dem(lat, lon, macro_km, crs=crs, resolution_m=max(resolution_m, 90.0))
     macro_s = smooth(macro, smooth_m)
     z0 = macro_s.point_value(x0, y0)
     if dem_path is None:
         meso = meso_grid if meso_grid is not None else load_dem(
-            lat, lon, meso_km, epsg=epsg, resolution_m=resolution_m)
+            lat, lon, meso_km, crs=crs, resolution_m=resolution_m)
     meso_s = smooth(meso, min(smooth_m, 120.0))
     z0_meso = meso_s.point_value(x0, y0)
     if math.isnan(z0):

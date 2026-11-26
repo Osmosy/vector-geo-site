@@ -35,11 +35,18 @@ class Site(BaseModel):
     # H1: полушарие и «около экватора» — факты, а не толкование
     hemisphere: Literal["N", "S"] | None = None
     equatorial: bool | None = None
+    # G2: в какой сетке считался участок и почему именно в ней
+    grid_crs: str | None = None
+    grid_crs_kind: Literal["utm", "aeqd"] | None = None
+    grid_crs_reason: str | None = None
+    convergence_deg: float | None = None
 
 
 class Orientation(BaseModel):
     facing_true_deg: float
     declination_deg: float | None = None
+    declination_horizontal_nt: float | None = None
+    declination_confidence: Confidence | None = None
     facing_mag_deg: float | None = None
     facing_mountain: str
     sitting_mountain: str
@@ -54,16 +61,20 @@ class ChartYear(BaseModel):
 
 
 class Ring(BaseModel):
+    """Кольцо сектора. Пустоты вместо чисел — `null`: «не смотрели» не равно «плоско»."""
+
     r_km: tuple[float, float]
-    max_rel_elev_m: float
-    mean_rel_elev_m: float
-    horizon_deg: float
+    max_rel_elev_m: float | None = None
+    mean_rel_elev_m: float | None = None
+    horizon_deg: float | None = None
     water_share: float | None = None
     built_share: float | None = None
     peaks: list[str] = Field(default_factory=list)
     # D3: у ближнего кольца оба вида рельефа — поверхность (крыши как городские 砂) и земля
     dsm: dict | None = None
     dtm: dict | None = None
+    # G4.4: доля пустот в кольце; больше 5 % — числам кольца верить нельзя
+    void_share: float | None = None
 
 
 class Sector(BaseModel):

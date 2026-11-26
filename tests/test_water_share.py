@@ -34,9 +34,9 @@ def test_share_lands_in_the_sector_where_the_water_is():
     site = np.array([0.0, 0.0])
     from pyproj import Transformer
 
-    xy = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    xy = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(xy.transform(lon, lat))
-    res = water_pack.sector_water_share([_F(north)], epsg=epsg, site_xy=site,
+    res = water_pack.sector_water_share([_F(north)], crs=epsg, site_xy=site,
                                         ring_m=(500.0, 4000.0))
     assert res["by_mountain"]["子"] > 0.001
     assert max(res["by_mountain"], key=res["by_mountain"].get) == "子"
@@ -48,11 +48,11 @@ def test_share_ignores_lines_and_tiny_ponds():
     epsg = 32630
     from pyproj import Transformer
 
-    xy = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    xy = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(xy.transform(lon, lat))
     line = _F([(lon, lat + 0.003), (lon, lat + 0.012)], name="line", kind="river")
     tiny = _F(_square(lon, lat + 0.009, side_m=20.0), name="tiny")
-    res = water_pack.sector_water_share([line, tiny], epsg=epsg, site_xy=site,
+    res = water_pack.sector_water_share([line, tiny], crs=epsg, site_xy=site,
                                         ring_m=(500.0, 2000.0))
     assert res["polygons"] == 0                     # 20 м × 20 м = 400 м² < 2000 м²
     assert res["area_km2"] == 0.0
@@ -65,10 +65,10 @@ def test_linear_length_is_metres_not_degrees():
     epsg = 32630
     from pyproj import Transformer
 
-    xy = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    xy = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(xy.transform(lon, lat))
     line = _F([(lon, lat + 0.0045), (lon, lat + 0.0135)], kind="river")   # ~1 км на север
-    res = water_pack.linear_water_by_sector([line], epsg=epsg, site_xy=site,
+    res = water_pack.linear_water_by_sector([line], crs=epsg, site_xy=site,
                                             ring_m=(0.0, 2000.0))
     assert 0.9 < res["子"] < 1.1
 
@@ -78,9 +78,9 @@ def test_ring_area_matches_geometry():
     epsg = 32630
     from pyproj import Transformer
 
-    xy = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    xy = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(xy.transform(lon, lat))
-    res = water_pack.sector_water_share([], epsg=epsg, site_xy=site, ring_m=(500.0, 2000.0))
+    res = water_pack.sector_water_share([], crs=epsg, site_xy=site, ring_m=(500.0, 2000.0))
     # π(2000² − 500²) = 11.78 км²
     assert res["ring_km2"] == pytest.approx(11.78, abs=0.05)
     assert all(v == 0.0 for v in res["by_mountain"].values())
@@ -92,12 +92,12 @@ def test_invalid_polygon_is_repaired_not_dropped():
     epsg = 32630
     from pyproj import Transformer
 
-    xy = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    xy = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(xy.transform(lon, lat))
     d = 0.006
     bowtie = [(lon - d, lat), (lon + d, lat), (lon - d, lat + 2 * d), (lon + d, lat + 2 * d),
               (lon - d, lat)]
-    res = water_pack.sector_water_share([_F(bowtie)], epsg=epsg, site_xy=site,
+    res = water_pack.sector_water_share([_F(bowtie)], crs=epsg, site_xy=site,
                                         ring_m=(500.0, 3000.0))
     assert res["skipped_invalid"] == 1
     assert res["polygons"] <= 1

@@ -37,7 +37,8 @@ def site_calibration(name: str) -> dict | None:
     fixture = site_dir / "fixtures"
     site = yaml.safe_load((site_dir / "site.yaml").read_text(encoding="utf-8"))
     lat, lon = float(site["lat"]), float(site["lon"])
-    epsg = geo.utm_epsg(lat, lon)
+    # G2: та же сетка, что и в пакете, иначе калибровка меряет не то, что пакет
+    epsg = geo.grid_crs(lat, lon, 50.0)["crs"]
     site_xy = water.to_utm([(lon, lat)], epsg)[0]
 
     osm_files = [p for p in (fixture / "osm-water.json.gz", fixture / "osm-water.json") if p.exists()]
@@ -46,13 +47,13 @@ def site_calibration(name: str) -> dict | None:
     payload = _load_osm_file(str(osm_files[0]))
     features = water.parse_features(payload, lat=lat, lon=lon, radius_m=8000.0)
     cover_path = fixture / "worldcover.tif"
-    cover = (landcover.measure(lat, lon, epsg=epsg, site_xy=site_xy, path=cover_path)
+    cover = (landcover.measure(lat, lon, crs=epsg, site_xy=site_xy, path=cover_path)
              if cover_path.exists() else None)
 
     tidal = any((f.tags.get("tidal") or "").lower() == "yes" for f in features)
     rows = []
     for r0, r1 in RINGS:
-        osm_ring = water_pack.sector_water_share(features, epsg=epsg, site_xy=site_xy,
+        osm_ring = water_pack.sector_water_share(features, crs=epsg, site_xy=site_xy,
                                                  ring_m=(r0, r1))
         osm_total = osm_ring["area_km2"] / max(osm_ring["ring_km2"], 1e-9)
         key = f"{r0 / 1000:g}-{r1 / 1000:g}"

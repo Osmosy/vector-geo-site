@@ -28,15 +28,15 @@ def test_read_hgt_decodes_and_marks_nodata(tmp_path):
     assert abs(transform.c - 0.0) < 1e-12 and abs(transform.f - 52.0) < 1e-12
 
 
-def _stub_grid(source: str, label: str, epsg: int):
+def _stub_grid(source: str, label: str, crs: int | str):
     import numpy as np
 
     from affine import Affine
 
-    from geosite import dem
+    from geosite import dem, geo
 
     grid = dem.DemGrid(np.zeros((3, 3), dtype="float32"), Affine(30.0, 0.0, 0.0, 0.0, -30.0, 0.0),
-                       f"EPSG:{epsg}", 30.0)
+                       geo.crs_str(crs), 30.0)
     grid.source, grid.label = source, label
     return grid
 
@@ -56,7 +56,7 @@ def test_load_dem_falls_back_to_srtm(monkeypatch):
     monkeypatch.setattr(dem, "_load_srtm",
                         lambda *a, **k: _stub_grid("srtm", dem.SRTM_LABEL, k.get("epsg", 32630)))
     monkeypatch.delenv("GEOSITE_DEM", raising=False)
-    grid = dem.load_dem(51.5138, -0.0984, 2.0, epsg=32630, resolution_m=90.0)
+    grid = dem.load_dem(51.5138, -0.0984, 2.0, crs=32630, resolution_m=90.0)
     assert grid.source == "srtm"
     assert "SRTM" in grid.label
 
@@ -66,7 +66,7 @@ def test_load_dem_srtm_real_tile():
     """Настоящий тайл SRTM: скачивание и чтение HGT (около 5 МБ, нужен интернет)."""
     from geosite import dem
 
-    grid = dem.load_dem(51.5138, -0.0984, 5.0, epsg=32630, resolution_m=30.0, source="srtm")
+    grid = dem.load_dem(51.5138, -0.0984, 5.0, crs=32630, resolution_m=30.0, source="srtm")
     assert grid.source == "srtm"
     assert grid.data.shape[0] > 100
 
@@ -78,7 +78,7 @@ def test_load_dem_reports_both_sources_when_none_work(monkeypatch):
     monkeypatch.setattr(dem, "_load_srtm", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("нет кеша")))
     monkeypatch.delenv("GEOSITE_DEM", raising=False)
     try:
-        dem.load_dem(51.5, -0.1, 1.0, epsg=32630, resolution_m=90.0)
+        dem.load_dem(51.5, -0.1, 1.0, crs=32630, resolution_m=90.0)
     except RuntimeError as exc:
         assert "copernicus" in str(exc) and "srtm" in str(exc)
     else:

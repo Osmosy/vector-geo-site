@@ -90,9 +90,9 @@ def test_confluences_found():
     epsg = 32630
     from pyproj import Transformer
     from geosite.water import to_utm
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site_xy = np.array(tr.transform(-0.0975, 51.50))
-    res = water.find_confluences([a, b], site_xy=site_xy, epsg=epsg, radius_m=5000)
+    res = water.find_confluences([a, b], site_xy=site_xy, crs=epsg, radius_m=5000)
     ids = list(res)
     assert res[ids[0]] and res[ids[1]]
     assert res[ids[0]][0]["dist_m"] < 200
@@ -111,9 +111,9 @@ def test_london_thames_metrics():
         pytest.skip("нет кеша воды для Вестминстера")
     merged = water.merge_by_name(water.parse_features(payload))
     thames = max([m for m in merged if m.name and "Thames" in m.name], key=lambda m: len(m.coords))
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site_xy = np.array(tr.transform(lon, lat))
-    metric = water.measure_feature(thames, site_xy=site_xy, lat=lat, lon=lon, epsg=epsg, grid=None)
+    metric = water.measure_feature(thames, site_xy=site_xy, lat=lat, lon=lon, crs=epsg, grid=None)
     assert metric is not None
     assert 150 < metric.nearest_m < 800
     assert metric.curvature_radius_m is not None
@@ -215,9 +215,9 @@ def test_y_junction_gives_single_confluence():
     main = make("Main", [(-0.100, 51.500), (-0.095, 51.500)], osm_id=1)
     trib = make("Trib", [(-0.0975, 51.505), (-0.0975, 51.500)], osm_id=2)
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.0975, 51.50))
-    res = water.find_confluences([main, trib], site_xy=site, epsg=epsg)
+    res = water.find_confluences([main, trib], site_xy=site, crs=epsg)
     main_key = [k for k in res if "Main" in k][0]
     assert len(res[main_key]) == 1
     assert res[main_key][0]["kind"] in {"confluence", "canal_junction", "culvert_outfall"}
@@ -229,9 +229,9 @@ def test_double_crossing_gives_two_confluences():
     a = make("A", [(-0.11, 51.50), (-0.09, 51.50)], osm_id=11)
     b = make("B", [(-0.105, 51.494), (-0.095, 51.506), (-0.093, 51.494)], osm_id=22)
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.10, 51.50))
-    res = water.find_confluences([a, b], site_xy=site, epsg=epsg)
+    res = water.find_confluences([a, b], site_xy=site, crs=epsg)
     a_key = [k for k in res if "A-" in k][0]
     distances = sorted(item["dist_m"] for item in res[a_key])
     assert len(distances) == 2
@@ -245,9 +245,9 @@ def test_near_duplicate_intersections_are_merged():
     a = make("A", [(-0.110, 51.500), (-0.090, 51.500)], osm_id=31)
     b = make("B", [(-0.1000, 51.495), (-0.1000, 51.505)], osm_id=32)
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.10, 51.50))
-    res = water.find_confluences([a, b], site_xy=site, epsg=epsg)
+    res = water.find_confluences([a, b], site_xy=site, crs=epsg)
     a_key = [k for k in res if "A-" in k][0]
     assert len(res[a_key]) == 1
 
@@ -258,9 +258,9 @@ def test_canal_junction_kind():
     river = make("R", [(-0.110, 51.500), (-0.090, 51.500)], osm_id=41)
     canal = make("C", [(-0.0980, 51.496), (-0.0980, 51.504)], kind="canal", osm_id=42)
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.10, 51.50))
-    res = water.find_confluences([river, canal], site_xy=site, epsg=epsg)
+    res = water.find_confluences([river, canal], site_xy=site, crs=epsg)
     kinds = {item["kind"] for items in res.values() for item in items}
     assert "canal_junction" in kinds
 
@@ -272,9 +272,9 @@ def test_confluence_cap_per_line():
     tribs = [make(f"T{i}", [(-0.115 + i * 0.01, 51.495), (-0.115 + i * 0.01, 51.505)], osm_id=60 + i)
              for i in range(8)]
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.10, 51.50))
-    res = water.find_confluences([river] + tribs, site_xy=site, epsg=epsg)
+    res = water.find_confluences([river] + tribs, site_xy=site, crs=epsg)
     river_key = [k for k in res if "R-" in k][0]
     assert len(res[river_key]) <= 5
     assert res[river_key][0]["dist_m"] <= res[river_key][-1]["dist_m"]
@@ -299,7 +299,7 @@ def test_hidden_share_hides_from_visible():
     assert merged[0].hidden_share > 0.8
     site = water.to_utm([(-0.099, 51.50)], 32630)[0]
     metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.099,
-                                   epsg=32630, grid=None)
+                                   crs=32630, grid=None)
     assert metric.visible is False
 
 
@@ -356,7 +356,7 @@ def test_confluence_found_on_second_chunk_of_same_river():
     from pyproj import Transformer
 
     epsg = 32630
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     site = np.array(tr.transform(-0.100, 51.500))
 
     # река разорвана надвое: ближний кусок у участка, дальний — в 4 км восточнее
@@ -364,7 +364,7 @@ def test_confluence_found_on_second_chunk_of_same_river():
     far_chunk = make("R", [(-0.060, 51.500), (-0.050, 51.500)], osm_id=2)
     trib = make("T", [(-0.055, 51.494), (-0.055, 51.506)], osm_id=3)
     merged = water.merge_by_name([near_chunk, far_chunk, trib])
-    res = water.find_confluences(merged, site_xy=site, epsg=epsg, clip_m=8000.0)
+    res = water.find_confluences(merged, site_xy=site, crs=epsg, clip_m=8000.0)
     r_uid = [m.uid for m in merged if m.name == "R"][1]
     assert res[r_uid], "слияние на дальнем куске реки потеряно"
     assert res[r_uid][0]["with"] == "osm-t-river"
@@ -483,7 +483,7 @@ def test_tidal_tag_reaches_flow_rule():
     merged = water.merge_by_name([piece], near=(51.50, -0.10))
     site = water.to_utm([(-0.10, 51.50)], 32630)[0]
     metric = water.measure_feature(merged[0], site_xy=site, lat=51.50, lon=-0.10,
-                                   epsg=32630, grid=None)
+                                   crs=32630, grid=None)
     assert metric.tidal is True
     assert metric.flow_rule == 2, metric.flow_rule
 
@@ -495,7 +495,7 @@ def test_partly_buried_river_is_not_a_culvert():
                              tags={"waterway": "river", "tunnel": "culvert"})
     site = water.to_utm([(-0.100, 51.500)], 32630)[0]
     metric = water.measure_feature(mixed, site_xy=site, lat=51.500, lon=-0.100,
-                                   epsg=32630, grid=None)
+                                   crs=32630, grid=None)
     assert metric.kind == "river"
     assert metric.visible is True
 
@@ -506,7 +506,7 @@ def test_almost_fully_buried_river_is_a_culvert():
                               hidden_share=0.93, tags={"waterway": "river"})
     site = water.to_utm([(-0.100, 51.500)], 32630)[0]
     metric = water.measure_feature(buried, site_xy=site, lat=51.500, lon=-0.100,
-                                   epsg=32630, grid=None)
+                                   crs=32630, grid=None)
     assert metric.kind == "culvert"
     assert metric.visible is False
 
@@ -537,7 +537,7 @@ def test_culvert_gets_no_flow_rule():
         buried = water.MergedLine("osm-buried", "Buried", "river", coords, 3, is_hidden,
                                   hidden_share=share, tags=tags)
         metric = water.measure_feature(buried, site_xy=site, lat=51.500, lon=-0.100,
-                                       epsg=32630, grid=None)
+                                       crs=32630, grid=None)
         assert metric.kind == "culvert"
         assert metric.flow_rule == 0
 
@@ -586,7 +586,7 @@ def test_same_river_pieces_are_not_a_confluence():
     south = make("R", seg(0.0000, 0.0100, 50.998))
     north.uid, south.uid = "r-n", "r-s"
     north.key = south.key = "osm-r-river"
-    out = water.find_confluences([north, south], site_xy=site, epsg=epsg, radius_m=8000)
+    out = water.find_confluences([north, south], site_xy=site, crs=epsg, radius_m=8000)
     assert all(not items for items in out.values())
 
 
@@ -600,11 +600,11 @@ def test_one_entry_per_name_prefers_main_channel_over_nearest_stub():
     stub = water.MergedLine("osm-r-river", "R", "river",
                             [(-0.00020, 51.0002), (-0.00020, 51.0010)], 1, False, 0.0,
                             uid="b", tags={})
-    m_main = water.measure_feature(main, site_xy=site, lat=51.0, lon=0.0, epsg=32630, grid=None)
-    m_stub = water.measure_feature(stub, site_xy=site, lat=51.0, lon=0.0, epsg=32630, grid=None)
+    m_main = water.measure_feature(main, site_xy=site, lat=51.0, lon=0.0, crs=32630, grid=None)
+    m_stub = water.measure_feature(stub, site_xy=site, lat=51.0, lon=0.0, crs=32630, grid=None)
     assert m_main is not None and m_stub is not None
     assert m_stub.nearest_m < m_main.nearest_m
-    kept = water._one_entry_per_name([m_stub, m_main], site_xy=site, epsg=32630)
+    kept = water._one_entry_per_name([m_stub, m_main], site_xy=site, crs=32630)
     assert len(kept) == 1
     assert kept[0].nearest_m == m_main.nearest_m
     assert kept[0].pieces == 2
@@ -631,7 +631,7 @@ def test_confluence_found_in_shorter_arm_of_horseshoe():
     trib.uid = "osm-tributary-0"
     trib.key = "osm-tributary-river"
 
-    out = water.find_confluences([horseshoe, trib], site_xy=site, epsg=epsg, radius_m=8000)
+    out = water.find_confluences([horseshoe, trib], site_xy=site, crs=epsg, radius_m=8000)
     assert out.get(trib.uid), "слияние через короткий рукав потеряно"
     assert min(h["dist_m"] for h in out[trib.uid]) < 1500
 
@@ -650,7 +650,7 @@ def test_tidal_null_has_reason_when_wide_payload_absent():
         dem_reason=None, tidal=None, tidal_source=None, source="openstreetmap",
         coords=[(-0.10, 51.51), (-0.09, 51.51)],
     )
-    water._resolve_tidal_by_reach([metric], 51.51, -0.10, epsg=epsg, site_xy=site,
+    water._resolve_tidal_by_reach([metric], 51.51, -0.10, crs=epsg, site_xy=site,
                                   radius_m=8000, wide_payload=None, allow_network=False)
     assert metric.tidal is None
     assert metric.tidal_reason and metric.tidal_reason.startswith("no_wide_payload")
@@ -682,10 +682,10 @@ def test_waterbody_outlines_do_not_make_confluences():
     for way in (59041257, 59042050, 368175646):          # три контура — площади
         assert kinds[way][1] == "area", kinds[way]
 
-    conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    conf = water.find_confluences(feats, site_xy=site, crs=epsg, radius_m=8000)
     assert not any(conf.values()), {k: v for k, v in conf.items() if v}
 
-    links = water.find_waterbody_links(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    links = water.find_waterbody_links(feats, site_xy=site, crs=epsg, radius_m=8000)
     creek = next(v for k, v in links.items() if k.startswith("osm-way-4054869"))
     assert creek, links
     assert all(item["kind"] == "enters_waterbody" for item in creek)
@@ -722,7 +722,7 @@ def test_area_polygon_never_joins_confluence_search():
     # вид описывает поверхность воды: у контура это не русло (E-018). Разделяет их `geom`.
     assert [f.kind for f in feats] == ["lake", "lake", "river"]
 
-    conf = water.find_confluences(feats, site_xy=site, epsg=epsg, radius_m=8000)
+    conf = water.find_confluences(feats, site_xy=site, crs=epsg, radius_m=8000)
     assert not any(conf.values()), conf
 
     # инвариант I-13: участники слияний — только линии; здесь площадь не участвует ни разу
@@ -771,7 +771,7 @@ def test_confluence_found_in_short_arm_real_data_gloucester_streams():
     pieces = water.clip_near(water.to_utm(short.coords, epsg) - site, 8000.0) or []
     assert sorted(len(p) for p in pieces) == [2, 4], [len(p) for p in pieces]
 
-    conf = water.find_confluences(merged, site_xy=site, epsg=epsg, radius_m=8000, clip_m=8000.0)
+    conf = water.find_confluences(merged, site_xy=site, crs=epsg, radius_m=8000, clip_m=8000.0)
     distances = [c["dist_m"] for c in conf[short.uid]]
     assert 7974.5 in distances, distances
 
@@ -780,7 +780,7 @@ def test_confluence_found_in_short_arm_real_data_gloucester_streams():
     water.clip_near = lambda pts, limit: (lambda out: [max(out, key=len)] if out else out)(
         original(pts, limit) or [])
     try:
-        old_style = water.find_confluences(merged, site_xy=site, epsg=epsg,
+        old_style = water.find_confluences(merged, site_xy=site, crs=epsg,
                                            radius_m=8000, clip_m=8000.0)
     finally:
         water.clip_near = original
@@ -811,7 +811,7 @@ def test_area_gets_only_waterbody_fields():
     ]}
     epsg = geo.utm_epsg(lat, lon)
     site = water.to_utm([(lon, lat)], epsg)[0]
-    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+    metrics = water.measure_water(lat, lon, crs=epsg, grid=None, site_xy=site,
                                   payload=payload, allow_network=False)
 
     area = next(m for m in metrics if m.geom == "area")
@@ -851,7 +851,7 @@ def test_dock_channel_links_to_area_and_gets_low():
     ]}
     epsg = geo.utm_epsg(lat, lon)
     site = water.to_utm([(lon, lat)], epsg)[0]
-    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+    metrics = water.measure_water(lat, lon, crs=epsg, grid=None, site_xy=site,
                                   payload=payload, allow_network=False)
 
     area = next(m for m in metrics if m.geom == "area")
@@ -879,7 +879,7 @@ def test_far_course_has_no_entry_and_exit_mountains():
     ]}
     epsg = geo.utm_epsg(lat, lon)
     site = water.to_utm([(lon, lat)], epsg)[0]
-    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+    metrics = water.measure_water(lat, lon, crs=epsg, grid=None, site_xy=site,
                                   payload=payload, allow_network=False)
     far = next(m for m in metrics if m.geom == "line")
     assert far.length_2km_m == 0.0, far.length_2km_m
@@ -971,7 +971,7 @@ def test_multipolygon_area_excludes_holes():
     site = water.to_utm([(-0.0984, 51.5138)], epsg)[0]
 
     metric = water.measure_feature(feats[0], site_xy=site, lat=51.5138, lon=-0.0984,
-                                   epsg=epsg, grid=None)
+                                   crs=epsg, grid=None)
     # 3000 × 3000 м минус 1000 × 1000 м = 8 000 000 м² (граница круга не задевает)
     assert metric.geom == "area"
     # 3000 × 3000 м минус 1000 × 1000 м: допуск 2 % на перевод градусов в UTM
@@ -1000,7 +1000,7 @@ def test_relation_surface_counts_in_water_share():
     epsg = geo.utm_epsg(51.5138, -0.0984)
     site = water.to_utm([(-0.0984, 51.5138)], epsg)[0]
 
-    share = water_pack.sector_water_share(feats, epsg=epsg, site_xy=site, ring_m=(500.0, 2000.0))
+    share = water_pack.sector_water_share(feats, crs=epsg, site_xy=site, ring_m=(500.0, 2000.0))
     assert share["area_km2"] > 0.0
     assert max(share["by_mountain"].values()) > 0.5, share["by_mountain"]
 
@@ -1019,7 +1019,7 @@ def test_unnamed_riverbank_links_to_named_line():
     site = water.to_utm([(lon, lat)], epsg)[0]
     fused = {"elements": bank["elements"] + line["elements"]}
 
-    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+    metrics = water.measure_water(lat, lon, crs=epsg, grid=None, site_xy=site,
                                   radius_m=8000, payload=fused, allow_network=False)
     bank_metric = next(m for m in metrics if m.geom == "area")
     assert bank_metric.source == "osm_relation"

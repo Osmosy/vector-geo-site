@@ -46,7 +46,7 @@ def test_mode_switch(monkeypatch):
 
 def test_none_mode_gives_no_dtm_and_reason(monkeypatch):
     monkeypatch.setenv("GEOSITE_DTM", "none")
-    grid, info = dtm.grid(52.3731, 4.8922, epsg=32631, radius_km=8.0)
+    grid, info = dtm.grid(52.3731, 4.8922, crs=32631, radius_km=8.0)
     assert grid is None and "GEOSITE_DTM=none" in info["reason"]
 
 
@@ -55,7 +55,7 @@ def test_offline_without_cache_is_none_not_zero(monkeypatch, tmp_path):
     monkeypatch.setattr(dtm, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setenv("GEOSITE_OFFLINE", "1")
     monkeypatch.setenv("GEOSITE_DTM", "lidar")
-    grid, info = dtm.grid(52.3731, 4.8922, epsg=32631, radius_km=8.0)
+    grid, info = dtm.grid(52.3731, 4.8922, crs=32631, radius_km=8.0)
     assert grid is None
     assert info["reason"] and "ahn4" in " ".join(info["tried"])
 

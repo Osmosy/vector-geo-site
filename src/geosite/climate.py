@@ -18,7 +18,7 @@ import json
 import math
 from pathlib import Path
 
-ALGO_VERSION = "1.1.0"
+ALGO_VERSION = "1.2.0"
 
 SOURCE_MAG = "WMM (NOAA), pygeomag"
 SOURCE_WIND = "ERA5 через Open-Meteo archive API (суточные, 10 м)"
@@ -41,14 +41,26 @@ def decimal_year(day: dt.date | None = None) -> float:
     return day.year + (day - start).days / (end - start).days
 
 
+HORIZONTAL_MIN_NT = 2000.0   # ниже этого компас не держит направление (G4)
+
+
 def declination(lat: float, lon: float, year: float | None = None) -> dict:
-    """Магнитное склонение: градусы, восточное положительное."""
+    """Магнитное склонение: градусы, восточное положительное.
+
+    Вместе со склонением возвращается горизонтальная составляющая поля: у магнитного полюса
+    стрелка не стоит на север, а дрожит — при H < 2000 нТл направление по компасу не измерить,
+    и об этом нужно сказать прямо, а не выдавать градусы с видом точности.
+    """
     import pygeomag
 
     when = decimal_year() if year is None else float(year)
     model = pygeomag.GeoMag()
     result = model.calculate(glat=lat, glon=lon, alt=0.0, time=when)
-    return {"deg": round(float(result.d), 3), "year": round(when, 2), "source": SOURCE_MAG}
+    horizontal = float(getattr(result, "h", float("nan")))
+    confidence = "high" if horizontal >= HORIZONTAL_MIN_NT else "low"
+    return {"deg": round(float(result.d), 3), "year": round(when, 2), "source": SOURCE_MAG,
+            "horizontal_nt": None if horizontal != horizontal else round(horizontal),
+            "confidence": confidence}
 
 
 def magnetic_bearing(true_bearing: float, declination_deg: float) -> float:

@@ -22,6 +22,8 @@ from pathlib import Path
 
 import numpy as np
 
+from . import geo
+
 ALGO_VERSION = "1.0.0"
 SOURCE = "ESA WorldCover 2021 v200"
 LICENSE = "CC BY 4.0"
@@ -125,7 +127,7 @@ def _window_remote(lat: float, lon: float, radius_m: float) -> dict | None:
     return {"array": array, "transform": transform, "tile": tile_name(lat, lon), "cached": False}
 
 
-def _pixel_coords(data: dict, epsg: int, site_xy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _pixel_coords(data: dict, crs: int | str, site_xy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Координаты центров пикселей относительно участка в UTM.
 
     Пересчёт идёт через градусы: WorldCover в EPSG:4326, а сектора и кольца считаются в UTM.
@@ -139,7 +141,7 @@ def _pixel_coords(data: dict, epsg: int, site_xy: np.ndarray) -> tuple[np.ndarra
     rows, cols = array.shape
     lons = c + (np.arange(cols) + 0.5) * a
     lats = f + (np.arange(rows) + 0.5) * e
-    to_utm = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    to_utm = Transformer.from_crs("EPSG:4326", geo.crs_str(crs), always_xy=True)
     xs, _ = to_utm.transform(lons, np.full_like(lons, float(lats.mean())))
     _, ys = to_utm.transform(np.full_like(lats, float(lons.mean())), lats)
     return xs - site_xy[0], ys - site_xy[1]
@@ -168,7 +170,7 @@ def write_crop(lat: float, lon: float, radius_m: float, path: str | Path, *,
     return True
 
 
-def measure(lat: float, lon: float, *, epsg: int, site_xy: np.ndarray,
+def measure(lat: float, lon: float, *, crs: int | str, site_xy: np.ndarray,
             rings: tuple[tuple[float, float], ...] = ((500.0, 2000.0), (2000.0, 8000.0)),
             radius_m: float = 8000.0, path: str | Path | None = None,
             offline: bool = False) -> dict | None:
@@ -183,7 +185,7 @@ def measure(lat: float, lon: float, *, epsg: int, site_xy: np.ndarray,
     if data is None:
         return None
     array = data["array"]
-    xs, ys = _pixel_coords(data, epsg, site_xy)
+    xs, ys = _pixel_coords(data, crs, site_xy)
     xg, yg = np.meshgrid(xs, ys)
     radius = np.hypot(xg, yg)
     inside = radius <= radius_m
