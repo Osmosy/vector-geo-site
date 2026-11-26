@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "7.4.0"
+ALGO_VERSION = "8.0.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -72,6 +72,10 @@ class Feature:
     # линия русла или контур водоёма: контуры берегов нельзя считать водотоками, иначе
     # пересечение двух берегов засчитывается как впадение (E-017)
     geom: str = "line"             # line / area
+    # дыры мультиполигона: остров внутри озера, суша внутри речного разлива (E-022).
+    # Площадь считается за вычетом дыр, иначе «озеро с островом» — это озеро плюс остров.
+    holes: list[list[tuple[float, float]]] = field(default_factory=list)
+    source: str = "osm_way"        # osm_way / osm_relation
 
 
 def _query(lat: float, lon: float, radius_m: int) -> str:
@@ -80,9 +84,16 @@ def _query(lat: float, lon: float, radius_m: int) -> str:
         "[out:json][timeout:90];"
         f'(way(around:{r},{lat},{lon})["waterway"~"^(river|stream|canal|drain|ditch|riverbank)$"];'
         f'way(around:{r},{lat},{lon})["natural"="water"];'
+        # Площадь воды: отношения-мультиполигоны (E-022). `type=multipolygon` не в фильтре —
+        # у отношения вода описывается членами, и любой `natural=water` собирается целиком;
+        # фильтр отбросил бы берега, помеченные как `type=waterway`.
         f'relation(around:{r},{lat},{lon})["natural"="water"];'
+        f'relation(around:{r},{lat},{lon})["waterway"="riverbank"];'
+        f'relation(around:{r},{lat},{lon})["landuse"~"^(reservoir|basin)$"];'
         f'way(around:{r},{lat},{lon})["waterway"="dam"];'
-        ");out geom tags;"
+        # `out body geom`, а не `out geom`: у отношений `out geom` отдаёт члены без геометрии,
+        # и мультиполигон приходил пустым (E-022)
+        ");out body geom;"
     )
 
 
@@ -325,7 +336,105 @@ def _name_of(tags: dict) -> str | None:
     return None
 
 
-def parse_features(payload: dict) -> list[Feature]:
+CLIP_MARGIN = 1.05          # обрезаем по кругу с запасом: клин кольца начинается внутри
+
+
+def _clip_circle(lat: float, lon: float, radius_m: float, *, steps: int = 120):
+    """Круг выборки в градусах — для обрезки мультиполигона до пересечений.
+
+    Точность обрезки на 8 км — сантиметры по дуге и единицы метров по радиусу: круг нужен
+    только чтобы не тащить в расчёт берег, уходящий на десятки километров. Площади секторов
+    считаются потом в UTM, поэтому запас `CLIP_MARGIN` важнее точности самого круга.
+    """
+    from shapely.geometry import Polygon
+
+    m_per_deg_lat = 111132.0
+    m_per_deg_lon = m_per_deg_lat * max(0.05, math.cos(math.radians(lat)))
+    points = []
+    for index in range(steps):
+        azimuth = 2.0 * math.pi * index / steps
+        points.append((lon + radius_m * math.sin(azimuth) / m_per_deg_lon,
+                       lat + radius_m * math.cos(azimuth) / m_per_deg_lat))
+    return Polygon(points)
+
+
+def _member_segments(el: dict) -> tuple[list[list[tuple[float, float]]], list[list[tuple[float, float]]]]:
+    """Члены отношения по ролям: внешние кольца и дыры, отдельными кусками."""
+    outer: list[list[tuple[float, float]]] = []
+    inner: list[list[tuple[float, float]]] = []
+    for member in el.get("members") or []:
+        if member.get("type") != "way":
+            continue
+        coords = [(g["lon"], g["lat"]) for g in member.get("geometry") or [] if g]
+        if len(coords) < 2:
+            continue
+        if (member.get("role") or "").lower() == "inner":
+            inner.append(coords)
+        else:
+            outer.append(coords)
+    return outer, inner
+
+
+def _assemble_relation(el: dict, *, lat: float, lon: float, radius_m: float,
+                       limit: int = 8) -> list[Feature]:
+    """Мультиполигон OSM в площади: внешние кольца склеиваются, дыры вычитаются (E-022).
+
+    Отношение — это не набор линий: `outer` идёт цепочкой кусков и замыкается только вместе.
+    До 8.0.0 каждый член становился отдельным объектом с тегами отношения, поэтому берег
+    Темзы приходил десятком незамкнутых обрывков, а поверхность реки в долю воды не попадала.
+
+    Склейка через `polygonize`: он собирает кольца по узлам, а не по порядку членов, поэтому
+    куски, отданные в другом порядке или в обратном направлении, всё равно замыкаются.
+    """
+    from shapely.geometry import LineString, Polygon
+    from shapely.ops import polygonize, unary_union
+
+    outer, inner = _member_segments(el)
+    if not outer:
+        return []
+    try:
+        faces = [poly for poly in polygonize(unary_union([LineString(s) for s in outer]))
+                 if poly.area > 0.0]
+        if not faces:
+            return []
+        holes = ([poly for poly in polygonize(unary_union([LineString(s) for s in inner]))
+                  if poly.area > 0.0] if inner else [])
+        holes_union = unary_union(holes) if holes else None
+        circle = _clip_circle(lat, lon, radius_m * CLIP_MARGIN)
+    except Exception:
+        return []
+    tags = el.get("tags") or {}
+    name = _name_of(tags)
+    out: list[Feature] = []
+    for face in faces:
+        piece = face if holes_union is None else face.difference(holes_union)
+        if not piece.is_valid:
+            piece = piece.buffer(0)
+        if piece.is_empty:
+            continue
+        try:
+            piece = piece.intersection(circle)     # обрезаем до пересечений с кольцами
+        except Exception:
+            continue
+        parts = list(piece.geoms) if piece.geom_type == "MultiPolygon" else [piece]
+        for poly in parts:
+            if poly.is_empty or poly.geom_type != "Polygon" or poly.area <= 0.0:
+                continue
+            ring = [(float(x), float(y)) for x, y in poly.exterior.coords]
+            if len(ring) < 4:
+                continue
+            out.append(Feature(int(el.get("id") or 0) * 1000 + len(out), "relation", name,
+                               _kind_of(tags), tags, ring, True, "area",
+                               holes=[[(float(x), float(y)) for x, y in hole.coords]
+                                      for hole in poly.interiors],
+                               source="osm_relation"))
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def parse_features(payload: dict, *, lat: float | None = None, lon: float | None = None,
+                   radius_m: float = 8000.0) -> list[Feature]:
     out: list[Feature] = []
     for el in payload.get("elements", []):
         tags = el.get("tags", {}) or {}
@@ -338,8 +447,13 @@ def parse_features(payload: dict) -> list[Feature]:
             out.append(Feature(el.get("id", 0), "way", _name_of(tags), kind, tags, coords, closed,
                                _geom_of(tags, closed)))
         elif el.get("type") == "relation" and el.get("members"):
-            # члены отношения не склеиваем в один контур: иначе между ними появляются
-            # хорды через полгорода и доля воды раздувается
+            # E-022: площадь отношения собирается целиком (outer + inner), а не по членам:
+            # берег Темзы приходит десятком незамкнутых кусков и без сборки не даёт площади.
+            # Обрезка по кругу — здесь, до пересечений с секторами.
+            if lat is not None and lon is not None:
+                out.extend(_assemble_relation(el, lat=lat, lon=lon, radius_m=radius_m))
+                continue
+            # без участка (старые вызовы, тесты) — прежнее поведение по членам
             for idx, member in enumerate(el["members"]):
                 geom = [(g["lon"], g["lat"]) for g in member.get("geometry") or [] if g]
                 if len(geom) >= 2:
@@ -508,6 +622,10 @@ class MergedLine:
     # «рельеф молчит», хотя тег `tidal=yes` есть у всех её кусков.
     tags: dict = field(default_factory=dict)
     geom: str = "line"             # line / area
+    # дыры мультиполигона (остров в озере) и источник: у площади из отношения площадь
+    # считается за вычетом дыр, и в пакете видно `source: osm_relation` (E-022)
+    holes: list[list[tuple[float, float]]] = field(default_factory=list)
+    source: str = "osm_way"
 
     def __post_init__(self) -> None:
         if not self.uid:
@@ -538,13 +656,19 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
         # тип в ключ не входит: одна река в OSM бывает и river, и stream на разных участках
         # контур водоёма и русло с тем же именем — разные объекты: склеенные в одну линию,
         # они дают скачки геометрии и ложные слияния берегов (E-017)
-        key = (hydronym.normalize_name(f.name) or f"#{f.osm_id}", f.geom)
+        # у площади из отношения свой osm_id на каждый кусок берега: `rel…` в ключе
+        # отличает его от way-контура с тем же числом (E-022)
+        fallback = (f"rel{f.osm_id}" if getattr(f, "source", "") == "osm_relation"
+                    else f"#{f.osm_id}")
+        key = (hydronym.normalize_name(f.name) or fallback, f.geom)
         groups.setdefault(key, []).append(f)
 
     merged: list[MergedLine] = []
     for (name, geom), items in groups.items():
         longest = max(items, key=lambda f: len(f.coords))
-        display = longest.name or name
+        # `#<id>` — ключ для безымянных, а не название: иначе объект зовётся «#28934005»
+        # и привязка берега к реке по имени не находит ничего (E-022)
+        display = longest.name
         kind = max((f.kind for f in items), key=lambda k: KIND_RANK.get(k, 0))
         pieces = [f.coords for f in items]
         hidden = all(is_hidden(f.tags) for f in items)
@@ -568,6 +692,19 @@ def merge_by_name(features: list[Feature], *, max_gap_m: float = 150.0,
         # длинного куска, и односторонняя жадность рвала её на 13 линий (E-014). Сначала
         # компоненты связности по концам (|разрыв| ≤ max_gap_m), затем внутри компоненты —
         # пришиваем куски то к началу, то к концу, пока есть что пришивать.
+        if geom == "area":
+            # Контуры не сшиваются: склейка колец даёт хорды между ними, и площадь
+            # «озёр» одного имени считалась бы вместе с сушей между ними (E-022).
+            for item in items:
+                item_hidden = is_hidden(item.tags)
+                length = _line_len(item.coords)
+                merged.append(MergedLine(f"osm-{name}-{kind}", item.name or display, kind,
+                                         list(item.coords), 1, item_hidden,
+                                         (1.0 if item_hidden else 0.0) if length > 0 else None,
+                                         tags=dict(item.tags), geom="area",
+                                         holes=[list(h) for h in item.holes],
+                                         source=item.source))
+            continue
         for comp in _components(pieces, max_gap_m):
             items_count = len(comp)
             for chain, forward, backward in _chain_component(pieces, max_gap_m, idx=comp,
@@ -810,8 +947,8 @@ def is_watercourse(obj) -> bool:
         "river", "stream", "canal", "culvert"}
 
 
-def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int,
-                       nearest_m: float) -> "WaterMetrics":
+def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int, nearest_m: float,
+                       hole_pts: list[np.ndarray] | None = None) -> "WaterMetrics":
     """Контур водоёма: площадь, сторона и ближайшая точка, без речных полей.
 
     `in_mountain`, `out_mountain`, `bend`, `loop`, `flow_*`, `water_mouth` и `tidal_*` не
@@ -829,15 +966,19 @@ def _measure_waterbody(feature, *, pts: np.ndarray, nearest_seg: int,
         water_mouth=None, outflow_visible=None, flow_dem_dir=None, flow_osm_dir=None,
         flow_agree=None, flow_chosen=None, flow_rule=None, flow_confidence=None,
         dem_slope_m_per_km=None, dem_slope_snr=None, dem_reason=None,
-        tidal=None, tidal_source=None, source="openstreetmap",
+        tidal=None, tidal_source=None,
         geom="area",
         nearest_azimuth_deg=round(bearing, 1),
         nearest_mountain=geo.mountain_name(bearing),
-        area_m2=round(abs(_polyline_area(pts)), 1) if len(pts) >= 4 else None,
+        # дыры мультиполигона вычитаются: остров внутри озера — суша (E-022)
+        area_m2=(round(max(0.0, abs(_polyline_area(pts))
+                          - sum(abs(_polyline_area(h)) for h in hole_pts or [])), 1)
+                 if len(pts) >= 4 else None),
         site_inside=(bool(_point_in_poly(0.0, 0.0, pts)) if len(pts) >= 4 else None),
         hidden_share=getattr(feature, "hidden_share", None),
         visible=(getattr(feature, "hidden_share", None) or 0.0) < 0.8,
         coords=list(feature.coords),
+        source=getattr(feature, "source", "openstreetmap"),
     )
 
 
@@ -855,7 +996,9 @@ def measure_feature(feature, *, site_xy: np.ndarray, lat: float, lon: float, eps
     if getattr(feature, "geom", "line") == "area":
         # Контур водоёма: площадь, сторона и ближайшая точка. Речных полей у него нет по
         # смыслу — бассейн не втекает и не вытекает, у него нет ни устья, ни петли (E-018).
-        return _measure_waterbody(feature, pts=pts, nearest_seg=nearest_seg, nearest_m=nearest_m)
+        holes = [to_utm(hole, epsg) - site_xy for hole in (getattr(feature, "holes", None) or [])]
+        return _measure_waterbody(feature, pts=pts, nearest_seg=nearest_seg, nearest_m=nearest_m,
+                                  hole_pts=holes)
 
     tags = getattr(feature, "tags", {}) or {}
     # Труба — свойство всей линии, а не ближайшего куска: с 6.1.1 склейка несёт теги
@@ -1360,6 +1503,11 @@ def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
     """
     from shapely.geometry import Point, Polygon
 
+    def label(f, idx: int) -> str:
+        """Имя записи: uid склейки, иначе osm-тип-id, иначе порядковый — у MergedLine нет osm_id."""
+        return (getattr(f, "uid", None) or getattr(f, "key", None)
+                or (f"osm-{f.osm_type}-{f.osm_id}-{idx}" if hasattr(f, "osm_id") else f"line-{idx}"))
+
     areas: list[tuple[str, object]] = []
     for idx, f in enumerate(features):
         if f.geom != "area" or len(f.coords) < 4:
@@ -1373,17 +1521,18 @@ def find_waterbody_links(features, *, site_xy: np.ndarray, epsg: int,
         if poly.is_empty or poly.area < 2000.0:
             # меньше 2000 м² — не водоём, а щель в обводке контура
             continue
-        areas.append((f.name or f"osm-{f.osm_type}-{f.osm_id}-{idx}", poly))
+        # ключ контура: имя, иначе uid склейки — у MergedLine нет osm_type/osm_id (E-022)
+        areas.append((f.name or label(f, idx), poly))
 
     out: dict[str, list[dict]] = {}
     for idx, f in enumerate(features):
         if f.geom != "line" or f.kind not in {"river", "stream", "canal"} or len(f.coords) < 2:
             continue
         pts = to_utm(f.coords, epsg) - site_xy
-        uid = getattr(f, "uid", None) or f"osm-{f.osm_type}-{f.osm_id}-{idx}"
-        label = f.name or uid
+        uid = label(f, idx)
+        title = f.name or uid
         for area_label, poly in areas:
-            if area_label == label:
+            if area_label == title:
                 continue
             # конец линии внутри контура — вход в водоём; у русла, нарисованного от устья,
             # вход в озеро — это начало, поэтому проверяются оба конца
@@ -1536,7 +1685,8 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
     """
     if payload is None:
         payload = fetch_raw(lat, lon, radius_m, allow_network=allow_network)
-    features = parse_features(payload)[:max_features]
+    # участок нужен разбору: мультиполигоны собираются и обрезаются по кругу (E-022)
+    features = parse_features(payload, lat=lat, lon=lon, radius_m=radius_m)[:max_features]
     merged = merge_by_name(features, near=(lat, lon))
 
     window_m = max(window_factor * float(radius_m), window_min_m)
@@ -1557,7 +1707,8 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
             chunks.append(MergedLine(line.key, line.name, line.kind,
                                      list(line.coords[i0:i1 + 1]), line.ways, line.hidden,
                                      line.hidden_share, uid=f"{line.uid}-{idx}",
-                                     tags=dict(line.tags), geom=line.geom))
+                                     tags=dict(line.tags), geom=line.geom,
+                                     holes=[list(h) for h in line.holes], source=line.source))
 
     # слияния ищем только у воды, которая вообще рядом с участком: иначе O(n²) по всему городу
     near = []
@@ -1605,11 +1756,45 @@ def measure_water(lat: float, lon: float, *, epsg: int, grid=None, site_xy: np.n
         if is_watercourse(metric) and metric.name:
             line_ids.setdefault(hydronym.normalize_name(metric.name) or metric.name, metric.id)
     for metric in out:
-        if metric.geom != "area" or not metric.name:
+        if metric.geom != "area":
             continue
         tags = area_tags.get(metric.id, {})
-        if (tags.get("water") or "") == "river" or tags.get("waterway") == "riverbank":
+        if not ((tags.get("water") or "") == "river" or tags.get("waterway") == "riverbank"):
+            continue
+        if metric.name:
             metric.riverbank_of = line_ids.get(hydronym.normalize_name(metric.name) or metric.name)
+    # Берег без имени: Темза размечена отношением `natural=water, water=river` без `name`,
+    # и по имени его ни с чем не связать (E-022). Привязка по геометрии: ближайшая видимая
+    # осевая того же вида в пределах 300 м — половина ширины Темзы около 80–100 м, поэтому
+    # порог в 60 м не нашёл бы ничего. Имя берётся у линии: у контура его просто нет.
+    unnamed = [m for m in out if m.geom == "area" and not m.name and not m.riverbank_of
+               and ((area_tags.get(m.id, {}).get("water") or "") == "river"
+                    or area_tags.get(m.id, {}).get("waterway") == "riverbank")]
+    if unnamed:
+        from shapely.geometry import LineString, Polygon
+
+        lines_xy: list[tuple[str, str, LineString]] = []
+        for metric in out:
+            if not is_watercourse(metric) or not metric.name or not metric.coords:
+                continue
+            if metric.visible is False:
+                continue
+            pts = to_utm(metric.coords, epsg) - site_xy
+            if len(pts) > 1:
+                lines_xy.append((metric.id, metric.name, LineString(pts)))
+        for metric in unnamed:
+            ring = to_utm(metric.coords, epsg) - site_xy
+            if len(ring) < 4:
+                continue
+            border = Polygon(ring).boundary
+            best: tuple[float, str, str] | None = None
+            for line_id, line_name, line in lines_xy:
+                dist = border.distance(line)
+                if dist <= 300.0 and (best is None or dist < best[0]):
+                    best = (dist, line_id, line_name)
+            if best is not None:
+                metric.riverbank_of = best[1]
+                metric.name = best[2]
     # Канал внутри дока (`waterway=canal` с именем дока) привязывается к контуру с тем же
     # именем: в отчёте он не идёт как отдельное русло, у дока остаются его поля водоёма.
     dock_ids: dict[str, str] = {}

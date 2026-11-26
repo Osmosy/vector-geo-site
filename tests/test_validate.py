@@ -160,7 +160,8 @@ def test_i11_version_mismatch_is_violation():
     violations = V.validate(pack)
     mismatch = [v for v in violations if v["code"] == "I-11" and v["path"] == "algo.water"]
     assert mismatch, violations
-    assert "6.0.0" in mismatch[0]["message"] and "7." in mismatch[0]["message"]
+    message = mismatch[0]["message"]
+    assert "6.0.0" in message and V.CODE_VERSIONS["water"] in message
 
 
 def test_i11_ignores_modules_missing_from_old_pack():

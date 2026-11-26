@@ -908,3 +908,108 @@ def test_loop_confidence_margins():
 
     margin, confidence = water.loop_confidence(3.6, 200.0, 0.06)
     assert confidence == "medium", (margin, confidence)
+
+# ---------- E-022: площадные отношения OSM ----------
+
+def _square_ring(lat: float, lon: float, half_m: float) -> list[dict]:
+    dlat = half_m / 111132.0
+    dlon = half_m / (111132.0 * math.cos(math.radians(lat)))
+    ring = [(lon - dlon, lat - dlat), (lon + dlon, lat - dlat),
+            (lon + dlon, lat + dlat), (lon - dlon, lat + dlat), (lon - dlon, lat - dlat)]
+    return [{"lon": x, "lat": y} for x, y in ring]
+
+
+def _relation_payload(*, outer_half_m: float = 1500.0, hole_half_m: float | None = 500.0,
+                      tags: dict | None = None, rel_id: int = 28934) -> dict:
+    lat, lon = 51.5138, -0.0984
+    members = [{"type": "way", "ref": 1, "role": "outer",
+                "geometry": _square_ring(lat, lon, outer_half_m)}]
+    if hole_half_m:
+        members.append({"type": "way", "ref": 2, "role": "inner",
+                        "geometry": _square_ring(lat, lon, hole_half_m)})
+    return {"elements": [{"type": "relation", "id": rel_id,
+                          "tags": tags or {"type": "multipolygon", "natural": "water",
+                                           "water": "river"},
+                          "members": members}]}
+
+
+def test_relation_multipolygon_becomes_one_area():
+    """E-022: отношение собирается в одну площадь, а не в десяток обрывков берега."""
+    payload = _relation_payload()
+    feats = water.parse_features(payload, lat=51.5138, lon=-0.0984, radius_m=8000.0)
+
+    assert len(feats) == 1, [(f.osm_id, len(f.coords), f.geom) for f in feats]
+    feat = feats[0]
+    assert feat.geom == "area" and feat.closed
+    assert feat.source == "osm_relation"
+    assert len(feat.holes) == 1
+
+
+def test_multipolygon_area_excludes_holes():
+    """Остров внутри озера — не вода: площадь считается за вычетом дыр."""
+    payload = _relation_payload()
+    feats = water.parse_features(payload, lat=51.5138, lon=-0.0984, radius_m=8000.0)
+    epsg = geo.utm_epsg(51.5138, -0.0984)
+    site = water.to_utm([(-0.0984, 51.5138)], epsg)[0]
+
+    metric = water.measure_feature(feats[0], site_xy=site, lat=51.5138, lon=-0.0984,
+                                   epsg=epsg, grid=None)
+    # 3000 × 3000 м минус 1000 × 1000 м = 8 000 000 м² (граница круга не задевает)
+    assert metric.geom == "area"
+    # 3000 × 3000 м минус 1000 × 1000 м: допуск 2 % на перевод градусов в UTM
+    assert abs(metric.area_m2 - 8_000_000.0) < 160_000.0, metric.area_m2
+    assert metric.area_m2 < 8_500_000.0, "дыра не вычтена"
+
+
+def test_multipolygon_is_clipped_to_sampling_circle():
+    """Берег, уходящий на десятки километров, обрезается по кругу до пересечений."""
+    payload = _relation_payload(outer_half_m=30_000.0, hole_half_m=None)
+    feats = water.parse_features(payload, lat=51.5138, lon=-0.0984, radius_m=8000.0)
+    epsg = geo.utm_epsg(51.5138, -0.0984)
+    site = water.to_utm([(-0.0984, 51.5138)], epsg)[0]
+
+    ring = water.to_utm(feats[0].coords, epsg) - site
+    far = float(np.hypot(*ring.T).max())
+    assert 8000.0 < far < 8800.0, far          # круг 8 км с запасом 5 %
+
+
+def test_relation_surface_counts_in_water_share():
+    """Площадь отношения попадает в долю воды, а не только в water.geojson."""
+    from geosite import water_pack
+
+    payload = _relation_payload(outer_half_m=1200.0, hole_half_m=None)
+    feats = water.parse_features(payload, lat=51.5138, lon=-0.0984, radius_m=8000.0)
+    epsg = geo.utm_epsg(51.5138, -0.0984)
+    site = water.to_utm([(-0.0984, 51.5138)], epsg)[0]
+
+    share = water_pack.sector_water_share(feats, epsg=epsg, site_xy=site, ring_m=(500.0, 2000.0))
+    assert share["area_km2"] > 0.0
+    assert max(share["by_mountain"].values()) > 0.5, share["by_mountain"]
+
+
+def test_unnamed_riverbank_links_to_named_line():
+    """Берег без имени привязывается к ближайшей осевой по геометрии (Темза в OSM без name)."""
+    lat, lon = 51.5138, -0.0984
+    bank = {"elements": [{"type": "relation", "id": 28934,
+                          "tags": {"type": "multipolygon", "natural": "water", "water": "river"},
+                          "members": [{"type": "way", "ref": 1, "role": "outer",
+                                       "geometry": _square_ring(lat, lon, 200.0)}]}]}
+    line = {"elements": [{"type": "way", "id": 4791944,
+                          "tags": {"waterway": "river", "name": "River Thames"},
+                          "geometry": _line_near(lat, lon)}]}
+    epsg = geo.utm_epsg(lat, lon)
+    site = water.to_utm([(lon, lat)], epsg)[0]
+    fused = {"elements": bank["elements"] + line["elements"]}
+
+    metrics = water.measure_water(lat, lon, epsg=epsg, grid=None, site_xy=site,
+                                  radius_m=8000, payload=fused, allow_network=False)
+    bank_metric = next(m for m in metrics if m.geom == "area")
+    assert bank_metric.source == "osm_relation"
+    assert bank_metric.riverbank_of and bank_metric.riverbank_of.startswith("osm-thames-river")
+    assert bank_metric.name == "River Thames"
+
+
+def _line_near(lat: float, lon: float) -> list[dict]:
+    """Осевая в 60 м к северу от контура: ближе порога 300 м."""
+    return [{"lon": lon - 0.002, "lat": lat + 0.00054},
+            {"lon": lon + 0.002, "lat": lat + 0.00054}]

@@ -141,7 +141,9 @@ def sector_water_share(features, *, epsg: int, site_xy: np.ndarray, ring_m: tupl
     invalid = 0
     for f in polygon_features(features):
         pts = to_utm([(lon, lat) for lon, lat in f.coords], epsg) - site_xy
-        poly = Polygon(pts)
+        holes = [to_utm([(lon, lat) for lon, lat in hole], epsg) - site_xy
+                 for hole in (getattr(f, "holes", None) or [])]
+        poly = Polygon(pts, holes) if holes else Polygon(pts)
         if not poly.is_valid:
             poly = poly.buffer(0)
             invalid += 1

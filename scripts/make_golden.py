@@ -76,8 +76,10 @@ def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
         target = GOLDEN / name
         (target / "fixtures").mkdir(parents=True, exist_ok=True)
         payload = osm_payload(site["lat"], site["lon"], 8000)
-        (target / "fixtures" / "osm-water.json").write_text(
-            json.dumps(payload), encoding="utf-8")
+        # gzip: `out body geom` приносит геометрию членов отношений, и файл втрое меньше
+        import gzip
+        with gzip.open(target / "fixtures" / "osm-water.json.gz", "wt", encoding="utf-8") as fh:
+            json.dump(payload, fh)
         try:
             wide = osm_payload(site["lat"], site["lon"], 30000)
             import gzip
