@@ -259,3 +259,12 @@ def test_golden_site(name: str):
             failures.append(f"water_mouth.{key}={mouth.get(key)!r}, ждали {expected!r}")
 
     assert not failures, "; ".join(failures)
+
+# G5: мировые эталоны идут тем же шагом CI. Отдельный job `golden-world` завёл бы файл
+# в .github/workflows, а токен репозитория не имеет scope `workflow` — тогда проверки мира
+# просто не запускались бы. Импорт кладёт их в общий прогон, где они уже стоят.
+from test_golden_world import (  # noqa: E402,F401  (нужны для сбора pytest)
+    test_world_coverage_documented,
+    test_world_fixtures_are_offline,
+    test_world_golden,
+)

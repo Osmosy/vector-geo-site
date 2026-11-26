@@ -78,7 +78,7 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
-ALGO_VERSION = "1.0.0"
+ALGO_VERSION = "1.1.0"
 
 AEQD = "+proj=aeqd +lat_0={lat:.6f} +lon_0={lon:.6f} +datum=WGS84 +units=m +no_defs"
 
@@ -89,11 +89,21 @@ ZONE_WIDTH_DEG = 6.0
 
 
 def crs_str(value) -> str:
-    """CRS в виде строки для pyproj/rasterio: код UTM — «EPSG:32630», строка — как есть."""
+    """CRS в виде строки для pyproj/rasterio.
+
+    Код UTM — «EPSG:32630»; PROJ-строка (`+proj=aeqd …`) и WKT (`PROJCS["…"]`, каким его отдаёт
+    rasterio) идут **как есть**: приписав к WKT «EPSG:», получаем `CRSError: crs not found`,
+    и пакет падает на пустом месте (E-035).
+    """
     if isinstance(value, int):
         return f"EPSG:{value}"
-    text = str(value)
-    return text if text.upper().startswith("EPSG:") or text.startswith("+") else f"EPSG:{text}"
+    text = str(value).strip()
+    if text.upper().startswith("EPSG:") or text.startswith("+"):
+        return text
+    if text.split("[", 1)[0].upper() in {"PROJCS", "GEOGCS", "PROJCRS", "GEOGCRS", "BOUNDCRS",
+                                          "COMPOUNDCRS", "COMPD_CS", "LOCAL_CS", "VERT_CS"}:
+        return text
+    return f"EPSG:{text}"
 
 
 def utm_zone(lon: float) -> int:

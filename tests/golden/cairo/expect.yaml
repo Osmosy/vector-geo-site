@@ -1,0 +1,22 @@
+# cairo: факты для мира. Каждый — с источником; подгонять под вывод кода запрещено (ТЗ Б4).
+world:
+  grid:
+    kind: utm
+  noon:
+    south_days_min: 360
+    north_days_max: 5
+  coast:
+    sea_in_ring: false
+  water:
+    count_min: 1
+    named_min: 1
+    kind_any:
+    - river
+  landcover:
+    water_wc_min: 0.05
+source:
+- 'OSM: Нил — отношение natural=water + water=river, анонимное (карта)'
+- 'полдень: широта 30.04° севернее тропика Рака (23.44°) — солнце в полдень весь год
+  на юге'
+- 'сетка: зона 36 (30…36° в. д.) — UTM'
+- 'WorldCover: Нил в кольце 0.5–2 км занимает больше 5 %'

@@ -135,9 +135,26 @@ def ensure_tile(lat_floor: int, lon_floor: int, *, timeout: int = 300) -> Path:
 
 
 def tiles_for_bbox(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> list[tuple[int, int]]:
+    """Тайлы, покрывающие bbox. Долгота приводится к [−180, 180): у линии перемены дат
+    `lon − радиус` даёт −180.06, и запрос уходил за `W181`, которого не существует (E-032)."""
     lats = range(math.floor(lat_min), math.floor(math.ceil(lat_max) if lat_max % 1 == 0 else lat_max) + 1)
-    lons = range(math.floor(lon_min), math.floor(math.ceil(lon_max) if lon_max % 1 == 0 else lon_max) + 1)
-    return [(la, lo) for la in lats for lo in lons]
+    lo0 = _wrap_lon(lon_min)
+    lo1 = _wrap_lon(lon_max)
+    if lo1 < lo0:                      # bbox пересекает 180° — два отрезка
+        spans = [(lo0, 180.0), (-180.0, lo1)]
+    else:
+        spans = [(lo0, lo1)]
+    out: list[tuple[int, int]] = []
+    for start, end in spans:
+        step = range(math.floor(start), math.floor(end) + (0 if end % 1 == 0 else 1))
+        out.extend((la, lo) for la in lats for lo in step if -180 <= lo < 180)
+    return sorted(set(out))
+
+
+def _wrap_lon(lon: float) -> float:
+    """Долгота в [−180, 180) без 180: тайла `E180` у Copernicus нет, край — `E179`."""
+    value = ((lon + 180.0) % 360.0) - 180.0
+    return -180.0 if value >= 180.0 else value
 
 
 def bbox_for_radius(lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:

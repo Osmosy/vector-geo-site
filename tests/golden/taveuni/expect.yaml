@@ -1,0 +1,21 @@
+# taveuni: факты для мира. Каждый — с источником; подгонять под вывод кода запрещено (ТЗ Б4).
+world:
+  grid:
+    kind: aeqd
+    reason: antimeridian
+  noon:
+    north_days_min: 250
+    south_days_min: 50
+  coast:
+    sea_in_ring: true
+    max_m: 2500
+  water:
+    count_min: 1
+    tidal_min: 3
+  landcover:
+    water_wc_min: 0.02
+source:
+- 'OSM: остров Тавеуни, берег в 1.7 км; линия перемены дат в 3 км восточнее (карта)'
+- 'прилив: Фиджи приливные, Fiji Hydrographic Office'
+- 'полдень: широта −16.79° в тропиках — солнце по обе стороны'
+- 'сетка: радиус 8 км пересекает меридиан 180° — азимутальная (ТЗ §7)'

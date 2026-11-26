@@ -11,7 +11,22 @@
 | `sankt-goar-rhine` | река `Rhein` у самого берега, течение на север, ущелье: `closure_index ≥ 0.5` | проходит (DEM с Copernicus, тайл N50/E007) |
 | `nizhny-novgorod-strelka` | слияние Волги и Оки у Стрелки | проходит: слияние 1280.7 м (E-008 закрыта, `water 6.1.0+`) |
 | `moscow-kremlin` | Москва-река (петля Балчуга), скрытая Неглинная (`visible: false`) | проходит (выгрузка с зеркала maps.mail.ru) |
+| **13 мировых** (`sydney`, `rio-de-janeiro`, `suva`, `singapore`, `cairo`, `hong-kong`, `reykjavik`, `beijing`, `istanbul`, `buenos-aires`, `dubai`, `taveuni`, `arctic-ocean`) | выбор сетки (UTM/азимутальная), сторона полуденного солнца, море в кольце, письменность имён, прилив без тега, пустота DEM — подробно в `docs/calc/world_coverage.md` | проходит (фикстуры 26.11.2026) |
 | плоская равнина | все рельефные поля `null`/`low` | покрыто синтетикой `tests/test_water.py::test_mouth_flat_plane_is_null` |
+
+## Мировые эталоны
+
+`tests/test_golden_world.py` проверяет не числа, а **выбор метода**: сетку и её причину, сторону
+полуденного солнца, наличие моря в кольце, письменность имён, прилив без тега, пустоту DEM.
+Фикстуры тех же видов, плюс `coast.json.gz` — сохранённый ответ `natural=coastline` (без него
+офлайн-эталон не может проверить `sea_in_ring`).
+
+```bash
+python scripts/make_golden.py sydney cairo hong-kong     # по именам из WORLD_SITES
+```
+
+DEM для мира вырезается **в сетке пакета** (`geo.grid_crs`): у антимеридиана и границы зон это
+азимутальная проекция, и вырезка в UTM положила бы центр участка в пустоту.
 
 ## Как собрать фикстуры
 
