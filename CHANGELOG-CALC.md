@@ -421,3 +421,29 @@
   `test_multipolygon_is_clipped_to_sampling_circle`, `test_relation_surface_counts_in_water_share`,
   `test_unnamed_riverbank_links_to_named_line`; всего **162 passed, 2 deselected**.
 - Документация: `docs/calc/water_share.md` (правила и «Границы метода»), errata E-022.
+
+## landcover 1.0.0 + pack 2.2.0 — 26.11.2026
+
+**ESA WorldCover 10 м: независимая сверка воды и первый источник по покрову (W2).**
+
+- Новый модуль `landcover`: тайлы ESA WorldCover 2021 v200 (3° × 3°, EPSG:4326, CC BY 4.0),
+  чтение окном 16 км по HTTP, кеш вырезкой в `~/.cache/vector-geo-site/worldcover`,
+  офлайн без кеша — `None` с предупреждением, а не нули.
+- `land_cover` в пакете: `built`, `tree`, `open`, `water_wc` рядом с OSM-водой, `source`,
+  `ring_km`; `files.land_cover` — источник, лицензия, разрешение, тайл, `cached`;
+  в `attribution` добавляется строка ESA, но только если слой считан.
+- `--worldcover-file` — вырезка вместо сети; `make_golden.py` пишет `worldcover.tif`
+  в фикстуры всех шести эталонов (223–461 КБ каждый).
+- `scripts/calibrate_water_share.py` — таблица OSM против WorldCover по кольцам и клиньям с
+  причиной расхождения; `--write` обновляет `docs/calc/water_share_calibration.md`.
+- Лондон, Сити: застройка 81.7 %, дерево 10.9 %, вода по OSM 7.88 % против 6.96 % по снимкам
+  (кольцо 0.5–2 км, разница 0.92 п.п. — внутри допуска); в клиньях у Темзы до +10.1 п.п.,
+  причина — причалы и отливная осушка в полигоне OSM.
+- Крупные расхождения у эталонов честно объяснены методом: Стрелка 2.12 % против 35.89 %
+  (Ока и Волга в OSM осевыми линиями), Санкт-Гоар 0.02 % против 9.23 %, Москва 0.00 % против
+  3.17 %.
+- Тесты: `tests/test_landcover.py` (7 проверок: имена тайлов, доля воды, класс 90 не вода,
+  группы по классам, офлайн без кеша, лондонская вырезка, южные сектора у Темзы);
+  всего **169 passed, 2 deselected**.
+- Документация: `docs/calc/landcover.md`, `water_share_calibration.md`, NOTICE (CC BY 4.0),
+  tests/golden/README.

@@ -1423,7 +1423,16 @@
   }
  },
  "land_cover": {
-  "water": 0.0788
+  "built": 0.8168,
+  "tree": 0.1086,
+  "water": 0.0788,
+  "open": 0.005,
+  "water_wc": 0.0696,
+  "source": "ESA WorldCover 2021 v200",
+  "ring_km": [
+   0.5,
+   2.0
+  ]
  },
  "quality": {
   "dem": "Copernicus DEM GLO-30 (DSM)",
@@ -1450,12 +1459,20 @@
   "geocode": "1.0.0",
   "climate": "1.1.0",
   "sun": "1.0.0",
-  "pack": "2.1.0"
+  "landcover": "1.0.0",
+  "pack": "2.2.0"
  },
  "files": {
   "water_geojson": "water.geojson",
   "sha256": {
    "water.geojson": "45d636c36cead4569cf2bdaf6d4b6e24d073f11735e5653d34500454e257545c"
+  },
+  "land_cover": {
+   "source": "ESA WorldCover 2021 v200",
+   "license": "CC BY 4.0",
+   "resolution_m": 10.0,
+   "tile": "N51W003",
+   "cached": true
   }
  },
  "summary": {

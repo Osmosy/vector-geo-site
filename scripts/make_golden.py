@@ -89,6 +89,13 @@ def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
             print(f"{name}: широкая выгрузка не получена ({exc})")
         if not osm_only:
             dem_crop(site["lat"], site["lon"], site["radius_km"], target / "fixtures" / "dem.tif")
+            from geosite import landcover
+            try:
+                if not landcover.write_crop(site["lat"], site["lon"], 8000.0,
+                                            target / "fixtures" / "worldcover.tif"):
+                    print(f"{name}: слой покрова не получен")
+            except Exception as exc:
+                print(f"{name}: слой покрова не получен ({exc})")
         facing = "null" if site["facing"] is None else f"{site['facing']}"
         (target / "site.yaml").write_text(
             f"name: {name}\nlat: {site['lat']}\nlon: {site['lon']}\n"

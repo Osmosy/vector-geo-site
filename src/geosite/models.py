@@ -235,10 +235,18 @@ class Exposure(BaseModel):
 
 
 class LandCover(BaseModel):
+    """Покров: вода — по OSM, остальное — по ESA WorldCover 10 м (W2).
+
+    `water` и `water_wc` стоят рядом намеренно: расхождение двух источников — это то, что
+    калибровка обязана объяснить, а не спрятать.
+    """
     built: float | None = None
     tree: float | None = None
     water: float | None = None
     open: float | None = None
+    water_wc: float | None = None
+    source: str | None = None
+    ring_km: list[float] | None = None
 
 
 class Quality(BaseModel):
@@ -265,6 +273,10 @@ class Algo(BaseModel):
 class Files(BaseModel):
     water_geojson: str | None = None
     sha256: dict[str, str] = Field(default_factory=dict)
+    # откуда взяты слои: недоступный источник должен быть виден, а не подразумеваться (G5)
+    land_cover: dict | None = None
+    dem: dict | None = None
+    dtm: dict | None = None
 
 
 class SitePack(BaseModel):
