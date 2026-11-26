@@ -30,7 +30,8 @@ def base_pack() -> dict:
                    "loop": None, "confluences": [], "flow_chosen": "downstream_toward_end",
                    "flow_rule": 1, "flow_confidence": "high", "water_mouth": None}],
         "quality": {"dem": "test", "warnings": [], "notes": []},
-        "algo": {"water": "3.1.0", "terrain": "2.0.0"},
+        # P0: версии берутся из кода, иначе I-11 справедливо ругается на устаревший пакет
+        "algo": dict(V.CODE_VERSIONS),
         "attribution": [],
     }
 
@@ -150,6 +151,23 @@ def test_i10_low_confidence_with_warning_ok():
     pack["water"][0]["flow_confidence"] = "low"
     pack["quality"]["warnings"] = ["water.flow: low — плоский профиль"]
     assert "I-10" not in codes(pack)
+
+
+def test_i11_version_mismatch_is_violation():
+    """P0: версия модуля в пакете сверяется с кодом, а не только на присутствие."""
+    pack = base_pack()
+    pack["algo"]["water"] = "6.0.0"
+    violations = V.validate(pack)
+    mismatch = [v for v in violations if v["code"] == "I-11" and v["path"] == "algo.water"]
+    assert mismatch, violations
+    assert "6.0.0" in mismatch[0]["message"] and "7." in mismatch[0]["message"]
+
+
+def test_i11_ignores_modules_missing_from_old_pack():
+    """Пакет до 1.7.0 не знает climate и geocode — их отсутствие не нарушение."""
+    pack = base_pack()
+    pack["algo"].pop("climate", None)
+    assert V.validate(pack) == []
 
 
 def test_i11_missing_algo():

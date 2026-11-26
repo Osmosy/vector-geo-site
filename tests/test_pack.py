@@ -155,3 +155,17 @@ def test_i13_confluence_participants_are_lines():
                 checked += 1
     assert checked > 0, "пакетов с слияниями не нашлось — проверять нечего"
 
+
+def test_algo_is_built_from_module_versions():
+    """P0: в ALGO нет ручных строк — все версии берутся из констант модулей."""
+    from geosite import climate, geocode, pack as pack_mod, terrain, water
+
+    assert pack_mod.ALGO == {
+        "water": water.ALGO_VERSION,
+        "terrain": terrain.ALGO_VERSION,
+        "geocode": geocode.ALGO_VERSION,
+        "climate": climate.ALGO_VERSION,
+        "pack": pack_mod.ALGO_VERSION,
+    }
+    # версия сборки пакета — одна и та же в обоих местах
+    assert pack_mod.ALGO["pack"] == pack_mod.ALGO_VERSION

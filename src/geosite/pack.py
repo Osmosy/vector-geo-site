@@ -7,14 +7,21 @@ from pathlib import Path
 
 import hashlib
 
-from . import figures, geo
+from . import climate, figures, geo, geocode, terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO = {"water": "7.4.0", "terrain": "2.1.0", "geocode": "1.0.0", "pack": "1.9.0",
-        "climate": "1.0.0"}
+ALGO_VERSION = "1.7.0"      # версия сборки пакета
 
-ALGO_VERSION = "1.6.0"
+# P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
+# кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
+ALGO = {
+    "water": water.ALGO_VERSION,
+    "terrain": terrain.ALGO_VERSION,
+    "geocode": geocode.ALGO_VERSION,
+    "climate": climate.ALGO_VERSION,
+    "pack": ALGO_VERSION,
+}
 
 ATTRIBUTION = [
     "© OpenStreetMap contributors",

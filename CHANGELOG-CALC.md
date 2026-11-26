@@ -369,3 +369,14 @@
 - `same_mountain_reason: "вне круга выборки"` остаётся для `validate` (граница замера не
   предупреждение).
 - Тест: `test_far_course_has_no_entry_and_exit_mountains`; всего **147 passed, 2 deselected**.
+
+## pack 1.7.0 — 26.11.2026
+
+**Одна версия вместо двух (E-024, P0 из ТЗ `world`).** `ALGO` собирается из `ALGO_VERSION`
+модулей; ручных строк в нём нет. I-11 теперь сверяет версию в пакете с версией кода и ругается
+на расхождение, а не только на пустое поле.
+
+- `ALGO_VERSION` был `1.6.0`, в `ALGO` стояло `"pack": "1.9.0"` — теперь оба места дают `1.7.0`.
+- Пакеты до 1.7.0 без `climate` и `geocode` проверку проходят: сверяется только записанное.
+- Тесты: `test_algo_is_built_from_module_versions`, `test_i11_version_mismatch_is_violation`,
+  `test_i11_ignores_modules_missing_from_old_pack`; всего **150 passed, 2 deselected**.
