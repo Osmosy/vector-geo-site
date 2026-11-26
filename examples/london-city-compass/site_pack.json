@@ -1,5 +1,5 @@
 {
- "schema": "site_pack/1",
+ "schema": "site_pack/2",
  "query": {
   "input": "51.5138, -0.0984",
   "kind": "point",
@@ -19,7 +19,9 @@
    "channels_within_km": 3,
    "hyriv_id": 20335508,
    "source": "HydroRIVERS v1.0 (WWF/HydroSHEDS, CC-BY 4.0)"
-  }
+  },
+  "hemisphere": "N",
+  "equatorial": false
  },
  "orientation": {
   "facing_true_deg": 180.0,
@@ -1282,27 +1284,27 @@
   "lift_over_200m_m": -0.1
  },
  "four_spirits": {
-  "tortoise": {
+  "back": {
    "rel_elev_m": 109.4,
    "dist_km": 8.0,
    "continuity": 0.79
   },
-  "bird": {
+  "front": {
    "rel_elev_m": 62.1,
    "dist_km": 7.97,
    "continuity": 0.71
   },
-  "dragon": {
+  "left": {
    "rel_elev_m": 20.2,
    "dist_km": 7.86,
    "continuity": 0.46
   },
-  "tiger": {
+  "right": {
    "rel_elev_m": 112.7,
    "dist_km": 8.0,
    "continuity": 0.71
   },
-  "dragon_vs_tiger": -92.5
+  "left_vs_right": -92.5
  },
  "dragon_vein": {
   "length_km": 12.0,
@@ -1357,6 +1359,73 @@
    {"id":"osm-#5926768-canal","name":"#5926768","pieces":1,"hidden_share":1.0,"visible":false,"kind":"culvert","in_mountain":"乙","out_mountain":"乙","nearest_m":2966.2,"bend":"inner","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-#5724255-canal","dist_m":2966.2,"mountain":"乙"}],"geom":"line","nearest_azimuth_deg":101.0,"nearest_mountain":"乙","outflow_visible":null,"curvature_radius_m":49.8,"between_branches":false,"flow_ways_share":0.31,"crossings_2km":0,"crossing_angle_deg":1.2,"length_2km_m":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":null,"flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"},
    {"id":"osm-tyburn-stream","name":"Tyburn","pieces":4,"hidden_share":1.0,"visible":false,"kind":"culvert","in_mountain":"戌","out_mountain":"未","nearest_m":3172.4,"bend":"outer","straight_at_site":false,"tidal":null,"confluences":[{"with":"osm-#1059661300-stream","dist_m":2186.7,"mountain":"坤"}],"geom":"line","nearest_azimuth_deg":262.9,"nearest_mountain":"酉","outflow_visible":null,"curvature_radius_m":96.3,"between_branches":false,"flow_ways_share":0.31,"crossings_2km":0,"crossing_angle_deg":92.1,"length_2km_m":0.0,"flow_osm_dir":"downstream_toward_end","flow_dem_dir":"downstream_toward_end","flow_rule":0,"flow_confidence":"high","flow_agree":false,"dem_reason":null,"source":"openstreetmap"}
   ],
+ "sun": {
+  "source": "NOAA Solar Calculator (формула, без сети)",
+  "latitude_abs": 51.514,
+  "noons": [
+   {
+    "event": "june_solstice",
+    "date": "2026-06-21",
+    "altitude_deg": 61.9,
+    "azimuth_deg": 180.0,
+    "mountain": "午",
+    "side8": "S",
+    "utc_hour": 12.03
+   },
+   {
+    "event": "december_solstice",
+    "date": "2026-12-21",
+    "altitude_deg": 15.1,
+    "azimuth_deg": 180.0,
+    "mountain": "午",
+    "side8": "S",
+    "utc_hour": 11.97
+   },
+   {
+    "event": "equinox",
+    "date": "2026-03-20",
+    "altitude_deg": 38.0,
+    "azimuth_deg": 180.0,
+    "mountain": "午",
+    "side8": "S",
+    "utc_hour": 12.14
+   }
+  ],
+  "noon_side": {
+   "mountain": "午",
+   "side8": "S",
+   "side8_ru": "юг"
+  },
+  "days_noon_north": 0,
+  "days_noon_south": 365,
+  "by_side8": {
+   "N": 0,
+   "NE": 0,
+   "E": 0,
+   "SE": 0,
+   "S": 365,
+   "SW": 0,
+   "W": 0,
+   "NW": 0
+  },
+  "illumination": {
+   "dem_layer": "dsm_smoothed",
+   "hours_by_side": {
+    "N": 0.0,
+    "NE": 77.7,
+    "E": 677.3,
+    "SE": 954.7,
+    "S": 887.7,
+    "SW": 894.7,
+    "W": 610.0,
+    "NW": 36.7
+   },
+   "total_hours": 4408.0,
+   "blocked_hours": 269.3,
+   "step_min": 20,
+   "source": "NOAA Solar Calculator (формула, без сети)"
+  }
+ },
  "exposure": {
   "wind_prevailing_deg": 235.8,
   "wind_prevailing_mountain": "申",
@@ -1375,7 +1444,20 @@
     "days": 920
    }
   },
-  "wind_source": "ERA5 через Open-Meteo archive API (суточные, 10 м)"
+  "wind_source": "ERA5 через Open-Meteo archive API (суточные, 10 м)",
+  "cold_wind": {
+   "season": "декабрь–февраль",
+   "months": [
+    12,
+    1,
+    2
+   ],
+   "prevailing_from_deg": 234.1,
+   "prevailing_from_mountain": "申",
+   "mean_speed_ms": 4.38,
+   "days": 903,
+   "share_of_days": 0.247
+  }
  },
  "land_cover": {
   "water": 0.0024
@@ -1398,10 +1480,11 @@
  },
  "algo": {
   "water": "7.4.0",
-  "terrain": "2.1.0",
+  "terrain": "3.0.0",
   "geocode": "1.0.0",
-  "climate": "1.0.0",
-  "pack": "1.7.0"
+  "climate": "1.1.0",
+  "sun": "1.0.0",
+  "pack": "2.0.0"
  },
  "files": {
   "water_geojson": "water.geojson",

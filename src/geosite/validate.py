@@ -34,12 +34,14 @@ CODES = {
 MIN_ELEV, MAX_ELEV = -430.0, 8850.0
 
 # P0 (I-11): версии модулей, с которыми сверяется пакет.
-from . import climate as _climate, geocode as _geocode, terrain as _terrain, water as _water
+from . import climate as _climate, geocode as _geocode, sun as _sun, terrain as _terrain
+from . import water as _water
 CODE_VERSIONS = {
     "water": _water.ALGO_VERSION,
     "terrain": _terrain.ALGO_VERSION,
     "geocode": _geocode.ALGO_VERSION,
     "climate": _climate.ALGO_VERSION,
+    "sun": _sun.ALGO_VERSION,
 }
 
 # I-10: поля с эвристикой обязаны нести парную уверенность. Список пополняется на каждом этапе.
@@ -105,7 +107,8 @@ def validate(pack: dict, *, dem_point: float | None = None, radius_m: float = 20
 
     # I-03 по духам
     spirits = pack.get("four_spirits") or {}
-    for key in ("tortoise", "bird", "dragon", "tiger"):
+    # H4: новые имена; старые читаются — пакеты до 2.0.0 не должны «ломаться» валидатором
+    for key in ("back", "front", "left", "right", "tortoise", "bird", "dragon", "tiger"):
         item = spirits.get(key) or {}
         val = _num(item.get("continuity"))
         if val is not None and not (0.0 <= val <= 1.0):

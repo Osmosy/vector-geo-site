@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import climate, geo, hydro, terrain, water, water_pack
+from . import climate, geo, hydro, sun, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -272,7 +272,15 @@ def cmd_pack(args) -> int:
     except Exception as exc:
         warnings.append(f"ветер не рассчитан: {exc}")
     if wind is not None:
-        m["exposure"] = {**(m.get("exposure") or {}), "wind": wind}
+        m["exposure"] = {**(m.get("exposure") or {}), "wind": wind,
+                         "cold_wind": wind.get("cold_wind")}
+
+    # H2: солнце. Горизонт берём по мезо-охвату (8 км) — тот же, что у сглаженного DSM.
+    try:
+        m["sun"] = sun.block(r.lat, r.lon, grid=m.get("grid_meso"), x0=m.get("x0"),
+                             y0=m.get("y0"), z0=m.get("elev_m"))
+    except Exception as exc:                       # солнце не должно ронять пакет
+        warnings.append(f"солнце не рассчитано: {exc}")
 
     orientation = {
         "facing_true_deg": round(facing, 1),
@@ -286,7 +294,10 @@ def cmd_pack(args) -> int:
     }
     site = {"lat": round(r.lat, 5), "lon": round(r.lon, 5), "elev_m": m["elev_m"],
             "precision": r.precision, "utm_epsg": geo.utm_epsg(r.lat, r.lon),
-            "boundary": None}
+            "boundary": None,
+            # H1: полушарие — факт; «около экватора» = солнце в зените в пределах 1°
+            "hemisphere": "S" if r.lat < 0 else "N",
+            "equatorial": abs(r.lat) <= 1.0}
     out_dir = Path(args.out or f"site-{abs(r.lat):.3f}-{abs(r.lon):.3f}")
     dem_source = m.get("dem_source") or "copernicus"
     dem_label = m.get("dem_label") or "Copernicus DEM GLO-30 (DSM)"

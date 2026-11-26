@@ -18,7 +18,7 @@ import json
 import math
 from pathlib import Path
 
-ALGO_VERSION = "1.0.0"
+ALGO_VERSION = "1.1.0"
 
 SOURCE_MAG = "WMM (NOAA), pygeomag"
 SOURCE_WIND = "ERA5 через Open-Meteo archive API (суточные, 10 м)"
@@ -93,8 +93,17 @@ def fetch_wind(lat: float, lon: float, *, allow_network: bool = True) -> dict:
     return data
 
 
-def summarize(data: dict, *, calm_kmh: float = 3.0) -> dict:
-    """Средний перенос, повторяемость по 24 горам, зима против лета."""
+COLD_MONTHS = {"N": (12, 1, 2), "S": (6, 7, 8)}
+COLD_LABEL = {"N": "декабрь–февраль", "S": "июнь–август"}
+
+
+def summarize(data: dict, *, calm_kmh: float = 3.0, hemisphere: str | None = None) -> dict:
+    """Средний перенос, повторяемость по 24 горам, зима против лета, холодный сезон (H3).
+
+    Холодный сезон выбирается по полушарию — это физика, а не толкование: в Северном это
+    декабрь–февраль, в Южном июнь–август. Поле `cold_wind` и есть ответ на «откуда дует
+    холодный ветер».
+    """
     from . import geo
 
     days = len(data.get("time") or [])
@@ -105,6 +114,7 @@ def summarize(data: dict, *, calm_kmh: float = 3.0) -> dict:
     calms = 0
     by_mountain: dict[str, int] = {name: 0 for name in geo.MOUNTAINS}
     seasonal: dict[str, list[tuple[float, float]]] = {"winter": [], "summer": []}
+    cold: list[tuple[float, float]] = []
     for i, day in enumerate(data["time"]):
         direction = data["direction"][i]
         speed = data["speed_kmh"][i]
@@ -124,6 +134,8 @@ def summarize(data: dict, *, calm_kmh: float = 3.0) -> dict:
             seasonal["winter"].append((ms, float(direction)))
         elif month in (6, 7, 8):
             seasonal["summer"].append((ms, float(direction)))
+        if hemisphere and month in COLD_MONTHS[hemisphere]:
+            cold.append((ms, float(direction)))
 
     total = sum(by_mountain.values()) or 1
     prevailing = math.degrees(math.atan2(-u, -v)) % 360.0 if (u or v) else None
@@ -135,6 +147,7 @@ def summarize(data: dict, *, calm_kmh: float = 3.0) -> dict:
         "calm_share": round(calms / total, 3),
         "by_mountain": shares,
         "seasonal": {k: _season(v) for k, v in seasonal.items()},
+        "cold_wind": _cold(cold, hemisphere, total),
         "days": total,
         "source": data.get("source") or SOURCE_WIND,
     }
@@ -151,7 +164,24 @@ def _season(items: list[tuple[float, float]]) -> dict:
             "days": len(items)}
 
 
+def _cold(items: list[tuple[float, float]], hemisphere: str | None, total: int) -> dict | None:
+    """Преобладающее направление и скорость в холодный сезон полушария (H3)."""
+    if not hemisphere:
+        return None
+    from . import geo
+
+    season = _season(items)
+    return {"season": COLD_LABEL[hemisphere], "months": list(COLD_MONTHS[hemisphere]),
+            "prevailing_from_deg": season["prevailing_from_deg"],
+            "prevailing_from_mountain": (None if season["prevailing_from_deg"] is None
+                                         else geo.mountain_name(season["prevailing_from_deg"])),
+            "mean_speed_ms": season["mean_speed_ms"],
+            "days": season["days"],
+            "share_of_days": round(season["days"] / total, 3) if total else None}
+
+
 def summary(lat: float, lon: float, *, allow_network: bool = True,
             payload: dict | None = None) -> dict:
     data = payload if payload is not None else fetch_wind(lat, lon, allow_network=allow_network)
-    return summarize(data)
+    hemisphere = "S" if lat < 0 else "N"
+    return summarize(data, hemisphere=hemisphere)

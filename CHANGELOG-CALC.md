@@ -380,3 +380,24 @@
 - Пакеты до 1.7.0 без `climate` и `geocode` проверку проходят: сверяется только записанное.
 - Тесты: `test_algo_is_built_from_module_versions`, `test_i11_version_mismatch_is_violation`,
   `test_i11_ignores_modules_missing_from_old_pack`; всего **150 passed, 2 deselected**.
+
+## pack 2.0.0 + terrain 3.0.0 + climate 1.1.0 + sun 1.0.0 — 26.11.2026
+
+**Полушария, солнце и ветер: только факты (H1–H4).** Пакет больше не называет духов именами школ
+и знает, где стоит солнце.
+
+- Схема `site_pack/2`: `four_spirits` → `back | front | left | right`, `dragon_vs_tiger` →
+  `left_vs_right`; имена 玄武, 朱雀, 青龍, 白虎 присваивает навык (`terrain 3.0.0`).
+- `site.hemisphere: N|S` и `site.equatorial` (солнце в зените в пределах 1°).
+- Новый блок `sun` (`sun 1.0.0`): полдни двух солнцестояний и равноденствия, сторона полудня по
+  24 горам и 8 сторонам, `days_noon_north` / `days_noon_south`, часы солнца по 8 секторам с
+  учётом горизонта (шаг 60 м, 72 бина, DSM).
+- `exposure.cold_wind` (`climate 1.1.0`): холодный сезон по полушарию, преобладающее
+  направление, скорость, доля дней.
+- Лондон: полдень 午 (юг), 61.9° в июне и 15.1° в декабре, 0 дней с северным полуднем;
+  часы солнца `S 887.7, SE 954.7, E 677.3`, закрыто рельефом 269.3 часа; холодный ветер 申,
+  4.38 м/с, 24.7 % дней.
+- Проверки: Сидней — полдень 子 (север), 32.7° и 79.6°; Рейкьявик — 2.4° в декабре.
+- Тесты: `tests/test_sun.py` (6), `test_axis_does_not_depend_on_hemisphere`,
+  `test_pack_roundtrip` следит за именами сторон; всего **157 passed, 2 deselected**.
+- Документация: `docs/calc/sun.md`, схема `site_pack-2.json`.

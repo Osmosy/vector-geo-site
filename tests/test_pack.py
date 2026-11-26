@@ -23,7 +23,7 @@ def test_schema_has_core_fields():
     props = schema["properties"]
     for key in ("schema", "query", "site", "orientation", "chart_year", "sectors", "quality", "attribution"):
         assert key in props, key
-    assert props["schema"]["default"] == "site_pack/1"
+    assert props["schema"]["default"] == "site_pack/2"
 
 
 def test_pack_roundtrip(tmp_path):
@@ -44,11 +44,11 @@ def test_pack_roundtrip(tmp_path):
         "sectors": [{"mountain": s.name, "rings": s.rings} for s in terrain.mountain_sectors(g, frame, 0.0)],
         "grid_macro": g, "x0": 5000, "y0": 5000,
         "point": {"slope_deg": 0.0, "aspect_deg": 0.0, "shape": "плоско / уступ", "elev_m": 0.0},
-        "four_spirits": {"tortoise": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
-                          "bird": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
-                          "dragon": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
-                          "tiger": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
-                          "dragon_vs_tiger": 0.0},
+        "four_spirits": {"back": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
+                          "front": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
+                          "left": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
+                          "right": {"rel_elev_m": 0.0, "dist_km": 1.0, "continuity": 0.0},
+                          "left_vs_right": 0.0},
         "dragon_vein": {"to_peak": None, "length_km": 0.0, "drop_m": 0.0, "bends": 0, "saddles": 0, "alive": False},
     }
     pack = build_pack(query={"input": "тест", "kind": "point", "resolved_by": "test", "alternatives": []},
@@ -64,7 +64,12 @@ def test_pack_roundtrip(tmp_path):
     assert (tmp_path / "figures" / "horizon.svg").exists()
     assert pack.sectors and len(pack.sectors) == 24
     reloaded = SitePack.model_validate(json.loads((tmp_path / "site_pack.json").read_text()))
-    assert reloaded.schema_id == "site_pack/1"
+    assert reloaded.schema_id == "site_pack/2"
+    # H4: в пакете нейтральные имена, имена школ присваивает навык
+    payload = json.loads((tmp_path / "site_pack.json").read_text())
+    assert set(payload["four_spirits"]) == {"back", "front", "left", "right", "left_vs_right"}
+    for old_name in ("tortoise", "bird", "dragon", "tiger", "dragon_vs_tiger"):
+        assert old_name not in payload["four_spirits"], old_name
 
 
 @pytest.mark.skipif(not HAS_TILES, reason="нет тайлов Copernicus DEM в кеше")
@@ -158,14 +163,46 @@ def test_i13_confluence_participants_are_lines():
 
 def test_algo_is_built_from_module_versions():
     """P0: в ALGO нет ручных строк — все версии берутся из констант модулей."""
-    from geosite import climate, geocode, pack as pack_mod, terrain, water
+    from geosite import climate, geocode, pack as pack_mod, sun, terrain, water
 
     assert pack_mod.ALGO == {
         "water": water.ALGO_VERSION,
         "terrain": terrain.ALGO_VERSION,
         "geocode": geocode.ALGO_VERSION,
         "climate": climate.ALGO_VERSION,
+        "sun": sun.ALGO_VERSION,
         "pack": pack_mod.ALGO_VERSION,
     }
     # версия сборки пакета — одна и та же в обоих местах
     assert pack_mod.ALGO["pack"] == pack_mod.ALGO_VERSION
+
+
+def test_axis_does_not_depend_on_hemisphere():
+    """H1: ось по модели нейтральна — гора на юге даёт «спину к югу» в обоих полушариях.
+
+    Разница полушарий живёт в толковании (навык), а не в оси и не в геоданных: функция оси
+    не принимает широту вовсе, и одинаковый рельеф даёт одинаковый фасад.
+    """
+    import inspect
+
+    from geosite.cli import _model_facing
+
+    signature = inspect.signature(_model_facing)
+    assert "lat" not in signature.parameters and "hemisphere" not in signature.parameters
+
+    def measured_with_hill(mountain: str) -> dict:
+        rings = [{"max_rel_elev_m": 0.0}] * 3
+        sectors = []
+        for name in geo.MOUNTAINS:
+            rings_here = [{"max_rel_elev_m": 120.0 if name == mountain else 5.0}] * 3
+            sectors.append({"mountain": name, "rings": rings_here})
+        return {"sectors": sectors}
+
+    facing, why = _model_facing(measured_with_hill("午"))     # гора на юге
+    assert facing == 0.0, (facing, why)                       # фасад на север, спина к югу
+    assert "午" in why
+
+    # та же гора и та же ось — независимо от того, где участок
+    north = _model_facing(measured_with_hill("午"))[0]
+    south = _model_facing(measured_with_hill("午"))[0]
+    assert north == south == 0.0
