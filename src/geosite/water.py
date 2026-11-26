@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.0.0"
+ALGO_VERSION = "8.1.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -1229,7 +1229,7 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
     if math.isnan(z0):
         return None
 
-    half_widths, hills, capped_sides = [], [], 0
+    half_widths, hills, capped, capped_sides = [], [], [], 0
     for sign in (1, -1):
         half_width, top, stop_reason = 0.0, 0.0, "capped"
         for step in range(1, max_steps + 1):
@@ -1249,19 +1249,26 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
                 stop_reason = "slope"
                 break
             half_width = d
-        if stop_reason != "slope":
+        # I-12: ноль при упёршейся стороне — не измеренная высота, а «борта не нашли».
+        # Писать 0 значит утверждать, что борт ровно нулевой; честнее не писать ничего.
+        hit_limit = stop_reason != "slope"
+        if hit_limit:
             capped_sides += 1
         half_widths.append(half_width)
-        hills.append(top)
+        capped.append(hit_limit)
+        # Борт ниже полуметра — не борт: это парапет или неровность, и после округления он
+        # превращается в 0.0, то есть в утверждение «высота нулевая» (I-12).
+        hills.append(None if hit_limit and top < 0.5 else top)
 
     width = half_widths[0] + half_widths[1]
     hill_left, hill_right = hills[0], hills[1]
-    mean_hill = (hill_left + hill_right) / 2.0
+    known = [h for h in hills if h is not None]
+    mean_hill = sum(known) / len(known) if known else None
     half = width / 2.0
     enclosure = None
     closure_index = None
     reason = None
-    if capped_sides >= 2:
+    if capped_sides >= 2 or mean_hill is None:
         reason = "flat_valley"
     elif half <= 1.0:
         enclosure = 99.0
@@ -1274,8 +1281,8 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
     return {
         "mountain": geo.mountain_name(bearing),
         "width_m": round(width, 1),
-        "left_hill_m": round(hill_left, 1),
-        "right_hill_m": round(hill_right, 1),
+        "left_hill_m": None if hill_left is None else round(hill_left, 1),
+        "right_hill_m": None if hill_right is None else round(hill_right, 1),
         "width_capped": capped_sides > 0,
         "capped_sides": capped_sides,
         "enclosure": None if enclosure is None else round(enclosure, 3),

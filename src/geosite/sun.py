@@ -138,7 +138,8 @@ def horizon_profile(grid, x0: float, y0: float, z0: float, *,
 
 
 def illumination(lat: float, lon: float, profile: list[float] | None, *,
-                 step_min: int = ILLUM_STEP_MIN, year: int = 2026) -> dict:
+                 step_min: int = ILLUM_STEP_MIN, year: int = 2026,
+                 layer: str | None = "dsm_smoothed") -> dict:
     """Часы прямого солнца за год по 8 секторам с учётом горизонта.
 
     Считается, в каком секторе стоит солнце, когда оно выше горизонта. Без профиля (нет DEM)
@@ -161,7 +162,7 @@ def illumination(lat: float, lon: float, profile: list[float] | None, *,
                     blocked += step_h
                     continue
             hours[side8(azimuth)] += step_h
-    return {"dem_layer": "dsm_smoothed" if profile else None,
+    return {"dem_layer": layer if profile else None,
             "hours_by_side": {name: round(value, 1) for name, value in hours.items()},
             "total_hours": round(total, 1), "blocked_hours": round(blocked, 1),
             "step_min": step_min,
@@ -170,7 +171,7 @@ def illumination(lat: float, lon: float, profile: list[float] | None, *,
 
 def block(lat: float, lon: float, *, grid=None, x0: float | None = None,
           y0: float | None = None, z0: float | None = None, max_km: float = 8.0,
-          year: int = 2026) -> dict:
+          year: int = 2026, layer: str | None = None) -> dict:
     """Блок `sun` пакета: полудни, сторона полудня, счёт дней, освещённость."""
     profile = None
     if grid is not None and x0 is not None and y0 is not None and z0 is not None:
@@ -186,4 +187,5 @@ def block(lat: float, lon: float, *, grid=None, x0: float | None = None,
             "days_noon_north": side["days_noon_north"],
             "days_noon_south": side["days_noon_south"],
             "by_side8": side["by_side8"],
-            "illumination": illumination(lat, lon, profile)}
+            "illumination": illumination(lat, lon, profile,
+                                         layer=layer or getattr(grid, "kind", "dsm_smoothed"))}

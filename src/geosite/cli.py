@@ -11,7 +11,8 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import calibrate, climate, dem, geo, hydro, landcover, sun, terrain, water, water_pack
+from . import calibrate, climate, dem, dtm, geo, hydro, landcover, sun, terrain, water
+from . import water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -90,8 +91,45 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
     facing = args.facing
     # в городе микрорельеф — это крыши: для уклона и формы берём сглаживание 300 м
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
-    out = terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0, macro_km=macro_km,
-                              meso_km=8.0, facing_deg=facing, point_smooth_m=point_smooth)
+
+    def _pass(macro_grid=None, meso_grid=None) -> dict:
+        return terrain.measure_site(r.lat, r.lon, epsg=epsg, resolution_m=30.0,
+                                    macro_km=macro_km, meso_km=8.0, facing_deg=facing,
+                                    point_smooth_m=point_smooth,
+                                    macro_grid=macro_grid, meso_grid=meso_grid)
+
+    # D3: сначала поверхность (DSM) — она нужна всегда, в том числе для кольца 0–0.5 км,
+    # где здания и есть городские 砂. Затем земля (DTM): по ней считаются все поля рельефа.
+    dsm = _pass()
+    out = dict(dsm)
+    out["dem_dsm"] = {"source": dsm.get("dem_source"), "kind": dsm.get("dem_kind", "dsm_smoothed"),
+                      "resolution_m": dsm.get("dem_resolution_m"),
+                      "vertical_datum": dsm.get("dem_vertical_datum")}
+    dtm_grid, dtm_info = (None, {"reason": "выключено флагом --no-dtm"})
+    if not getattr(args, "no_dtm", False):
+        macro_dtm, macro_info = dtm.grid(r.lat, r.lon, epsg=epsg, radius_km=macro_km,
+                                         resolution_m=max(90.0, 30.0))
+        if macro_dtm is not None:
+            meso_dtm, _ = dtm.grid(r.lat, r.lon, epsg=epsg, radius_km=8.0, resolution_m=30.0)
+            dtm_grid = macro_dtm
+            dtm_info = macro_info
+            dtm_out = _pass(macro_grid=macro_dtm, meso_grid=meso_dtm or macro_dtm)
+            # ближнее кольцо остаётся в двух видах: поверхность (здания) и земля
+            dtm_out["dsm_near_ring"] = {s["mountain"]: s["rings"][0] for s in dsm["sectors"]}
+            dtm_out["dtm_info"] = dtm_info
+            dtm_out["dem_dsm"] = out["dem_dsm"]
+            out = dtm_out
+            if dtm_info.get("vertical_datum") and dtm_info["vertical_datum"] != "EGM2008":
+                out.setdefault("dtm_notes", []).append(
+                    "DTM в системе %s (сдвиг к EGM2008: %s)"
+                    % (dtm_info["vertical_datum"],
+                       "не применён" if dtm_info.get("datum_shift_m") is None
+                       else f"{dtm_info['datum_shift_m']:+.2f} м"))
+        else:
+            out["dtm_info"] = macro_info
+    else:
+        out["dtm_info"] = dtm_info
+
     if with_water:
         out.update(_measure_water(r, out, epsg, payload=osm_payload, args=args))
     return out
@@ -314,6 +352,13 @@ def cmd_pack(args) -> int:
         notes.append("год постройки не указан: карта считается для текущего года")
     if m.get("flow_conflict"):
         warnings.append("water.flow: low — конфликт OSM и рельефа у " + ", ".join(m["flow_conflict"]))
+    low_flow = [w for w in m.get("water") or [] if getattr(w, "flow_confidence", None) == "low"]
+    if low_flow and not m.get("flow_conflict"):
+        # E-020: низкая уверенность бывает и без конфликта — короткий канал не выходит
+        # из своей горы, и направление нечем проверить. Молчать об этом нельзя (I-10).
+        reasons = sorted({getattr(w, "same_mountain_reason", None) for w in low_flow} - {None})
+        warnings.append("water.flow: low — у %d водотоков направление не проверено (%s)"
+                        % (len(low_flow), ", ".join(reasons) or "вход и выход в одной горе"))
     if m.get("water_share_skipped"):
         warnings.append("доля воды по секторам не считается: полигоны OSM не получены")
     if m.get("water_share"):
@@ -323,6 +368,17 @@ def cmd_pack(args) -> int:
         warnings.append("вода: слои OSM не получены, water и water_share пусты")
     if m.get("water_error"):
         warnings.append(f"вода: {m['water_error']}")
+    dtm_info = m.get("dtm_info") or {}
+    if dtm_info.get("source"):
+        notes.append("рельеф: земля (DTM) — %s, %s м, система высот %s; расчёт полей по земле, "
+                     "кольцо 0–0.5 км — в двух видах (dsm и dtm)"
+                     % (dtm_info.get("name"), dtm_info.get("resolution_m"),
+                        dtm_info.get("vertical_datum")))
+        for line in m.get("dtm_notes") or []:
+            notes.append(line)
+    else:
+        warnings.append("no_dtm: " + str(dtm_info.get("reason") or "DTM не подключён")
+                        + " — все поля рельефа посчитаны по поверхности (DSM)")
     dem_source = m.get("dem_source") or "copernicus"
     dem_layer = dem.SOURCE_INFO.get(dem_source, {}).get("kind", "dsm_smoothed")
     built_share = (m.get("land_cover") or {}).get("built")
@@ -465,6 +521,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--offline", action="store_true", help="не ходить в сеть, брать из кеша")
         p.add_argument("--osm-file", default=None,
                        help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
+        p.add_argument("--no-dtm", action="store_true",
+                       help="не подключать DTM: считать всё по поверхности (DSM)")
         p.add_argument("--worldcover-file", default=None,
                        help="сохранённая вырезка ESA WorldCover (GeoTIFF) вместо сети")
         p.add_argument("--osm-file-wide", default=None,

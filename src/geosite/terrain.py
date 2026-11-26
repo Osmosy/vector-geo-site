@@ -240,8 +240,13 @@ def point_description(grid: DemGrid, x0: float, y0: float) -> dict:
 def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
                  macro_km: float = 20.0, meso_km: float = 8.0,
                  facing_deg: float | None = None, smooth_m: float = 300.0,
-                 point_smooth_m: float = 90.0, dem_path=None):
-    """Полный замер рельефа: макро- и мезо-охваты в UTM."""
+                 point_smooth_m: float = 90.0, dem_path=None,
+                 macro_grid=None, meso_grid=None):
+    """Полный замер рельефа: макро- и мезо-охваты в UTM.
+
+    `macro_grid` / `meso_grid` — готовые сетки (DTM из `dtm.grid`): тогда сеть не нужна и
+    считаются те же величины, но по земле, а не по поверхности. Иначе грузится DSM.
+    """
     from pyproj import Transformer
 
     from .dem import load_dem, load_dem_file
@@ -252,12 +257,15 @@ def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
     if dem_path is not None:
         macro = load_dem_file(dem_path)
         meso = macro
+    elif macro_grid is not None:
+        macro = macro_grid
     else:
         macro = load_dem(lat, lon, macro_km, epsg=epsg, resolution_m=max(resolution_m, 90.0))
     macro_s = smooth(macro, smooth_m)
     z0 = macro_s.point_value(x0, y0)
     if dem_path is None:
-        meso = load_dem(lat, lon, meso_km, epsg=epsg, resolution_m=resolution_m)
+        meso = meso_grid if meso_grid is not None else load_dem(
+            lat, lon, meso_km, epsg=epsg, resolution_m=resolution_m)
     meso_s = smooth(meso, min(smooth_m, 120.0))
     z0_meso = meso_s.point_value(x0, y0)
     if math.isnan(z0):
@@ -279,6 +287,9 @@ def measure_site(lat: float, lon: float, *, epsg: int, resolution_m: float,
         # откуда рельеф: пакет обязан сказать, Copernicus это или запасной SRTM
         "dem_source": getattr(macro, "source", "copernicus"),
         "dem_label": getattr(macro, "label", ""),
+        "dem_kind": getattr(macro, "kind", "dsm_smoothed"),
+        "dem_vertical_datum": getattr(macro, "vertical_datum", None),
+        "dem_resolution_m": getattr(macro, "resolution_m", None),
         "dem_attribution": getattr(macro, "attribution", ""),
     }
     if facing_deg is not None:
