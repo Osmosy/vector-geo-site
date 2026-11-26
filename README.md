@@ -147,6 +147,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 | Прямой участок у участка | радиус кривизны больше 5 км |
 | Слияния | пересечения разных водотоков и общие узлы OSM: расстояние, гора, тип; у реки одна запись, слияния собираются по всем её кускам |
 | Доля воды | по полигонам OSM аналитически в UTM (кольца 0.5–2 и 2–8 км), мелкие пруды отброшены; длина линейной воды — рядом (правило — [docs/calc/water_share.md](docs/calc/water_share.md)) |
+| Покров | ESA WorldCover 10 м: `built`, `tree`, `open`, `water_wc` рядом с OSM-водой; калибровка — [docs/calc/landcover.md](docs/calc/landcover.md), таблица — [water_share_calibration.md](docs/calc/water_share_calibration.md) |
 | Порядок и расход | HydroRIVERS v1.0: `site.hydro` — главный участок в 2 км (порядок по Стралеру, средний расход, расстояние), у реки — `order`/`discharge_m3s` при совпадении геометрии (правило — [docs/calc/hydro.md](docs/calc/hydro.md)) |
 | Водные врата | где вода уходит из круга 8 км, ширина долины, высоты бортов, `enclosure` и `closure_index`; при упоре замера в предел — `width_capped` и `null` с причиной `flat_valley` (формула — [docs/calc/water_mouth.md](docs/calc/water_mouth.md)) |
 | Видимость ухода воды | прямая видимость по рельефу из точки с глазом 2 м |
@@ -201,12 +202,13 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 157 passed, сеть не нужна
+python -m pytest -q          # 169 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
-  --osm-file tests/golden/london-city/fixtures/osm-water.json.gz --out /tmp/pack
+  --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \
+  --worldcover-file tests/golden/london-city/fixtures/worldcover.tif --out /tmp/pack
 # приливность по руслу: широкая выгрузка (файлы бывают сжатыми — gzip определяется по магии)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
   --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \

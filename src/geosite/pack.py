@@ -7,11 +7,11 @@ from pathlib import Path
 
 import hashlib
 
-from . import climate, figures, geo, geocode, sun, terrain, water
+from . import climate, figures, geo, geocode, landcover, sun, terrain, water
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.1.0"      # версия сборки пакета
+ALGO_VERSION = "2.2.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -21,6 +21,7 @@ ALGO = {
     "geocode": geocode.ALGO_VERSION,
     "climate": climate.ALGO_VERSION,
     "sun": sun.ALGO_VERSION,
+    "landcover": landcover.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -250,8 +251,8 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         quality={"dem": dem_label, "dem_source": dem_source, "dem_resolution_m": dem_resolution_m,
                  "warnings": warnings, "notes": notes},
         summary=summary,
-        files={"water_geojson": geojson_name, "sha256": sha},
-        attribution=ATTRIBUTION,
+        files=_files_block(geojson_name, sha, measured.get("land_cover_layer")),
+        attribution=_attribution(measured.get("land_cover_layer")),
     )
     payload = pack.model_dump(by_alias=True, exclude_none=False)
     payload["water"] = [_strip_area_fields(item) for item in payload.get("water") or []]
@@ -270,6 +271,25 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
 
 def load_pack(path: Path) -> SitePack:
     return SitePack.model_validate(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+WORLDCOVER_ATTRIBUTION = ("ESA WorldCover 2021 / Contains modified Copernicus Sentinel data "
+                          "(2021) processed by ESA WorldCover consortium (CC BY 4.0)")
+
+
+def _attribution(cover: dict | None) -> str:
+    """Строка атрибуции пакета: WorldCover добавляется только если слой действительно считан."""
+    return ATTRIBUTION if not cover else ATTRIBUTION + " · " + WORLDCOVER_ATTRIBUTION
+
+
+def _files_block(geojson_name: str, sha: str, cover: dict | None) -> dict:
+    """Откуда взяты данные: у недоступного источника это видно в `files`, а не в догадках."""
+    block: dict = {"water_geojson": geojson_name, "sha256": sha}
+    if cover:
+        block["land_cover"] = {"source": landcover.SOURCE, "license": landcover.LICENSE,
+                               "resolution_m": cover.get("resolution_m"),
+                               "tile": cover.get("tile"), "cached": cover.get("cached")}
+    return block
 
 
 def schema_text() -> str:

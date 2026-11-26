@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import climate, geo, hydro, sun, terrain, water, water_pack
+from . import climate, geo, hydro, landcover, sun, terrain, water, water_pack
 from .models import SitePack, json_schema
 
 STAGES_DONE = {"resolve", "frame", "fetch", "terrain", "pack"}
@@ -195,10 +195,34 @@ def _measure_water(r, measured: dict, epsg: int, payload: dict | None = None, ar
                     seen.append(name)
             names[mountain] = seen[:4]
         result["water_names"] = names
-        result["land_cover"] = {"water": round(inner["area_km2"] / max(inner["ring_km2"], 1e-9), 4)}
+        osm_water = round(inner["area_km2"] / max(inner["ring_km2"], 1e-9), 4)
+        result["land_cover"] = {"water": osm_water}
     except Exception as exc:
         result["water_share_skipped"] = True
         result["water_share_error"] = str(exc)
+    # W2: независимая сверка по ESA WorldCover 10 м. Считается всегда, когда есть слой:
+    # это не украшение, а второй источник по воде и первый — по застройке, деревьям и открытому.
+    try:
+        cover = landcover.measure(r.lat, r.lon, epsg=epsg, site_xy=site_xy,
+                                  path=getattr(args, "worldcover_file", None),
+                                  offline=bool(getattr(args, "offline", False)))
+    except Exception as exc:                      # слой не должен ронять пакет
+        cover = None
+        warnings.append(f"worldcover: слой не прочитан ({exc})")
+    if cover is None:
+        warnings.append("worldcover: слоя покрова нет — land_cover кроме воды пуст, "
+                        "двери расхождения OSM и снимков не проверены")
+    else:
+        share = result.get("land_cover") or {}
+        share.update({"built": cover["groups"]["built"], "tree": cover["groups"]["tree"],
+                      "open": cover["groups"]["open"], "water_wc": cover["groups"]["water"],
+                      "source": cover["source"], "ring_km": cover["groups_ring_km"]})
+        result["land_cover"] = share
+        result["water_share_wc"] = cover["rings"]
+        result["land_cover_layer"] = {"tile": cover["tile"], "cached": cover["cached"],
+                                      "resolution_m": cover["resolution_m"],
+                                      "license": cover["license"]}
+
     # П6/П4: расхождения источников и низкая уверенность должны звучать в warnings
     conflicts = [m for m in metrics if m.flow_rule == 4]
     lows = [m for m in metrics if m.flow_confidence == "low"]
@@ -387,6 +411,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--offline", action="store_true", help="не ходить в сеть, брать из кеша")
         p.add_argument("--osm-file", default=None,
                        help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
+        p.add_argument("--worldcover-file", default=None,
+                       help="сохранённая вырезка ESA WorldCover (GeoTIFF) вместо сети")
         p.add_argument("--osm-file-wide", default=None,
                        help="ответ Overpass радиусом 30 км (приливность по руслу); подменяет загрузку")
 
