@@ -1,0 +1,23 @@
+# hong-kong: факты для мира. Каждый — с источником; подгонять под вывод кода запрещено (ТЗ Б4).
+world:
+  grid:
+    kind: aeqd
+    reason: zone_boundary
+  noon:
+    south_days_min: 300
+    north_days_min: 20
+  coast:
+    sea_in_ring: true
+    max_m: 2000
+  water:
+    count_min: 10
+    named_min: 5
+    tidal_min: 10
+  landcover:
+    water_wc_min: 0.15
+source:
+- 'OSM: залив Виктории задан береговой линией; берег в 560 м от Централа (карта)'
+- 'прилив: Гонконг приливный, Hong Kong Observatory'
+- 'полдень: широта 22.28° южнее тропика Рака — часть дней солнце на севере'
+- 'сетка: участок в 16 км от границы зоны 50 (114°) при радиусе 8 км — азимутальная
+  (ТЗ §7)'

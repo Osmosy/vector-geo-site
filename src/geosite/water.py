@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides, worldnames
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.4.0"
+ALGO_VERSION = "8.5.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -1484,8 +1484,24 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
     perp = np.array([-flow_dir[1], flow_dir[0]])
     x_abs, y_abs = exit_pt + site_xy
     z0 = grid.point_value(x_abs, y_abs)
+    level_source = "mouth"
     if math.isnan(z0):
-        return None
+        # в устье DEM часто пуст: вода не даёт высоты, и Copernicus оставляет nodata.
+        # Это не повод отказываться от врат: уровень воды ищем в ближайшей клетке поперёк
+        # русла (в пределах 500 м) и говорим об этом полем `level_source` (E-036).
+        found = None
+        for d in range(1, 11):
+            for sign in (1, -1):
+                z = grid.point_value(*(site_xy + exit_pt + perp * sign * d * step_m))
+                if not math.isnan(z):
+                    found = float(z)
+                    break
+            if found is not None:
+                break
+        if found is None:
+            return None
+        z0 = found
+        level_source = "nearest_cell"
 
     half_widths, hills, capped, capped_sides = [], [], [], 0
     for sign in (1, -1):
@@ -1550,6 +1566,8 @@ def _water_mouth(grid, exit_pt: np.ndarray, flow_pt: np.ndarray, site_xy: np.nda
         # что настоящих бортов долины мы не нашли, — это low, а не «средне»
         "closure_confidence": ("low" if (capped_sides > 0 or (enclosure is not None and enclosure < 0.05))
                                else ("high" if (enclosure or 0.0) >= 0.2 else "medium")),
+        # уровень воды в устье: измерен в самой точке или взят в ближайшей клетке
+        "level_source": level_source,
         "_x": float(x_abs),
         "_y": float(y_abs),
     }

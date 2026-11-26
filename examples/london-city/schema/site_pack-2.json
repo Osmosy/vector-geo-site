@@ -1,0 +1,2565 @@
+{
+  "$defs": {
+    "Algo": {
+      "description": "Версии алгоритмов, которые писали в пакет (П5).",
+      "properties": {
+        "water": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water"
+        },
+        "terrain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain"
+        },
+        "geocode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Geocode"
+        },
+        "climate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Climate"
+        },
+        "sun": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sun"
+        },
+        "pack": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack"
+        }
+      },
+      "title": "Algo",
+      "type": "object"
+    },
+    "ChartYear": {
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "ChartYear",
+      "type": "object"
+    },
+    "Confluence": {
+      "properties": {
+        "with": {
+          "title": "With",
+          "type": "string"
+        },
+        "dist_m": {
+          "title": "Dist M",
+          "type": "number"
+        },
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        }
+      },
+      "required": [
+        "with",
+        "dist_m",
+        "mountain"
+      ],
+      "title": "Confluence",
+      "type": "object"
+    },
+    "DemFile": {
+      "description": "D2: паспорт слоя рельефа. `kind` говорит, что это по природе, а не откуда скачано.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "dsm",
+            "dsm_smoothed",
+            "dtm"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution M"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        },
+        "vertical_datum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vertical Datum"
+        },
+        "datum_shift_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datum Shift M"
+        }
+      },
+      "required": [
+        "source",
+        "kind"
+      ],
+      "title": "DemFile",
+      "type": "object"
+    },
+    "DragonVein": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "to_peak": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To Peak"
+        },
+        "length_km": {
+          "title": "Length Km",
+          "type": "number"
+        },
+        "drop_m": {
+          "title": "Drop M",
+          "type": "number"
+        },
+        "bends": {
+          "title": "Bends",
+          "type": "integer"
+        },
+        "saddles": {
+          "title": "Saddles",
+          "type": "integer"
+        },
+        "alive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alive"
+        }
+      },
+      "required": [
+        "length_km",
+        "drop_m",
+        "bends",
+        "saddles"
+      ],
+      "title": "DragonVein",
+      "type": "object"
+    },
+    "Exposure": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "enclosure_index": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enclosure Index"
+        },
+        "windy_mountains": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Windy Mountains",
+          "type": "array"
+        },
+        "sky_view_factor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sky View Factor"
+        },
+        "winter_sun_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Winter Sun Hours"
+        },
+        "wind_prevailing_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Prevailing Deg"
+        },
+        "wind_prevailing_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Prevailing Mountain"
+        },
+        "wind_speed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Speed Ms"
+        },
+        "wind_calm_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Calm Share"
+        },
+        "wind_days": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Days"
+        },
+        "wind_seasonal": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Seasonal"
+        },
+        "wind_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Source"
+        },
+        "cold_wind": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cold Wind"
+        }
+      },
+      "title": "Exposure",
+      "type": "object"
+    },
+    "Files": {
+      "properties": {
+        "water_geojson": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Geojson"
+        },
+        "sha256": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Sha256",
+          "type": "object"
+        },
+        "land_cover": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Land Cover"
+        },
+        "dem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DemFile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dtm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DemFile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Files",
+      "type": "object"
+    },
+    "FourSpirits": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "back": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "front": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "left": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "right": {
+          "$ref": "#/$defs/Spirit"
+        },
+        "left_vs_right": {
+          "title": "Left Vs Right",
+          "type": "number"
+        }
+      },
+      "required": [
+        "back",
+        "front",
+        "left",
+        "right",
+        "left_vs_right"
+      ],
+      "title": "FourSpirits",
+      "type": "object"
+    },
+    "LandCover": {
+      "description": "Покров: вода — по OSM, остальное — по ESA WorldCover 10 м (W2).\n\n`water` и `water_wc` стоят рядом намеренно: расхождение двух источников — это то, что\nкалибровка обязана объяснить, а не спрятать.",
+      "properties": {
+        "built": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Built"
+        },
+        "tree": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tree"
+        },
+        "water": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water"
+        },
+        "open": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Open"
+        },
+        "water_wc": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Wc"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "ring_km": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ring Km"
+        }
+      },
+      "title": "LandCover",
+      "type": "object"
+    },
+    "Orientation": {
+      "properties": {
+        "facing_true_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Facing True Deg"
+        },
+        "declination_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Deg"
+        },
+        "declination_horizontal_nt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Horizontal Nt"
+        },
+        "declination_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Confidence"
+        },
+        "facing_mag_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Facing Mag Deg"
+        },
+        "facing_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Facing Mountain"
+        },
+        "sitting_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sitting Mountain"
+        },
+        "source": {
+          "enum": [
+            "user_compass",
+            "osm_building",
+            "model",
+            "none"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "none"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "near_boundary": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Near Boundary"
+        }
+      },
+      "required": [
+        "source",
+        "confidence"
+      ],
+      "title": "Orientation",
+      "type": "object"
+    },
+    "PointMetrics": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "slope_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slope Deg"
+        },
+        "aspect_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aspect Deg"
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shape"
+        },
+        "elev_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elev M"
+        },
+        "lift_over_200m_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lift Over 200M M"
+        }
+      },
+      "title": "PointMetrics",
+      "type": "object"
+    },
+    "Quality": {
+      "properties": {
+        "dem": {
+          "title": "Dem",
+          "type": "string"
+        },
+        "dem_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Source"
+        },
+        "dem_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "dsm",
+                "dsm_smoothed",
+                "dtm"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Kind"
+        },
+        "dem_resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Resolution M"
+        },
+        "dem_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Confidence"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "valid": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid"
+        },
+        "violations": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Violations",
+          "type": "array"
+        },
+        "partial": {
+          "default": false,
+          "title": "Partial",
+          "type": "boolean"
+        },
+        "partial_overpass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Partial Overpass"
+        },
+        "partial_osm": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Partial Osm"
+        }
+      },
+      "required": [
+        "dem"
+      ],
+      "title": "Quality",
+      "type": "object"
+    },
+    "Query": {
+      "properties": {
+        "input": {
+          "title": "Input",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "point",
+            "address",
+            "settlement",
+            "district"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolved_by": {
+          "title": "Resolved By",
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "input",
+        "kind",
+        "resolved_by"
+      ],
+      "title": "Query",
+      "type": "object"
+    },
+    "Ring": {
+      "description": "Кольцо сектора. Пустоты вместо чисел — `null`: «не смотрели» не равно «плоско».",
+      "properties": {
+        "r_km": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "R Km",
+          "type": "array"
+        },
+        "max_rel_elev_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Rel Elev M"
+        },
+        "mean_rel_elev_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean Rel Elev M"
+        },
+        "horizon_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Horizon Deg"
+        },
+        "water_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share"
+        },
+        "built_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Built Share"
+        },
+        "peaks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Peaks",
+          "type": "array"
+        },
+        "dsm": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dsm"
+        },
+        "dtm": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dtm"
+        },
+        "void_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Void Share"
+        }
+      },
+      "required": [
+        "r_km"
+      ],
+      "title": "Ring",
+      "type": "object"
+    },
+    "Sector": {
+      "properties": {
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "from_deg": {
+          "title": "From Deg",
+          "type": "number"
+        },
+        "to_deg": {
+          "title": "To Deg",
+          "type": "number"
+        },
+        "rings": {
+          "items": {
+            "$ref": "#/$defs/Ring"
+          },
+          "title": "Rings",
+          "type": "array"
+        },
+        "water": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Water",
+          "type": "array"
+        },
+        "water_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Km"
+        },
+        "wind_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wind Share"
+        },
+        "water_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share"
+        },
+        "water_share_osm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Osm"
+        },
+        "water_share_wc": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Wc"
+        },
+        "water_share_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Confidence"
+        },
+        "water_share_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "axis_line",
+                "bridge",
+                "dock_lock",
+                "tidal_flat",
+                "stale_osm",
+                "shadow",
+                "sea_in_ring"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Water Share Reason"
+        }
+      },
+      "required": [
+        "mountain",
+        "from_deg",
+        "to_deg",
+        "rings"
+      ],
+      "title": "Sector",
+      "type": "object"
+    },
+    "Site": {
+      "properties": {
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "title": "Lon",
+          "type": "number"
+        },
+        "elev_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elev M"
+        },
+        "precision": {
+          "enum": [
+            "point",
+            "building",
+            "district",
+            "settlement"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "utm_epsg": {
+          "title": "Utm Epsg",
+          "type": "integer"
+        },
+        "boundary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Boundary"
+        },
+        "hydro": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hydro"
+        },
+        "hemisphere": {
+          "anyOf": [
+            {
+              "enum": [
+                "N",
+                "S"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hemisphere"
+        },
+        "equatorial": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Equatorial"
+        },
+        "grid_crs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs"
+        },
+        "grid_crs_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "utm",
+                "aeqd"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs Kind"
+        },
+        "grid_crs_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Crs Reason"
+        },
+        "convergence_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Convergence Deg"
+        },
+        "sea_in_ring": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sea In Ring"
+        },
+        "distance_to_coast_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distance To Coast M"
+        }
+      },
+      "required": [
+        "lat",
+        "lon",
+        "precision",
+        "utm_epsg"
+      ],
+      "title": "Site",
+      "type": "object"
+    },
+    "Spirit": {
+      "properties": {
+        "rel_elev_m": {
+          "title": "Rel Elev M",
+          "type": "number"
+        },
+        "dist_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dist Km"
+        },
+        "continuity": {
+          "title": "Continuity",
+          "type": "number"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "rel_elev_m",
+        "continuity"
+      ],
+      "title": "Spirit",
+      "type": "object"
+    },
+    "SunBlock": {
+      "description": "H2: солнце как факт — полдни, сторона полудня, счёт дней, освещённость.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "latitude_abs": {
+          "title": "Latitude Abs",
+          "type": "number"
+        },
+        "noons": {
+          "items": {
+            "$ref": "#/$defs/SunNoon"
+          },
+          "title": "Noons",
+          "type": "array"
+        },
+        "noon_side": {
+          "additionalProperties": true,
+          "title": "Noon Side",
+          "type": "object"
+        },
+        "days_noon_north": {
+          "title": "Days Noon North",
+          "type": "integer"
+        },
+        "days_noon_south": {
+          "title": "Days Noon South",
+          "type": "integer"
+        },
+        "by_side8": {
+          "additionalProperties": true,
+          "title": "By Side8",
+          "type": "object"
+        },
+        "illumination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SunIllumination"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source",
+        "latitude_abs",
+        "noon_side",
+        "days_noon_north",
+        "days_noon_south"
+      ],
+      "title": "SunBlock",
+      "type": "object"
+    },
+    "SunIllumination": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "hours_by_side": {
+          "additionalProperties": true,
+          "title": "Hours By Side",
+          "type": "object"
+        },
+        "total_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Hours"
+        },
+        "blocked_hours": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Hours"
+        },
+        "step_min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Min"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "hours_by_side"
+      ],
+      "title": "SunIllumination",
+      "type": "object"
+    },
+    "SunNoon": {
+      "properties": {
+        "event": {
+          "enum": [
+            "june_solstice",
+            "december_solstice",
+            "equinox"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "altitude_deg": {
+          "title": "Altitude Deg",
+          "type": "number"
+        },
+        "azimuth_deg": {
+          "title": "Azimuth Deg",
+          "type": "number"
+        },
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "side8": {
+          "enum": [
+            "N",
+            "NE",
+            "E",
+            "SE",
+            "S",
+            "SW",
+            "W",
+            "NW"
+          ],
+          "title": "Side8",
+          "type": "string"
+        },
+        "utc_hour": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Utc Hour"
+        }
+      },
+      "required": [
+        "event",
+        "date",
+        "altitude_deg",
+        "azimuth_deg",
+        "mountain",
+        "side8"
+      ],
+      "title": "SunNoon",
+      "type": "object"
+    },
+    "WaterMouth": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "mountain": {
+          "title": "Mountain",
+          "type": "string"
+        },
+        "closure_index": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Index"
+        },
+        "closure_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Reason"
+        },
+        "closure_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closure Confidence"
+        },
+        "enclosure": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enclosure"
+        },
+        "width_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width M"
+        },
+        "left_hill_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Left Hill M"
+        },
+        "right_hill_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Right Hill M"
+        },
+        "width_capped": {
+          "default": false,
+          "title": "Width Capped",
+          "type": "boolean"
+        },
+        "capped_sides": {
+          "default": 0,
+          "title": "Capped Sides",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mountain"
+      ],
+      "title": "WaterMouth",
+      "type": "object"
+    },
+    "WaterObject": {
+      "properties": {
+        "dem_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Layer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Names",
+          "type": "array"
+        },
+        "seasonal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seasonal"
+        },
+        "pieces": {
+          "default": 1,
+          "title": "Pieces",
+          "type": "integer"
+        },
+        "hidden_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hidden Share"
+        },
+        "visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visible"
+        },
+        "kind": {
+          "enum": [
+            "river",
+            "stream",
+            "canal",
+            "lake",
+            "sea",
+            "dock",
+            "culvert",
+            "road"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order"
+        },
+        "discharge_m3s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discharge M3S"
+        },
+        "hydro_distance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hydro Distance M"
+        },
+        "in_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Mountain"
+        },
+        "out_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Mountain"
+        },
+        "nearest_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nearest M"
+        },
+        "bend": {
+          "anyOf": [
+            {
+              "enum": [
+                "outer",
+                "inner",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bend"
+        },
+        "straight_at_site": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Straight At Site"
+        },
+        "tidal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal"
+        },
+        "tidal_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal Source"
+        },
+        "tidal_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tidal Reason"
+        },
+        "confluences": {
+          "items": {
+            "$ref": "#/$defs/Confluence"
+          },
+          "title": "Confluences",
+          "type": "array"
+        },
+        "waterbody_links": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Waterbody Links",
+          "type": "array"
+        },
+        "geom": {
+          "default": "line",
+          "enum": [
+            "line",
+            "area"
+          ],
+          "title": "Geom",
+          "type": "string"
+        },
+        "nearest_azimuth_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nearest Azimuth Deg"
+        },
+        "nearest_mountain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nearest Mountain"
+        },
+        "area_m2": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Area M2"
+        },
+        "site_inside": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Site Inside"
+        },
+        "riverbank_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Riverbank Of"
+        },
+        "dock_channel_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dock Channel Of"
+        },
+        "water_mouth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterMouth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "outflow_visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outflow Visible"
+        },
+        "curvature_radius_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Curvature Radius M"
+        },
+        "bend_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "bend",
+                "loop",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bend Kind"
+        },
+        "loop": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Loop"
+        },
+        "site_position": {
+          "anyOf": [
+            {
+              "enum": [
+                "inside",
+                "outside_convex",
+                "outside_concave"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Site Position"
+        },
+        "between_branches": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Between Branches"
+        },
+        "flow_ways_share": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Ways Share"
+        },
+        "crossings_2km": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crossings 2Km"
+        },
+        "crossing_angle_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crossing Angle Deg"
+        },
+        "length_2km_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Length 2Km M"
+        },
+        "same_mountain_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Same Mountain Reason"
+        },
+        "flow_osm_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Osm Dir"
+        },
+        "flow_dem_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Dem Dir"
+        },
+        "flow_chosen": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Chosen"
+        },
+        "flow_rule": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Rule"
+        },
+        "flow_confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Confidence"
+        },
+        "flow_agree": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Agree"
+        },
+        "dem_slope_m_per_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Slope M Per Km"
+        },
+        "dem_slope_snr": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Slope Snr"
+        },
+        "dem_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dem Reason"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "WaterObject",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema": {
+      "default": "site_pack/2",
+      "title": "Schema",
+      "type": "string"
+    },
+    "query": {
+      "$ref": "#/$defs/Query"
+    },
+    "site": {
+      "$ref": "#/$defs/Site"
+    },
+    "orientation": {
+      "$ref": "#/$defs/Orientation"
+    },
+    "chart_year": {
+      "$ref": "#/$defs/ChartYear"
+    },
+    "sectors": {
+      "items": {
+        "$ref": "#/$defs/Sector"
+      },
+      "title": "Sectors",
+      "type": "array"
+    },
+    "point": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PointMetrics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "four_spirits": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FourSpirits"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "dragon_vein": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DragonVein"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "water": {
+      "items": {
+        "$ref": "#/$defs/WaterObject"
+      },
+      "title": "Water",
+      "type": "array"
+    },
+    "roads": {
+      "items": {
+        "$ref": "#/$defs/WaterObject"
+      },
+      "title": "Roads",
+      "type": "array"
+    },
+    "sun": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SunBlock"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "exposure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Exposure"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "land_cover": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LandCover"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "water_share_rule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Water Share Rule"
+    },
+    "quality": {
+      "$ref": "#/$defs/Quality"
+    },
+    "algo": {
+      "$ref": "#/$defs/Algo"
+    },
+    "files": {
+      "$ref": "#/$defs/Files"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "attribution": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attribution",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query",
+    "site",
+    "orientation",
+    "chart_year",
+    "quality"
+  ],
+  "title": "SitePack",
+  "type": "object"
+}

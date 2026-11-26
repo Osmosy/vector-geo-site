@@ -18,6 +18,26 @@ ROOT = Path(__file__).resolve().parents[1]
 GOLDEN = ROOT / "tests" / "golden"
 CACHE = Path.home() / ".cache" / "vector-geo-site"
 
+# Мировые эталоны (G1). Каждый покрывает то, что не воспроизводится в Европе: полушарие,
+# экватор, антимеридиан, граница зон UTM, полярная широта, море в кольце, прилив по берегу,
+# письменность имени. `wide` — только там, где граница прилива дальше 8 км от участка.
+WORLD_SITES = {
+    "sydney": {"lat": -33.8688, "lon": 151.2093, "radius_km": 8.0, "facing": None, "wide": True},
+    "rio-de-janeiro": {"lat": -22.9068, "lon": -43.1729, "radius_km": 8.0, "facing": None},
+    "suva": {"lat": -18.1416, "lon": 178.4419, "radius_km": 8.0, "facing": None},
+    "singapore": {"lat": 1.3521, "lon": 103.8198, "radius_km": 8.0, "facing": None},
+    "cairo": {"lat": 30.0444, "lon": 31.2357, "radius_km": 8.0, "facing": None},
+    "hong-kong": {"lat": 22.2819, "lon": 114.1582, "radius_km": 8.0, "facing": None,
+                  "macro_km": 50.0},
+    "reykjavik": {"lat": 64.1466, "lon": -21.9426, "radius_km": 8.0, "facing": None},
+    "beijing": {"lat": 39.9042, "lon": 116.4074, "radius_km": 8.0, "facing": None},
+    "istanbul": {"lat": 41.0082, "lon": 28.9784, "radius_km": 8.0, "facing": None},
+    "buenos-aires": {"lat": -34.6037, "lon": -58.3816, "radius_km": 8.0, "facing": None},
+    "dubai": {"lat": 25.2048, "lon": 55.2708, "radius_km": 8.0, "facing": None},
+    "taveuni": {"lat": -16.79, "lon": -179.97, "radius_km": 8.0, "facing": None},
+    "arctic-ocean": {"lat": 84.30, "lon": 15.00, "radius_km": 8.0, "facing": None},
+}
+
 SITES = {
     "london-city": {"lat": 51.5138, "lon": -0.0984, "radius_km": 20.0, "facing": 180.0},
     "london-isle-of-dogs": {"lat": 51.4885, "lon": -0.0195, "radius_km": 20.0, "facing": None},
@@ -26,22 +46,44 @@ SITES = {
     "nizhny-novgorod-strelka": {"lat": 56.3300, "lon": 44.0100, "radius_km": 20.0, "facing": None},
     "sankt-goar-rhine": {"lat": 50.1500, "lon": 7.7100, "radius_km": 20.0, "facing": None},
 }
+SITES.update(WORLD_SITES)
 
 
-def dem_crop(lat: float, lon: float, radius_km: float, out: Path, resolution_m: float = 90.0) -> None:
-    """Вырезать квадрат DEM из кеша тайлов Copernicus в UTM и сохранить плотным GeoTIFF."""
+def dem_crop(lat: float, lon: float, radius_km: float, out: Path, resolution_m: float = 90.0,
+             macro_km: float | None = None, crs: str | None = None) -> None:
+    """Вырезать квадрат DEM из кеша тайлов Copernicus и сохранить плотным GeoTIFF.
+
+    Сетка вырезки — та же, что у пакета (`geo.grid_crs`): у антимеридиана и границы зон это
+    азимутальная, а не UTM. Иначе `measure_site` читает файл в чужой проекции и центр участка
+    попадает в пустоту — высота точки приходит `None` там, где DEM на самом деле есть (E-034).
+    """
     from pyproj import Transformer
 
     from geosite import geo
-    from geosite.dem import bbox_for_radius, ensure_tile, tiles_for_bbox
+    from geosite.dem import bbox_parts, ensure_tile, tiles_for_bbox
 
-    epsg = geo.utm_epsg(lat, lon)
-    lat_min, lat_max, lon_min, lon_max = bbox_for_radius(lat, lon, radius_km)
+    # сетка вырезки: явно заданная, иначе сетка пакета (macro_km), иначе UTM — так европейские
+    # эталоны остаются в той же проекции, в которой их проверяет test_golden.py
+    if crs is not None:
+        epsg = crs
+    elif macro_km is not None:
+        epsg = geo.grid_crs(lat, lon, float(macro_km))["crs"]
+    else:
+        epsg = geo.utm_epsg(lat, lon)
+    # у линии перемены дат один bbox выходит за 180°: берём части, как делает пакет (E-032)
     tiles = []
-    for la, lo in tiles_for_bbox(lat_min, lat_max, lon_min, lon_max):
-        tiles.append(ensure_tile(la, lo))
+    seen = set()
+    for lat_min, lat_max, lon_min, lon_max in bbox_parts(lat, lon, radius_km):
+        for la, lo in tiles_for_bbox(lat_min, lat_max, lon_min, lon_max):
+            if (la, lo) in seen:
+                continue
+            seen.add((la, lo))
+            try:
+                tiles.append(ensure_tile(la, lo))
+            except Exception as exc:
+                print(f"тайл {la},{lo}: {exc}")
 
-    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
+    tr = Transformer.from_crs("EPSG:4326", geo.crs_str(epsg), always_xy=True)
     x0, y0 = tr.transform(lon, lat)
     size = int(2 * radius_km * 1000 / resolution_m) + 1
     transform = rasterio.transform.from_origin(x0 - size * resolution_m / 2,
@@ -54,12 +96,16 @@ def dem_crop(lat: float, lon: float, radius_km: float, out: Path, resolution_m: 
     for tile in tiles:
         with rasterio.open(tile) as src:
             band = src.read(1).astype("float32")
-            reproject(band, mosaic, src_transform=src.transform, src_crs=src.crs,
-                      dst_transform=transform, dst_crs=f"EPSG:{epsg}",
+            part = np.full_like(mosaic, np.nan)
+            reproject(band, part, src_transform=src.transform, src_crs=src.crs,
+                      dst_transform=transform, dst_crs=geo.crs_str(epsg),
                       resampling=Resampling.bilinear, dst_nodata=np.nan)
+        # reproject заливает весь массив nodata'ой за пределами своего тайла: писать напрямую
+        # в мозаику значит стирать уже собранное (из 4 тайлов выживал последний)
+        mosaic = np.where(np.isnan(part), mosaic, part)
     out.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(out, "w", driver="GTiff", height=size, width=size, count=1,
-                       dtype="float32", crs=f"EPSG:{epsg}", transform=transform,
+                       dtype="float32", crs=geo.crs_str(epsg), transform=transform,
                        compress="deflate", nodata=np.nan) as dst:
         dst.write(mosaic, 1)
 
@@ -80,15 +126,36 @@ def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
         import gzip
         with gzip.open(target / "fixtures" / "osm-water.json.gz", "wt", encoding="utf-8") as fh:
             json.dump(payload, fh)
+        # берег — такой же вход, как вода (E-028): без него офлайн-пакет не знает про море
+        from geosite import water as _w
         try:
-            wide = osm_payload(site["lat"], site["lon"], 30000)
+            coast = _w.fetch_coast(site["lat"], site["lon"], 8000, allow_network=True)
+        except Exception as exc:
+            coast = None
+            print(f"{name}: берег не получен ({exc})")
+        if coast and coast.get("elements"):
             import gzip
-            with gzip.open(target / "fixtures" / "osm-water-wide.json.gz", "wt", encoding="utf-8") as fh:
-                json.dump(wide, fh)
-        except Exception as exc:  # широкий запрос не обязателен для проверок без приливности
-            print(f"{name}: широкая выгрузка не получена ({exc})")
+            with gzip.open(target / "fixtures" / "coast.json.gz", "wt", encoding="utf-8") as fh:
+                json.dump(coast, fh)
+        else:
+            print(f"{name}: береговой линии в 8 км нет")
+        # широкая выгрузка нужна только там, где граница прилива дальше 8 км (Темза, Парраматта);
+        # для остальных это 2 МБ в репозитории без пользы
+        if site.get("wide", name not in WORLD_SITES):
+            try:
+                wide = osm_payload(site["lat"], site["lon"], 30000)
+                import gzip
+                with gzip.open(target / "fixtures" / "osm-water-wide.json.gz", "wt",
+                               encoding="utf-8") as fh:
+                    json.dump(wide, fh)
+            except Exception as exc:  # широкий запрос не обязателен для проверок без приливности
+                print(f"{name}: широкая выгрузка не получена ({exc})")
         if not osm_only:
-            dem_crop(site["lat"], site["lon"], site["radius_km"], target / "fixtures" / "dem.tif")
+            try:
+                dem_crop(site["lat"], site["lon"], site["radius_km"],
+                         target / "fixtures" / "dem.tif", macro_km=site.get("macro_km"))
+            except Exception as exc:      # вне покрытия Copernicus (84° с. ш.) рельефа не будет
+                print(f"{name}: DEM не получен ({exc})")
             from geosite import landcover
             try:
                 if not landcover.write_crop(site["lat"], site["lon"], 8000.0,

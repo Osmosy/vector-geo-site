@@ -1,0 +1,20 @@
+# singapore: факты для мира. Каждый — с источником; подгонять под вывод кода запрещено (ТЗ Б4).
+world:
+  grid:
+    kind: utm
+  noon:
+    north_days_min: 150
+    south_days_min: 150
+  coast:
+    sea_in_ring: false
+  water:
+    count_min: 3
+    named_min: 1
+  landcover:
+    water_wc_min: 0.03
+source:
+- 'OSM: natural=coastline в 8 км от Раффлз-Плейс нет (ближайшая линия — за 8 км);
+  берег Marina Bay задан полигоном воды — карта OSM, запрос 26.11.2026'
+- 'полдень: широта 1.35° — у экватора солнце по обе стороны, дни делятся примерно
+  пополам'
+- 'сетка: зона 48 (102…108° в. д.) — UTM'

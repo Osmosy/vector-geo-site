@@ -208,8 +208,8 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
     if water.truncated(payload):
         result["water_partial"] = True
     # G3.4: берег нужен, чтобы отличить приливную воду от речной; офлайн без кеша — None
-    coast_payload = None
-    if payload is not None:
+    coast_payload = _load_osm_file(getattr(args, "coast_file", None))
+    if payload is not None and coast_payload is None:
         try:
             coast_payload = water.fetch_coast(
                 r.lat, r.lon, 8000,
@@ -654,6 +654,10 @@ def main(argv: list[str] | None = None) -> int:
                        help="сохранённая вырезка ESA WorldCover (GeoTIFF) вместо сети")
         p.add_argument("--osm-file-wide", default=None,
                        help="ответ Overpass радиусом 30 км (приливность по руслу); подменяет загрузку")
+        # G1: берег — такой же вход, как вода. Без него офлайн-эталон не может проверить
+        # E-028 (`sea_in_ring`), а живой и офлайн-прогон дали бы разные пакеты из одних данных
+        p.add_argument("--coast-file", default=None,
+                       help="сохранённый ответ Overpass с natural=coastline; подменяет загрузку")
 
     p_res = sub.add_parser("resolve", help="ввод → точка, тип, точность")
     p_res.add_argument("place")
