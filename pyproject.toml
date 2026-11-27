@@ -32,7 +32,10 @@ packages = ["src/geosite"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["network: тесты, которым нужен интернет"]
+markers = [
+    "network: тесты, которым нужен интернет",
+    "skill: сквозная проверка навыка vector-fengshui-bazi по закреплённому коммиту",
+]
 addopts = "-m \"not network\""
 # S5: RuntimeWarning из кода пакета — падение, а не шум в логах (nanmean по пустой выборке
 # раньше печатался 81 раз и прятал настоящие предупреждения)

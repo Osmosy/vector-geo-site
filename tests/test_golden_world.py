@@ -103,6 +103,13 @@ def facts(name: str) -> dict:
     out["tidal"] = sum(1 for m in metrics if getattr(m, "tidal", None) is True)
     out["tidal_unseen"] = sum(1 for m in metrics if getattr(m, "tidal", None) is None)
     out["max_nearest_m"] = max((m.nearest_m or 0.0) for m in metrics) if metrics else None
+    # Море (S2) считается по тем же измеренным объектам: приливный признак живёт в воде,
+    # и передавать в sea.detect пустой список значило бы не проверять его вовсе
+    out["water_objects"] = [
+        {"name": getattr(m, "name", None), "kind": getattr(m, "kind", None),
+         "nearest_m": getattr(m, "nearest_m", None), "tidal": getattr(m, "tidal", None)}
+        for m in metrics
+    ]
 
     cover = None
     if raster is not None and (fixtures / "worldcover.tif").exists():
@@ -173,6 +180,29 @@ def _check_world(name: str, expect: dict, got: dict) -> list[str]:
         fails.append(f"высота точки: {got['elev_m']} < {dem['elev_min']}")
     if dem.get("void") and got["elev_m"] is not None:
         fails.append(f"ожидалась пустота DEM, измерено {got['elev_m']} м")
+
+    # Рельеф по карте (S4): ожидание — вершина с именем, высотой и расстоянием из OSM,
+    # а не число, списанное с вывода кода. Проверяем максимум кольца в горе, где эта вершина
+    # лежит; `from` в строке — тот самый источник, который читатель может перепроверить.
+    ter = w.get("terrain") or {}
+    if ter:
+        by_ring: dict = {}
+        for sector in got["terrain"].get("sectors") or []:
+            for ring in sector.get("rings") or []:
+                by_ring.setdefault(tuple(ring["r_km"]), {})[sector["mountain"]] = \
+                    ring.get("max_rel_elev_m")
+        for row in ter.get("ring_max") or []:
+            ring = tuple(row["ring"])
+            mountain = row["mountain"]
+            value = by_ring.get(ring, {}).get(mountain)
+            label = f"рельеф {mountain} {ring[0]:g}–{ring[1]:g} км"
+            if value is None:
+                fails.append(f"{label}: нет значения (ожидание: {row.get('from')})")
+                continue
+            if "min" in row and value < float(row["min"]):
+                fails.append(f"{label}: {value:.0f} м < {row['min']} ({row.get('from')})")
+            if "max" in row and value > float(row["max"]):
+                fails.append(f"{label}: {value:.0f} м > {row['max']} ({row.get('from')})")
     return fails
 
 
@@ -223,11 +253,13 @@ def test_world_sea_by_evidence(name: str):
     fixtures = GOLDEN / name / "fixtures"
     site = yaml.safe_load((GOLDEN / name / "site.yaml").read_text(encoding="utf-8")) or {}
     lat, lon = float(site["lat"]), float(site["lon"])
-    coast = _gzip_json(fixtures / "coast.json.gz")
-    wide = _gzip_json(fixtures / "coast-wide.json.gz")
+    # Вода считается тем же путём, что и в пакете: приливный признак — свойство измеренного
+    # объекта, и `water=[]` оставлял у Сувы один берег вместо двух признаков (ТЗ S2)
+    measured = facts(name)
     payload = _gzip_json(fixtures / "sea.json.gz")
     polygons = sea.payload_polygons(payload, lat, lon) if payload else []
-    got = sea.detect(water=[], coast_m=water.nearest_coast_m(coast, lat, lon),
+    wide = _gzip_json(fixtures / "coast-wide.json.gz")
+    got = sea.detect(water=measured["water_objects"], coast_m=measured["coast_m"],
                      coast_wide_m=water.nearest_coast_m(wide, lat, lon),
                      wc_share=exp.get("wc_share"), gsw_share=exp.get("gsw_share"),
                      osm_water_share=exp.get("osm_water_share"), sea_polygons=polygons)

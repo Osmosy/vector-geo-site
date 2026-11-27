@@ -108,9 +108,12 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
     point_smooth = 300.0 if r.precision in {"district", "settlement"} else 90.0
 
     def _pass(macro_grid=None, meso_grid=None) -> dict:
+        # DEM из файла — готовая сетка эталона (tests/golden): тогда ни макро, ни мезо не грузятся,
+        # и офлайн-прогон собирает пакет из тех же фикстур, что проверяет эталон
+        dem_path = getattr(args, "dem_file", None) if macro_grid is None and meso_grid is None else None
         return terrain.measure_site(r.lat, r.lon, crs=crs, resolution_m=30.0,
                                     macro_km=macro_km, meso_km=8.0, facing_deg=facing,
-                                    point_smooth_m=point_smooth,
+                                    point_smooth_m=point_smooth, dem_path=dem_path,
                                     macro_grid=macro_grid, meso_grid=meso_grid)
 
     # D3: сначала поверхность (DSM) — она нужна всегда, в том числе для кольца 0–0.5 км,
@@ -121,7 +124,11 @@ def _measure(args, r, *, with_water: bool = True, osm_payload: dict | None = Non
                       "resolution_m": dsm.get("dem_resolution_m"),
                       "vertical_datum": dsm.get("dem_vertical_datum")}
     dtm_grid, dtm_info = (None, {"reason": "выключено флагом --no-dtm"})
-    if not getattr(args, "no_dtm", False):
+    if getattr(args, "dem_file", None):
+        # DEM из файла уже покрывает всю сетку: подключать DTM значило бы ходить в сеть
+        # и смешивать два слоя там, где эталон задал один
+        dtm_info = {"reason": "DEM из файла (--dem-file): DTM не подключается"}
+    elif not getattr(args, "no_dtm", False):
         macro_dtm, macro_info = dtm.grid(r.lat, r.lon, crs=crs, radius_km=macro_km,
                                          resolution_m=max(90.0, 30.0))
         # ближнее кольцо считается отдельно: национальный лидар часто отдаёт землю только
@@ -747,6 +754,9 @@ def main(argv: list[str] | None = None) -> int:
                        help="готовый ответ Overpass (JSON) вместо загрузки: офлайн-пересборка")
         p.add_argument("--no-dtm", action="store_true",
                        help="не подключать DTM: считать всё по поверхности (DSM)")
+        p.add_argument("--dem-file", default=None,
+                       help="готовый вырез DEM (GeoTIFF) вместо загрузки тайлов: офлайн-сборка "
+                            "пакета из фикстуры эталона")
         p.add_argument("--worldcover-file", default=None,
                        help="сохранённая вырезка ESA WorldCover (GeoTIFF) вместо сети")
         p.add_argument("--osm-file-wide", default=None,

@@ -197,10 +197,15 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Защита от неверных расчётов
 
 - `geosite validate` — 12 инвариантов пакета (`quality.violations`), запускается в конце `pack`.
-- Эталоны `tests/golden/` — шесть мест: Лондон-Сити, Айл-оф-Догс, Кингстон (граница прилива),
-  Нижний Новгород (слияние Оки и Волги), Москва (Москва-река и Неглинная в трубе), Санкт-Гоар
-  (ущелье Рейна). Факты в `expect.yaml` с источниками, тесты офлайн на сохранённых ответах OSM
-  и вырезанном DEM; состояние каждого — в [tests/golden/README.md](tests/golden/README.md).
+- Эталоны `tests/golden/` — шесть европейских мест (Лондон-Сити, Айл-оф-Догс, Кингстон —
+  граница прилива, Нижний Новгород — слияние Оки и Волги, Москва — Москва-река и Неглинная
+  в трубе, Санкт-Гоар — ущелье Рейна) и семнадцать мировых (сетка, полдень, море, письменность,
+  прилив без тега, высоты ниже нуля, классические фэншуй-места). Факты в `expect.yaml`
+  с источниками, тесты офлайн на сохранённых ответах OSM и вырезанном DEM; состояние каждого —
+  в [tests/golden/README.md](tests/golden/README.md).
+- Сквозная проверка навыка: `tests/test_skill_e2e.py` собирает пакеты южных эталонов и Пекина
+  офлайн и прогоняет `landform` навыка `vector-fengshui-bazi`, закреплённого коммитом:
+  у южных — две интерпретации и раздел расхождений, у северного — одна.
 - Версии алгоритмов в каждом пакете (`algo`), журнал изменений расчёта — [CHANGELOG-CALC.md](CHANGELOG-CALC.md),
   найденные ошибки — [docs/calc/errata.md](docs/calc/errata.md).
 - `scripts/diff_packs.py old.json new.json` — что изменилось между двумя пакетами.
@@ -209,13 +214,18 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 386 passed, сеть не нужна
+python -m pytest -q          # 393 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
   --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \
   --worldcover-file tests/golden/london-city/fixtures/worldcover.tif --out /tmp/pack
+# тот же путь для мирового эталона: DEM из выреза, DTM не подключается, сеть не нужна
+geosite pack "-33.8688, 151.2093" --offline --dem-file tests/golden/sydney/fixtures/dem.tif \
+  --osm-file tests/golden/sydney/fixtures/osm-water.json.gz \
+  --coast-file tests/golden/sydney/fixtures/coast.json.gz \
+  --worldcover-file tests/golden/sydney/fixtures/worldcover.tif --out /tmp/pack-sydney
 # приливность по руслу: широкая выгрузка (файлы бывают сжатыми — gzip определяется по магии)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
   --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \

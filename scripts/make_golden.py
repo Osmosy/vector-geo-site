@@ -39,7 +39,10 @@ WORLD_SITES = {
     # S4: Амстердам обязателен — высоты ниже уровня моря (I-09), AHN как DTM, NAP → EGM2008;
     # классические места — на них проверяется смысл интерпретации, а не только геоданные
     "amsterdam": {"lat": 52.3731, "lon": 4.8922, "radius_km": 8.0, "facing": None},
-    "hangzhou-west-lake": {"lat": 30.2428, "lon": 120.1517, "radius_km": 8.0, "facing": 270.0},
+    # Ханчжоу у границы зон UTM (120° в. д.): круг 20 км задевает её, и пакет считает в aeqd.
+    # macro_km обязан стоять здесь, иначе DEM вырезается в UTM и центр участка попадает в пустоту
+    "hangzhou-west-lake": {"lat": 30.2428, "lon": 120.1517, "radius_km": 8.0, "facing": 270.0,
+                           "macro_km": 20.0},
     "kyoto-imperial-palace": {"lat": 35.0254, "lon": 135.7622, "radius_km": 8.0, "facing": 90.0},
     "chongqing-jiefangbei": {"lat": 29.5576, "lon": 106.5771, "radius_km": 8.0, "facing": None},
 }
@@ -170,9 +173,10 @@ def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
             except Exception as exc:
                 print(f"{name}: слой покрова не получен ({exc})")
         facing = "null" if site["facing"] is None else f"{site['facing']}"
+        macro = f"macro_km: {site['macro_km']}\n" if site.get("macro_km") else ""
         (target / "site.yaml").write_text(
             f"name: {name}\nlat: {site['lat']}\nlon: {site['lon']}\n"
-            f"radius_km: {site['radius_km']}\nfacing: {facing}\n",
+            f"radius_km: {site['radius_km']}\nfacing: {facing}\n{macro}",
             encoding="utf-8")
         print(f"{name}: {target}")
     return 0

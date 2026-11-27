@@ -17,7 +17,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e . pytest
+      - name: "Навык по закреплённому коммиту (сквозная проверка)"
+        run: |
+          git init -q /tmp/landform
+          git -C /tmp/landform remote add origin https://github.com/Osmosy/vector-fengshui-bazi.git
+          git -C /tmp/landform fetch -q --depth 1 origin "$(cat tests/skill_pin.txt)"
+          git -C /tmp/landform checkout -q FETCH_HEAD
       - name: "Тесты: офлайн, без сети и без кеша DEM"
+        env:
+          LANDFORM_REPO: /tmp/landform
         run: pytest -q -m "not network"
       - name: Инварианты пакетов примеров
         run: |

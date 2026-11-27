@@ -8,7 +8,7 @@ world:
   sea:
     present: true
     kind: ocean
-    min_kinds: 1
+    min_kinds: 2
     nearest_max_m: 2500
     source: 'OSM: natural=coastline в 1.41 км — берег бухты Сувы; приливные участки в кольце. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   water:
