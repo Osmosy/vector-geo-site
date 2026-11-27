@@ -1,85 +1,99 @@
 {
-  "version": "1.0.0",
-  "note": "Реестр DTM-источников (D3). Проверяется при подключении: страна, покрытие, лицензия, разрешение, дата проверки. Записи с license_class=closed в цепочку не попадают: источники с запретом коммерческого использования не берём (приёмка раздела 4).",
-  "sources": [
-    {
-      "id": "ahn4",
-      "country": "NL",
-      "name": "Actueel Hoogtebestand Nederland 4, DTM 0.5 м (Rijkswaterstaat / PDOK)",
-      "bbox": [
-        50.7,
-        3.3,
-        53.65,
-        7.3
-      ],
-      "kind": "wcs",
-      "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0",
-      "coverage": "dtm_05m",
-      "protocol": "wcs-1.0.0",
-      "resolution_m": 0.5,
-      "license": "CC BY 4.0 (AHN, Rijkswaterstaat, via PDOK)",
-      "license_class": "open",
-      "vertical_datum": "NAP",
-      "datum_shift_m": null,
-      "datum_note": "NAP → EGM2008: сдвиг не применён, геоидная модель не подключена; расхождение порядка ±0.2 м, для рельефа на 30 м несущественно, но записано явно",
-      "verified": "2026-11-26",
-      "verified_note": "GetCapabilities 200, GetCoverage 533×533 px за 1.7 с, высоты -7.2…+30 м на дамбе"
-    },
-    {
-      "id": "ea-lidar",
-      "country": "GB",
-      "name": "Environment Agency LIDAR Composite DTM 2 м",
-      "bbox": [
-        49.9,
-        -6.5,
-        55.9,
-        2.1
-      ],
-      "kind": "wcs",
-      "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-2m/wcs",
-      "coverage": "09ea3b37-df3a-4e8b-ac69-fb0842227b04__Lidar_Composite_Elevation_DTM_2m",
-      "protocol": "wcs-2.0.1",
-      "resolution_m": 2.0,
-      "license": "Open Government Licence v3 (EA LIDAR)",
-      "license_class": "open",
-      "vertical_datum": "ODN",
-      "datum_shift_m": null,
-      "datum_note": "ODN → EGM2008: сдвиг не применён; расхождение порядка ±0.3 м",
-      "verified": "2026-11-26",
-      "verified_note": "через VPN (GB): GetCapabilities 200, CoverageId …DTM_2m, окно 16×16 км отдано за ~1 мин; без VPN сервер отвечал 429 на корень сайта",
-      "crs": "EPSG:27700",
-      "axes": [
-        "E",
-        "N"
-      ],
-      "max_pixels": 64000000,
-      "window_note": "WCS 2.0.1 отдаёт окно в нативной сетке OSGB; 2 м выбраны потому, что 1 м на кольцо 8 км — 256 Мпикс и 1 ГБ перекачки, а масштабирование сервером (`scaleFactor`) читает всё покрытие Англии (30.9 ГБ против лимита 10 ГБ)",
-      "max_total_pixels": 90000000,
-      "max_bytes": 45000000,
-      "window_factor": 1.05
-    },
-    {
-      "id": "gedtm30",
-      "country": "*",
-      "name": "GEDTM30 (OpenGeoHub, v1.2.0), глобальный DTM 30 м",
-      "bbox": [
-        -60.0,
-        -180.0,
-        84.0,
-        180.0
-      ],
-      "kind": "cog-tiles",
-      "url": "https://data.opengeohub.org/gedtm30",
-      "tile_pattern": "GEDTM30_v1.2.0/{name}.tif",
-      "resolution_m": 30.0,
-      "license": "CC BY 4.0 (GEDTM30, OpenGeoHub)",
-      "license_class": "open",
-      "vertical_datum": "EGM2008",
-      "datum_shift_m": 0.0,
-      "datum_note": "EGM2008 — та же система, что у Copernicus GLO-30: сдвиг не нужен",
-      "verified": "2026-11-26",
-      "verified_note": "не подключён: data.opengeohub.org не резолвится с этой машины (DNS), файлы GEDTM30 30 м есть только там; на Zenodo лежит 240-метровая версия и примеры моделирования",
-      "active": false
-    }
-  ]
+ "version": "1.0.0",
+ "note": "Реестр DTM-источников (D3). Проверяется при подключении: страна, покрытие, лицензия, разрешение, дата проверки. Записи с license_class=closed в цепочку не попадают: источники с запретом коммерческого использования не берём (приёмка раздела 4).",
+ "sources": [
+  {
+   "id": "ahn4",
+   "country": "NL",
+   "name": "Actueel Hoogtebestand Nederland 4, DTM 0.5 м (Rijkswaterstaat / PDOK)",
+   "bbox": [
+    50.7,
+    3.3,
+    53.65,
+    7.3
+   ],
+   "kind": "wcs",
+   "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0",
+   "coverage": "dtm_05m",
+   "protocol": "wcs-1.0.0",
+   "resolution_m": 0.5,
+   "license": "CC BY 4.0 (AHN, Rijkswaterstaat, via PDOK)",
+   "license_class": "open",
+   "vertical_datum": "NAP",
+   "datum_shift_m": null,
+   "datum_note": "NAP → EGM2008: сдвиг не применён, геоидная модель не подключена; расхождение порядка ±0.2 м, для рельефа на 30 м несущественно, но записано явно",
+   "verified": "2026-11-26",
+   "verified_note": "GetCapabilities 200, GetCoverage 533×533 px за 1.7 с, высоты -7.2…+30 м на дамбе"
+  },
+  {
+   "id": "ea-lidar",
+   "country": "GB",
+   "name": "Environment Agency LIDAR Composite DTM 2 м",
+   "bbox": [
+    49.9,
+    -6.5,
+    55.9,
+    2.1
+   ],
+   "kind": "wcs",
+   "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-2m/wcs",
+   "coverage": "09ea3b37-df3a-4e8b-ac69-fb0842227b04__Lidar_Composite_Elevation_DTM_2m",
+   "protocol": "wcs-2.0.1",
+   "resolution_m": 2.0,
+   "license": "Open Government Licence v3 (EA LIDAR)",
+   "license_class": "open",
+   "vertical_datum": "ODN",
+   "datum_shift_m": null,
+   "datum_note": "ODN → EGM2008: сдвиг не применён; расхождение порядка ±0.3 м",
+   "verified": "2026-11-26",
+   "verified_note": "через VPN (GB): GetCapabilities 200, CoverageId …DTM_2m, окно 16×16 км отдано за ~1 мин; без VPN сервер отвечал 429 на корень сайта",
+   "crs": "EPSG:27700",
+   "axes": [
+    "E",
+    "N"
+   ],
+   "max_pixels": 64000000,
+   "window_note": "WCS 2.0.1 отдаёт окно в нативной сетке OSGB; 2 м выбраны потому, что 1 м на кольцо 8 км — 256 Мпикс и 1 ГБ перекачки, а масштабирование сервером (`scaleFactor`) читает всё покрытие Англии (30.9 ГБ против лимита 10 ГБ)",
+   "max_total_pixels": 90000000,
+   "max_bytes": 45000000,
+   "window_factor": 1.05
+  },
+  {
+   "id": "gedtm30",
+   "country": "*",
+   "name": "GEDTM30 (OpenGeoHub, v1.2.0), глобальный DTM 30 м",
+   "bbox": [
+    -60.0,
+    -180.0,
+    84.0,
+    180.0
+   ],
+   "kind": "opentopography",
+   "url": "https://portal.opentopography.org/API/globaldem",
+   "tile_pattern": "GEDTM30_v1.2.0/{name}.tif",
+   "resolution_m": 30.0,
+   "license": "CC BY 4.0 (GEDTM30, OpenGeoHub; выдача OpenTopography)",
+   "license_class": "open",
+   "vertical_datum": "EGM2008",
+   "datum_shift_m": 0.0,
+   "datum_note": "EGM2008 — та же система, что у Copernicus GLO-30: сдвиг не нужен",
+   "verified": "2026-11-26",
+   "verified_note": "подключён через OpenTopography GlobalDEM API (demtype=GEDTM30): окно 0.17°×0.15° — 1.0 МБ / 12.5 с, 0.41°×0.37° (20 км) — 6.4 МБ / 14.4 с, Сува (Фиджи) 1.9 МБ / 12.4 с, 2°×2° — 153 МБ / 42.7 с; EPSG:4326, 1″, float32, nodata 3.4e38. Прямые тайлы data.opengeohub.org не резолвятся (DNS), на Zenodo только 240 м — потому API",
+   "active": true,
+   "demtype": "GEDTM30",
+   "key_env": "OPENTOPOGRAPHY_API_KEY",
+   "protocol": "opentopography-globaldem",
+   "verified_facts": {
+    "crs": "EPSG:4326",
+    "step_deg": 0.00027777777777799305,
+    "nodata": 3.4028234663852886e+38,
+    "window_20km_mb": 6.4,
+    "suva_ok": true,
+    "max_radius_km": 32.0
+   },
+   "note": "тайлы OpenGeoHub оставлены резервом: включаются переменной GEOSITE_GEDTM30_URL",
+   "window_factor": 1.45,
+   "fallback": true
+  }
+ ]
 }

@@ -14,6 +14,7 @@
 | Рельеф — земля (DTM) | GEDTM30, OpenGeoHub (не подключён: домен недоступен с машины) | CC BY 4.0 | «GEDTM30, OpenGeoHub» |
 | Рельеф — земля (DTM) | Environment Agency LIDAR Composite DTM, Англия (подключён: WCS 2.0.1, доступен из Великобритании) | Open Government Licence v3 | «© Environment Agency» |
 | Вода — частота и сезонность | JRC Global Surface Water v1.4 (2021), 30 м, плитки 10° | свободно с указанием | «JRC Global Surface Water, Pekel et al. 2016» |
+| Земля (DTM) | GEDTM30 v1.2.0 (OpenGeoHub), 30 м, глобально; выдача OpenTopography | CC BY 4.0 | «GEDTM30, OpenGeoHub» |
 | Покров (этап 3) | ESA WorldCover 2021 v200, 10 м, тайлы 3° | CC BY 4.0 | «ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium» |
 
 Требования, которые модуль соблюдает сам:
