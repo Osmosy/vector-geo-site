@@ -5,9 +5,12 @@ world:
   noon:
     north_days_min: 300
     south_days_min: 10
-  coast:
-    sea_in_ring: true
-    max_m: 2000
+  sea:
+    present: true
+    kind: bay
+    min_kinds: 2
+    nearest_max_m: 1000
+    source: 'OSM: береговая линия бухты Гуанабара в 432 м и площадь залива внутри кольца. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   water:
     count_min: 1
     named_min: 1

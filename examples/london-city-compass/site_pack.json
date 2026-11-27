@@ -1660,6 +1660,12 @@
    "note": "OSM и снимок сходятся в пределах допуска"
   }
  },
+ "sea": {
+  "present": false,
+  "confidence": "medium",
+  "radius_km": 8.0,
+  "deprecated_sea_in_ring": false
+ },
  "quality": {
   "dem": "Copernicus DEM GLO-30 (DSM)",
   "dem_source": "copernicus",
@@ -1681,16 +1687,16 @@
  },
  "algo": {
   "water": "8.5.0",
-  "terrain": "3.2.0",
+  "terrain": "3.3.0",
   "geocode": "1.0.0",
   "geo": "1.1.0",
   "climate": "1.2.0",
   "sun": "1.0.0",
   "landcover": "1.0.0",
   "calibrate": "1.1.0",
-  "dtm": "1.2.0",
+  "dtm": "1.2.1",
   "worldnames": "1.0.0",
-  "pack": "2.12.0"
+  "pack": "2.13.0"
  },
  "files": {
   "water_geojson": "water.geojson",

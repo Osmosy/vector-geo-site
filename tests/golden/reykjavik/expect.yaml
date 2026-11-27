@@ -5,6 +5,12 @@ world:
   noon:
     south_days_min: 360
     north_days_max: 5
+  sea:
+    present: true
+    kind: bay
+    min_kinds: 2
+    nearest_max_m: 1000
+    source: 'OSM: береговая линия 397 м (бухта Факсафлоуи) и площади бухт (Eiðisvík, Nauthólsvík). Карта OSM, запрос 27.11.2026 (S2/E-038)'
   coast:
     sea_in_ring: true
     max_m: 1500

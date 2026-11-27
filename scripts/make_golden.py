@@ -36,6 +36,12 @@ WORLD_SITES = {
     "dubai": {"lat": 25.2048, "lon": 55.2708, "radius_km": 8.0, "facing": None},
     "taveuni": {"lat": -16.79, "lon": -179.97, "radius_km": 8.0, "facing": None},
     "arctic-ocean": {"lat": 84.30, "lon": 15.00, "radius_km": 8.0, "facing": None},
+    # S4: Амстердам обязателен — высоты ниже уровня моря (I-09), AHN как DTM, NAP → EGM2008;
+    # классические места — на них проверяется смысл интерпретации, а не только геоданные
+    "amsterdam": {"lat": 52.3731, "lon": 4.8922, "radius_km": 8.0, "facing": None},
+    "hangzhou-west-lake": {"lat": 30.2428, "lon": 120.1517, "radius_km": 8.0, "facing": 270.0},
+    "kyoto-imperial-palace": {"lat": 35.0254, "lon": 135.7622, "radius_km": 8.0, "facing": 90.0},
+    "chongqing-jiefangbei": {"lat": 29.5576, "lon": 106.5771, "radius_km": 8.0, "facing": None},
 }
 
 SITES = {

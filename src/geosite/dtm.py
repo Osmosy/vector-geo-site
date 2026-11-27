@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import math
 import os
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -22,7 +24,7 @@ import numpy as np
 
 from . import dem, geo
 
-ALGO_VERSION = "1.2.0"
+ALGO_VERSION = "1.2.1"
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "data" / "dtm_sources.json"
 CACHE_DIR = dem.CACHE_DIR / "dtm"
@@ -301,8 +303,25 @@ def _ot_window(source: dict, lat: float, lon: float, radius_km: float,
                                         "west": west, "east": east,
                                         "outputFormat": "GTiff", "API_Key": key})
         url = f"{source['url']}?{query}"
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            payload = resp.read()
+        # S5: бесплатный ключ ограничен 50 запросами в сутки (200 для академических).
+        # Один 429 не должен ронять пакет: пауза, повтор, и только потом отказ с причиной,
+        # по которой вызывающий код перейдёт на DSM с предупреждением `dtm_quota`.
+        payload = b""
+        for attempt in range(2):
+            try:
+                with urllib.request.urlopen(url, timeout=timeout) as resp:
+                    payload = resp.read()
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429:
+                    raise
+                if attempt == 0:
+                    time.sleep(5.0)
+                    continue
+                raise RuntimeError(
+                    "dtm_quota: OpenTopography ограничил частоту запросов (бесплатный ключ — "
+                    "50 запросов в сутки, академический — 200). Окно уже в кеше? "
+                    "См. docs/calc/dtm.md, раздел «Квоты и условия»") from exc
         if payload[:2] == b"<?" or payload[:1] == b"<":       # сервис вернул XML с ошибкой
             raise RuntimeError("gedtm30: сервер вернул текст ошибки вместо GeoTIFF")
         CACHE_DIR.mkdir(parents=True, exist_ok=True)

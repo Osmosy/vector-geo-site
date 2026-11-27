@@ -326,6 +326,20 @@ class Algo(BaseModel):
     pack: str | None = None
 
 
+class SeaBlock(BaseModel):
+    """Море в кольце: признаки, согласие и уверенность (S2/E-038)."""
+    present: bool | None = None
+    kind: str | None = None
+    kind_ru: str | None = None
+    nearest_m: float | None = None
+    sectors: list[str] = []
+    confidence: str | None = None
+    evidence: list[dict] = []
+    note: str | None = None
+    radius_km: float | None = None
+    deprecated_sea_in_ring: bool | None = None
+
+
 class GswBlock(BaseModel):
     """JRC Global Surface Water: второе мнение по воде, не замена OSM (W2)."""
     source: str | None = None
@@ -367,6 +381,7 @@ class SitePack(BaseModel):
     land_cover: LandCover | None = None
     water_share_rule: str | None = None
     water_gsw: GswBlock | None = None
+    sea: SeaBlock | None = None
     quality: Quality
     algo: Algo = Field(default_factory=Algo)
     files: Files = Field(default_factory=Files)

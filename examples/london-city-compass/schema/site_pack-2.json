@@ -1287,6 +1287,126 @@
       "title": "Ring",
       "type": "object"
     },
+    "SeaBlock": {
+      "description": "Море в кольце: признаки, согласие и уверенность (S2/E-038).",
+      "properties": {
+        "present": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Present"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "kind_ru": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind Ru"
+        },
+        "nearest_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nearest M"
+        },
+        "sectors": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Sectors",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "radius_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Km"
+        },
+        "deprecated_sea_in_ring": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deprecated Sea In Ring"
+        }
+      },
+      "title": "SeaBlock",
+      "type": "object"
+    },
     "Sector": {
       "properties": {
         "mountain": {
@@ -2695,6 +2815,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/GswBlock"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "sea": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SeaBlock"
         },
         {
           "type": "null"

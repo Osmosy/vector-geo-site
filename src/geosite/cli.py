@@ -11,8 +11,8 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from . import (calibrate, climate, dem, dtm, geo, gsw, hydro, landcover, sun, terrain,
-               water)
+from . import (calibrate, climate, dem, dtm, geo, gsw, hydro, landcover, sea, sun,
+               terrain, water)
 from . import water_pack
 from .models import SitePack, json_schema
 
@@ -225,17 +225,35 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
                 allow_network=not from_file and not getattr(args, "offline", False))
         except Exception as exc:
             result.setdefault("water_warnings", []).append(f"берег: {exc}")
+    # S3: GEDTM30 в застройке не точнее medium — сверка с AHN дала ME +2.14 м и p95 6.06 м
+    # на домах (docs/calc/dtm.md, «GEDTM30 против лидара»)
     result["coast_seen"] = coast_payload is not None
     # E-028: берег в пределах кольца 0–2 км — значит в кольце море, и снимок посчитает его водой
     coast_m = water.nearest_coast_m(coast_payload, r.lat, r.lon)
     result["coast_distance_m"] = None if coast_m is None else round(coast_m, 1)
-    result["sea_in_ring"] = bool(coast_m is not None and coast_m <= 2000.0)
-    if result["sea_in_ring"]:
-        result.setdefault("water_warnings", []).append(
-            "море в кольце (берег в %d м): в OSM море задано береговой линией, в снимке — "
-            "классом воды; доля воды считается по пресной воде OSM, расхождение с WorldCover "
-            "помечено кодом sea_in_ring, а не «устаревшим OSM» (E-028)"
-            % round(coast_m))
+    # S2/E-038: море определяется не одной береговой линией. В расширенном круге до 15 км берег
+    # ищется отдельно: Сува и Сидней давали «моря нет» только потому, что natural=coastline
+    # в 8 км не попадал в выборку, а залив нарисован полигонами.
+    coat_wide_m = None
+    if coast_payload is not None and (coast_m is None or coast_m > 8000.0):
+        try:
+            wide_coast = water.fetch_coast(
+                r.lat, r.lon, 15000,
+                allow_network=not from_file and not getattr(args, "offline", False))
+            coat_wide_m = water.nearest_coast_m(wide_coast, r.lat, r.lon)
+        except Exception as exc:
+            result.setdefault("water_warnings", []).append(f"берег 15 км: {exc}")
+    result["coast_wide_distance_m"] = None if coat_wide_m is None else round(coat_wide_m, 1)
+    # S2: признаки моря отдельным запросом — заливы и гавани помечены не как natural=water,
+    # и в слое воды их нет (Порт-Джексон в Сиднее — natural=bay)
+    sea_payload = None
+    try:
+        sea_payload = sea.fetch_payload(
+            r.lat, r.lon, 8000,
+            allow_network=not from_file and not getattr(args, "offline", False))
+    except Exception as exc:
+        result.setdefault("water_warnings", []).append(f"море: запрос признаков ({exc})")
+    sea_polygons = sea.payload_polygons(sea_payload, r.lat, r.lon, radius_km=8.0)
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
                                   radius_m=8000, payload=payload, wide_payload=wide_payload,
@@ -407,6 +425,43 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
         gsw_metrics = gsw.metrics(r.lat, r.lon, radius_km=8.0, allow_network=allow)
     except Exception:
         gsw_metrics = None
+    # S3: правило уверенности — глобальный DTM в плотной застройке и на побережье не выше medium
+    try:
+        built = ((result.get("land_cover") or {}).get("built")) or 0.0
+        source = (result.get("dtm_info") or {}).get("source")
+        if source == "gedtm30" and built >= 0.30:
+            result.setdefault("dtm_notes", []).append(
+                "gedtm30: застройка %.0f %% кольца — глобальный DTM здесь не точнее medium "
+                "(сверка с AHN: ME +2.1 м, p95 6.1 м на домах)" % (built * 100))
+    except Exception:
+        pass
+
+    # S2/E-038: море по согласию признаков — берег, полигоны, прилив, снимок
+    try:
+        # доля воды по снимку в макро-кольце: WorldCover — класс 80, GSW — постоянная вода
+        wc_share = (result.get("land_cover") or {}).get("water_wc")
+        gsw_share = (gsw_metrics or {}).get("share_permanent") if gsw_metrics else None
+        water_items = result.get("water") or []
+        if water_items and hasattr(water_items[0], "model_dump"):
+            water_items = [w.model_dump() for w in water_items]
+        result["sea"] = sea.detect(water=water_items, radius_km=8.0,
+                                   coast_m=coast_m, coast_wide_m=coat_wide_m,
+                                   wc_share=None if wc_share is None else float(wc_share),
+                                   gsw_share=gsw_share, sea_polygons=sea_polygons)
+        result["sea_in_ring"] = result["sea"]["deprecated_sea_in_ring"]
+        warning = sea.conflict_warning(result["sea"])
+        if warning:
+            result.setdefault("water_warnings", []).append(warning)
+        if result["sea"]["present"] is True:
+            result.setdefault("water_warnings", []).append(
+                "море в кольце (%s): признаки — %s; доля воды OSM считается по пресной воде, "
+                "снимок видит море классом воды — это расхождение помечено, а не «устаревшим "
+                "OSM» (E-028, E-038)" % (
+                    result["sea"].get("kind_ru") or "море",
+                    ", ".join(sorted({e["kind"] for e in result["sea"]["evidence"]}))))
+    except Exception as exc:
+        result.setdefault("water_warnings", []).append(f"море: {exc}")
+
     if gsw_metrics is not None:
         # доля OSM по тем же 8 км: кольца секторов площадь-взвешены, клинья равны по площади,
         # поэтому среднее по клиньям и есть доля в круге

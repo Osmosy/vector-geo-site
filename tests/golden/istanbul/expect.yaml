@@ -5,6 +5,12 @@ world:
   noon:
     south_days_min: 360
     north_days_max: 5
+  sea:
+    present: true
+    kind: bay
+    min_kinds: 2
+    nearest_max_m: 1200
+    source: 'OSM: берег Босфора и Золотого Рога (Haliç) в 585 м — береговая линия и площадь залива. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   water:
     count_min: 1
     named_min: 1
