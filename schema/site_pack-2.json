@@ -544,6 +544,146 @@
       "title": "FourSpirits",
       "type": "object"
     },
+    "GswBlock": {
+      "description": "JRC Global Surface Water: второе мнение по воде, не замена OSM (W2).",
+      "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        },
+        "tile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tile"
+        },
+        "resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution M"
+        },
+        "radius_km": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Km"
+        },
+        "share_any": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Share Any"
+        },
+        "share_permanent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Share Permanent"
+        },
+        "share_seasonal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Share Seasonal"
+        },
+        "months_water_median": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Months Water Median"
+        },
+        "compare": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compare"
+        }
+      },
+      "title": "GswBlock",
+      "type": "object"
+    },
     "LandCover": {
       "description": "Покров: вода — по OSM, остальное — по ESA WorldCover 10 м (W2).\n\n`water` и `water_wc` стоят рядом намеренно: расхождение двух источников — это то, что\nкалибровка обязана объяснить, а не спрятать.",
       "properties": {
@@ -2550,6 +2690,17 @@
       ],
       "default": null,
       "title": "Water Share Rule"
+    },
+    "water_gsw": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GswBlock"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "quality": {
       "$ref": "#/$defs/Quality"

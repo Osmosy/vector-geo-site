@@ -12,7 +12,7 @@ from . import terrain, water, worldnames
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.10.0"      # версия сборки пакета
+ALGO_VERSION = "2.11.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -293,6 +293,7 @@ def build_pack(*, query: dict, site: dict, orientation: dict, chart_year: dict,
         roads=measured.get("roads", []),
         exposure=exposure or None,
         land_cover=measured.get("land_cover"),
+        water_gsw=measured.get("water_gsw"),
         water_share_rule=calibrate.RULE if measured.get("water_calibration") else None,
         quality={"dem": dem_label, "dem_source": dem_source, "dem_kind": layer,
                  "dem_resolution_m": dem_resolution_m, "dem_confidence": dem_confidence,
