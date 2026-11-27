@@ -33,6 +33,7 @@ ALGO_VERSION = "1.0.0"
 
 NEAR_KM = 8.0              # кольцо участка
 WIDE_KM = 15.0             # расширенный круг для береговой линии
+INLAND_EXPLAINS_RATIO = 0.7   # снимок объяснён внутренними водами
 SATELLITE_MIN = 0.30       # доля воды по снимку, ниже которой снимок не спорит с OSM
 DEPRECATED_NEAR_M = 2000.0
 
@@ -69,7 +70,8 @@ def _polygon_kind(item: dict) -> str | None:
 
 def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | None,
            coast_wide_m: float | None = None, wc_share: float | None = None,
-           gsw_share: float | None = None, sea_polygons: list[dict] | None = None) -> dict:
+           gsw_share: float | None = None, sea_polygons: list[dict] | None = None,
+           osm_water_share: float | None = None) -> dict:
     """Свести признаки моря в одно поле `sea` с доказательствами и уверенностью."""
     evidence: list[dict] = []
     near_m = radius_km * 1000.0
@@ -103,6 +105,29 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
     for item in sea_polygons or []:
         polygons.append({"kind": item.get("kind") or "ocean", "name": item.get("name"),
                          "distance_m": item.get("distance_m"), "area_m2": None})
+    # Гавань без берега рядом — это портовый бассейн, а не море: у Амстердама 13 таких
+    # площадей в Западном порту, и они выдавали город за приморский. Залив (natural=bay)
+    # и море (place=sea) остаются признаком сами по себе.
+    # Гавань и залив без берега рядом — это портовый бассейн или залив внутреннего водоёма,
+    # а не море: у Амстердама 13 гаваней Западного порта и IJburgbaai на Эймере выдавали город
+    # за приморский. Самостоятельным признаком остаются только место-море (place=sea|ocean)
+    # и пролив (water=strait).
+    # Залив и гавань — признак, но не приговор: ТЗ требует подтверждения вторым признаком
+    # (берег в 15 км, прилив или снимок). Иначе IJburgbaai на Эймере делал Амстердам приморским
+    # городом, а Ханчжоу с Чунцином — тоже: их «вода» это озеро и русла рек.
+    coast_is_near = coast_m is not None and coast_m <= WIDE_KM * 1000.0
+    sat_share = max([v for v in (wc_share, gsw_share) if v is not None], default=None)
+    corroborated = coast_is_near or bool(tidal) or (sat_share is not None
+                                                    and sat_share >= SATELLITE_MIN)
+    dropped: list[str] = []
+    if not corroborated:
+        kept = []
+        for item in polygons:
+            if item["kind"] in {"harbour", "bay", "lagoon"}:
+                dropped.append(item.get("name") or item["kind"])
+                continue
+            kept.append(item)
+        polygons = kept
     ordered = sorted(polygons, key=lambda p: p.get("distance_m") if p.get("distance_m") is not None
                      else 1e12)
     for item in ordered[:4]:
@@ -133,6 +158,11 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
     distances = [e["distance_m"] for e in osm_evidence if e.get("distance_m") is not None]
     nearest = min(distances) if distances else None
 
+    if dropped:
+        evidence.append({"kind": "polygon_dropped", "count": len(dropped),
+                         "names": dropped[:4],
+                         "note": "гавани и заливы без береговой линии в 15 км — это не море"})
+
     if polygons:
         kinds = {p["kind"] for p in polygons}
         kind = next((k for k in KIND_PRIORITY if k in kinds), "ocean")
@@ -148,6 +178,16 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
                 e["kind"] in {"coastline", "polygon", "tidal"} for e in osm_evidence):
             confidence = "medium"
         note = None
+    elif satellite_share is not None and satellite_share >= SATELLITE_MIN and (
+            osm_water_share is not None
+            and osm_water_share >= satellite_share * INLAND_EXPLAINS_RATIO):
+        # Ханчжоу и Чунцин: снимок видит 40 % и 35 % воды, но это Западное озеро и русла
+        # Янцзы с Цзялином, а не море. Когда OSM-вода объясняет почти всю воду снимка,
+        # морем это не считается — и в поле пишется, чем именно объясняется.
+        present = False
+        confidence = "medium"
+        note = ("снимок показывает %.1f %% воды, но это внутренние воды (OSM %.1f %%): "
+                "море не подтверждено" % (satellite_share * 100, osm_water_share * 100))
     elif satellite_share is not None and satellite_share >= SATELLITE_MIN:
         present = None
         confidence = "low"

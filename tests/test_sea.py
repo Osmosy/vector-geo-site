@@ -39,8 +39,10 @@ def test_bay_polygon_without_coastline_is_sea():
 
 def test_bay_wins_over_harbour():
     """Гавань обычно вложена в залив: у Сиднея в кольце и Port Jackson, и Sydney Harbour."""
+    # подтверждение вторым признаком: снимок видит воду — без него гавань и залив не признак
     got = sea.detect(water=[poly("Sydney Harbour", 700, tags={"water": "harbour"}),
-                            poly("Port Jackson", 700, tags={"natural": "bay"})], coast_m=None)
+                            poly("Port Jackson", 700, tags={"natural": "bay"})],
+                     coast_m=None, wc_share=0.35)
     assert got["kind"] == "bay"
 
 
@@ -102,3 +104,18 @@ def test_radius_is_recorded():
 def test_satellite_threshold_boundary(share, expected):
     got = sea.detect(water=[], coast_m=None, gsw_share=share)
     assert got["present"] is expected
+
+
+def test_lake_explains_satellite_water_so_not_sea():
+    """Ханчжоу 39.8 % и Чунцин 34.7 % воды по снимку — это озеро и реки, а не море."""
+    got = sea.detect(water=[], coast_m=None, coast_wide_m=None, wc_share=0.398,
+                     osm_water_share=0.398)
+    assert got["present"] is False
+    assert "внутренние воды" in (got["note"] or "")
+
+
+def test_unexplained_satellite_water_stays_unknown():
+    """Если OSM воду не объясняет, ответ остаётся «не знаю», а не «моря нет»."""
+    got = sea.detect(water=[], coast_m=None, coast_wide_m=None, wc_share=0.398,
+                     osm_water_share=0.01)
+    assert got["present"] is None

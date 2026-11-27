@@ -230,7 +230,7 @@ def test_world_sea_by_evidence(name: str):
     got = sea.detect(water=[], coast_m=water.nearest_coast_m(coast, lat, lon),
                      coast_wide_m=water.nearest_coast_m(wide, lat, lon),
                      wc_share=exp.get("wc_share"), gsw_share=exp.get("gsw_share"),
-                     sea_polygons=polygons)
+                     osm_water_share=exp.get("osm_water_share"), sea_polygons=polygons)
     assert got["present"] is exp["present"], (
         f"{name}: море {got['present']}, ожидали {exp['present']}; признаки "
         f"{[e['kind'] for e in got['evidence']]}")

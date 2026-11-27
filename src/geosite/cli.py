@@ -444,10 +444,14 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
         water_items = result.get("water") or []
         if water_items and hasattr(water_items[0], "model_dump"):
             water_items = [w.model_dump() for w in water_items]
+        # доля воды по OSM в кольце 0.5–2 км: нужна, чтобы отличить море от озера и рек,
+        # которые снимок видит как «воду» (Западное озеро в Ханчжоу, Янцзы с Цзялином)
+        osm_share = (result.get("land_cover") or {}).get("water")
         result["sea"] = sea.detect(water=water_items, radius_km=8.0,
                                    coast_m=coast_m, coast_wide_m=coat_wide_m,
                                    wc_share=None if wc_share is None else float(wc_share),
-                                   gsw_share=gsw_share, sea_polygons=sea_polygons)
+                                   gsw_share=gsw_share, sea_polygons=sea_polygons,
+                                   osm_water_share=None if osm_share is None else float(osm_share))
         result["sea_in_ring"] = result["sea"]["deprecated_sea_in_ring"]
         warning = sea.conflict_warning(result["sea"])
         if warning:
