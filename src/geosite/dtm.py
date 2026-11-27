@@ -22,7 +22,7 @@ import numpy as np
 
 from . import dem, geo
 
-ALGO_VERSION = "1.1.0"
+ALGO_VERSION = "1.2.0"
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "data" / "dtm_sources.json"
 CACHE_DIR = dem.CACHE_DIR / "dtm"
@@ -50,9 +50,13 @@ def registry() -> list[dict]:
 
 
 def lidar_for(lat: float, lon: float, *, only_active: bool = True) -> dict | None:
-    """Первый лидар из реестра, покрывающий точку: страна, полигон, открытая лицензия."""
+    """Первый **местный** лидар, покрывающий точку: страна, полигон, открытая лицензия.
+
+    Глобальные источники (`fallback: true`, GEDTM30) сюда не попадают: у них покрытие —
+    весь мир, и они вернулись бы на любую точку, выдав себя за национальный лидар.
+    """
     for item in registry():
-        if item.get("kind") == "cog-tiles":
+        if item.get("kind") == "cog-tiles" or item.get("fallback"):
             continue
         if item.get("license_class") != "open":
             continue
@@ -236,38 +240,118 @@ def _tile_name(lat: float, lon: float) -> str:
     return f"{ns}{abs(int(math.floor(lat))):02d}{ew}{abs(int(math.floor(lon))):03d}"
 
 
-def _gedtm30_window(source: dict, lat: float, lon: float, radius_km: float,
-                    resolution_m: float, *, timeout: int = 180) -> dict | None:
-    """COG-тайл GEDTM30 читается окном 16 км; тайл целиком (десятки МБ) не тянем."""
+KEY_FILE = Path.home() / ".config" / "vector-geo-site" / "opentopography.key"
+
+
+def _gedtm30_key(source: dict) -> str | None:
+    """Ключ OpenTopography: переменная окружения, иначе файл `~/.config/.../opentopography.key`.
+
+    Файл нужен, чтобы пакет собирался без `export` в каждой оболочке; права 600, в репозиторий
+    он не попадает (секрет живёт вне дерева).
+    """
+    key = os.environ.get(source.get("key_env") or "OPENTOPOGRAPHY_API_KEY")
+    if key:
+        return key.strip()
+    try:
+        return KEY_FILE.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def _ot_window(source: dict, lat: float, lon: float, radius_km: float,
+               resolution_m: float, *, timeout: int = 300) -> dict | None:
+    """GEDTM30 через OpenTopography GlobalDEM API: один запрос по bbox, ответ — GeoTIFF 4326.
+
+    Почему API, а не тайлы: домен `data.opengeohub.org` с тайлами GEDTM30 не резолвится
+    (DNS), на Zenodo лежит только 240-метровая версия. Тот же 30-метровый продукт отдаёт
+    OpenTopography по бесплатному ключу; проверено 26.11.2026: окно 0.17°×0.15° — 1.0 МБ
+    за 12.5 с, 0.41°×0.37° (20 км) — 6.4 МБ за 14.4 с, Сува (Фиджи) — 1.9 МБ за 12.4 с.
+
+    Предел площади на стороне сервиса не мешает: 2°×2° отдаются (153 МБ за 42.7 с), но нам
+    столько не нужно — радиус ограничен 32 км, иначе это уже не ближний рельеф.
+    """
+    import urllib.parse
+    import urllib.request
+
+    from rasterio.io import MemoryFile
+
+    if offline():
+        raise RuntimeError("offline: сеть запрещена")
+    if radius_km > 32.0:
+        raise RuntimeError(f"gedtm30: радиус {radius_km:.0f} км больше предела 32 км — "
+                           "рельеф ближнего кольца, не региональный")
+    key = _gedtm30_key(source)
+    if not key:
+        raise RuntimeError(f"gedtm30: нет ключа OpenTopography "
+                           f"({source.get('key_env') or 'OPENTOPOGRAPHY_API_KEY'})")
+    # окно берём по диагонали квадрата пакета: сетка в UTM, а bbox в 4326, и углы 16×16 км
+    # иначе выходят за запрошенное (у Лондона 24.5 % пустот — это наши углы, а не пробелы
+    # источника). Пустота обязана значить «не измерено», а не «не спросили».
+    half = radius_km * float(source.get("window_factor") or 1.45)
+    dlat = half / 111.32
+    dlon = half / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
+    south, north = round(lat - dlat, 4), round(lat + dlat, 4)
+    west, east = round(lon - dlon, 4), round(lon + dlon, 4)
+    cache = CACHE_DIR / f"gedtm30_{south}_{north}_{west}_{east}.tif"
+    if cache.exists():
+        payload = cache.read_bytes()
+    else:
+        query = urllib.parse.urlencode({"demtype": source.get("demtype") or "GEDTM30",
+                                        "south": south, "north": north,
+                                        "west": west, "east": east,
+                                        "outputFormat": "GTiff", "API_Key": key})
+        url = f"{source['url']}?{query}"
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            payload = resp.read()
+        if payload[:2] == b"<?" or payload[:1] == b"<":       # сервис вернул XML с ошибкой
+            raise RuntimeError("gedtm30: сервер вернул текст ошибки вместо GeoTIFF")
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(payload)
+    with MemoryFile(payload) as mem, mem.open() as ds:
+        band = ds.read(1)
+        transform = tuple(ds.transform)[:6]
+        crs = str(ds.crs)
+    if not np.isfinite(_mask_heights(band)).any():
+        return None
+    return {"array": _mask_heights(band), "transform": transform, "crs": crs}
+
+
+def _gedtm30_cog(source: dict, lat: float, lon: float, radius_km: float,
+                 resolution_m: float, *, timeout: int = 180) -> dict | None:
+    """Резервный путь: COG-тайлы OpenGeoHub, если `GEOSITE_GEDTM30_URL` всё-таки отвечает."""
     import rasterio
     from rasterio.windows import from_bounds
 
     if offline():
         raise RuntimeError("offline: сеть запрещена")
-
-    base = os.environ.get("GEOSITE_GEDTM30_URL") or source["url"]
+    base = os.environ["GEOSITE_GEDTM30_URL"]
     pattern = source.get("tile_pattern") or "GEDTM30_v1.2.0/{name}.tif"
     dlat = radius_km / 111.32
     dlon = radius_km / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
-    lats = range(int(math.floor(lat - dlat)), int(math.floor(lat + dlat)) + 1)
-    lons = range(int(math.floor(lon - dlon)), int(math.floor(lon + dlon)) + 1)
     parts = []
-    for la in lats:
-        for lo in lons:
-            name = _tile_name(la + 0.5, lo + 0.5)
-            url = f"{base}/{pattern.format(name=name)}"
+    for la in range(int(math.floor(lat - dlat)), int(math.floor(lat + dlat)) + 1):
+        for lo in range(int(math.floor(lon - dlon)), int(math.floor(lon + dlon)) + 1):
+            url = f"{base}/{pattern.format(name=_tile_name(la + 0.5, lo + 0.5))}"
             try:
                 with rasterio.open(url) as ds:
-                    window = from_bounds(lon - dlon, lat - dlat, lon + dlon, lat + dlat, ds.transform)
-                    band = ds.read(1, window=window, boundless=True)
-                    transform = ds.window_transform(window)
-                    parts.append((band, tuple(transform)[:6], str(ds.crs)))
+                    window = from_bounds(lon - dlon, lat - dlat, lon + dlon, lat + dlat,
+                                         ds.transform)
+                    parts.append((ds.read(1, window=window, boundless=True),
+                                  tuple(ds.window_transform(window))[:6], str(ds.crs)))
             except Exception:
                 continue
     if not parts:
         return None
     band, transform, crs = parts[0]
     return {"array": _mask_heights(band), "transform": transform, "crs": crs}
+
+
+def _gedtm30_window(source: dict, lat: float, lon: float, radius_km: float,
+                    resolution_m: float, *, timeout: int = 300) -> dict | None:
+    """GEDTM30: API OpenTopography по умолчанию, COG-тайлы — только по явному адресу."""
+    if os.environ.get("GEOSITE_GEDTM30_URL"):
+        return _gedtm30_cog(source, lat, lon, radius_km, resolution_m, timeout=timeout)
+    return _ot_window(source, lat, lon, radius_km, resolution_m, timeout=timeout)
 
 
 def grid(lat: float, lon: float, *, crs: int | str, radius_km: float, resolution_m: float = 30.0
