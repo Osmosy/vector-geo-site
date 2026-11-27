@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 import yaml
 
-from geosite import geo, landcover, sun, terrain, water
+from geosite import geo, landcover, sea, sun, terrain, water
 
 GOLDEN = Path(__file__).parent / "golden"
 
@@ -199,6 +199,50 @@ def test_world_golden(name: str, monkeypatch):
 
 
 @pytest.mark.skipif(not WORLD, reason="нет мировых эталонов")
+@pytest.mark.parametrize("name", WORLD)
+def _gzip_json(path: Path) -> dict | None:
+    import gzip
+    import json
+
+    if not path.exists():
+        return None
+    return json.loads(gzip.open(path, "rt", encoding="utf-8").read())
+
+
+@pytest.mark.parametrize("name", WORLD)
+def test_world_sea_by_evidence(name: str):
+    """Море (S2/E-038): ОСМ-признаки и снимок сверяются, а не берётся одна береговая линия.
+
+    Ожидание в `expect.yaml` — с источником (карта, лоция). Проверка идёт по фикстурам:
+    берег 8 км, берег 15 км и отдельный ответ Overpass с признаками моря.
+    """
+    expect = yaml.safe_load((GOLDEN / name / "expect.yaml").read_text(encoding="utf-8")) or {}
+    exp = (expect.get("world") or {}).get("sea")
+    if not exp:
+        pytest.skip(f"{name}: ожидание моря не задано")
+    fixtures = GOLDEN / name / "fixtures"
+    site = yaml.safe_load((GOLDEN / name / "site.yaml").read_text(encoding="utf-8")) or {}
+    lat, lon = float(site["lat"]), float(site["lon"])
+    coast = _gzip_json(fixtures / "coast.json.gz")
+    wide = _gzip_json(fixtures / "coast-wide.json.gz")
+    payload = _gzip_json(fixtures / "sea.json.gz")
+    polygons = sea.payload_polygons(payload, lat, lon) if payload else []
+    got = sea.detect(water=[], coast_m=water.nearest_coast_m(coast, lat, lon),
+                     coast_wide_m=water.nearest_coast_m(wide, lat, lon),
+                     wc_share=exp.get("wc_share"), gsw_share=exp.get("gsw_share"),
+                     sea_polygons=polygons)
+    assert got["present"] is exp["present"], (
+        f"{name}: море {got['present']}, ожидали {exp['present']}; признаки "
+        f"{[e['kind'] for e in got['evidence']]}")
+    if exp.get("kind"):
+        assert got["kind"] == exp["kind"], f"{name}: вид моря {got['kind']}, ждали {exp['kind']}"
+    kinds = {e["kind"] for e in got["evidence"]}
+    assert len(kinds) >= int(exp.get("min_kinds", 1)), (
+        f"{name}: признаков {sorted(kinds)}, ждали минимум {exp.get('min_kinds')}")
+    if exp.get("nearest_max_m") is not None and got["nearest_m"] is not None:
+        assert got["nearest_m"] <= float(exp["nearest_max_m"])
+
+
 @pytest.mark.parametrize("name", WORLD)
 def test_world_fixtures_are_offline(name: str):
     """Фикстура обязана быть: эталон без неё — обещание, а не проверка."""

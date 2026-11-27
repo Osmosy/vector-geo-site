@@ -5,8 +5,12 @@ world:
   noon:
     north_days_min: 150
     south_days_min: 150
-  coast:
-    sea_in_ring: false
+  sea:
+    present: true
+    kind: ocean
+    min_kinds: 1
+    nearest_max_m: 12000
+    source: 'OSM: ближайший natural=coastline — 8.97 км от Раффлз-Плейс (внешний берег после рекламации); в кольце 8 км его нет, срабатывает признак coastline_wide; Marina Bay задана полигонами воды. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   water:
     count_min: 3
     named_min: 1

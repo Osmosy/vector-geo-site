@@ -6,6 +6,10 @@ world:
   noon:
     south_days_min: 360
     north_days_max: 5
+  sea:
+    present: null
+    min_kinds: 0
+    source: 'вне покрытия: ни natural=coastline, ни WorldCover до 84.3° с. ш. — ответ «не знаю», а не «моря нет». Запрос 27.11.2026 (S2/E-038)'
   water:
     count_min: 0
   dem:

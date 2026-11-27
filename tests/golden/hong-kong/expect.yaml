@@ -6,9 +6,12 @@ world:
   noon:
     south_days_min: 300
     north_days_min: 20
-  coast:
-    sea_in_ring: true
-    max_m: 2000
+  sea:
+    present: true
+    kind: bay
+    min_kinds: 2
+    nearest_max_m: 1000
+    source: 'OSM: береговая линия 560 м; заливы и typhoon shelters (銅鑼灣避風塘) в кольце. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   water:
     count_min: 10
     named_min: 5

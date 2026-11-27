@@ -5,8 +5,11 @@ world:
   noon:
     south_days_min: 360
     north_days_max: 5
-  coast:
-    sea_in_ring: false
+  sea:
+    present: false
+    min_kinds: 0
+    source: 'OSM и снимок: моря в кольце 8 км нет (Нил не море). Карта OSM, запрос 27.11.2026 (S2/E-038)'
+    wc_share: 0.044
   water:
     count_min: 1
     named_min: 1

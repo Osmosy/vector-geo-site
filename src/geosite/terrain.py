@@ -13,7 +13,7 @@ import numpy as np
 from . import geo
 from .dem import DemGrid, gradient, smooth
 
-ALGO_VERSION = "3.2.0"
+ALGO_VERSION = "3.3.0"
 
 EYE_M = 2.0          # высота глаз для угла горизонта
 RINGS_KM = [(0.0, 0.5), (0.5, 2.0), (2.0, 8.0), (8.0, 50.0)]
@@ -85,6 +85,17 @@ def mountain_sectors(grid: DemGrid, frame: PolarFrame, z0: float,
                 continue
             vals = rel[mask]
             dists = frame.dist[mask]
+            # S5: пустое кольцо даёт null с причиной, а не RuntimeWarning из nanmean.
+            # «Не измерено» ≠ «плоско»: у арктической точки DEM нет вовсе.
+            measured = np.isfinite(vals)
+            if not measured.any():
+                rings_out.append({"r_km": [r0, r1], "max_rel_elev_m": None,
+                                  "mean_rel_elev_m": None, "horizon_deg": None,
+                                  "horizon_azimuth": None, "hill_share": None, "peaks": [],
+                                  "void_share": void_share, "reason": "кольцо без измерений"})
+                continue
+            vals = vals[measured]
+            dists = dists[measured]
             angles = np.degrees(np.arctan2(vals - EYE_M, np.maximum(dists, 1.0)))
             imax = int(np.argmax(angles))
             rings_out.append({
@@ -92,7 +103,7 @@ def mountain_sectors(grid: DemGrid, frame: PolarFrame, z0: float,
                 "max_rel_elev_m": round(float(np.nanmax(vals)), 1),
                 "mean_rel_elev_m": round(float(np.nanmean(vals)), 1),
                 "horizon_deg": round(float(angles[imax]), 2),
-                "horizon_azimuth": round(float(frame.bearing[mask][imax]), 1),
+                "horizon_azimuth": round(float(frame.bearing[mask][measured][imax]), 1),
                 "hill_share": round(float(np.mean(vals > HILL_THRESHOLD_M)), 3),
                 "peaks": [],
                 "void_share": void_share,
@@ -237,7 +248,13 @@ def point_description(grid: DemGrid, x0: float, y0: float) -> dict:
     local_aspect = float(aspect[r, c])
     k = max(3, int(round(200 / grid.resolution_m)) | 1)
     around = grid.data[max(0, r - k):r + k + 1, max(0, c - k):c + k + 1]
-    lifted = grid.data[r, c] - np.nanmean(around)
+    measured = np.isfinite(around)
+    lifted = (float(grid.data[r, c]) - float(np.nanmean(around[measured]))) if measured.any() else None
+    if lifted is None:
+        # S5: окрестность не измерена — форма не «склон», а «не измерено»
+        return {"slope_deg": None if not np.isfinite(local_slope) else round(local_slope, 1),
+                "aspect_deg": None if not np.isfinite(local_aspect) else round(local_aspect, 1),
+                "shape": "не измерено", "elev_m": z0}
     if lifted > 8:
         shape = "гребень"
     elif lifted < -8:

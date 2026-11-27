@@ -6,6 +6,12 @@ world:
   noon:
     north_days_min: 250
     south_days_min: 50
+  sea:
+    present: true
+    kind: ocean
+    min_kinds: 1
+    nearest_max_m: 2500
+    source: 'OSM: береговая линия океана в 1.76 км — Тавеуни остров. Карта OSM, запрос 27.11.2026 (S2/E-038)'
   coast:
     sea_in_ring: true
     max_m: 2500
