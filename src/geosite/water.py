@@ -23,7 +23,7 @@ import numpy as np
 from . import geo, hydronym, tides, worldnames
 
 CACHE_DIR = Path(os.environ.get("GEOSITE_CACHE", Path.home() / ".cache" / "vector-geo-site")) / "osm"
-ALGO_VERSION = "8.5.0"
+ALGO_VERSION = "8.6.0"
 
 USER_AGENT = "vector-geo-site/0.1 (fengshui landform measurement; https://github.com/Osmosy/vector-geo-site)"
 
@@ -307,6 +307,32 @@ def coast_lines(payload: dict | None) -> list[list[tuple[float, float]]]:
         if len(line) >= 2:
             out.append(line)
     return out
+
+
+def clip_coast(payload: dict | None, lat: float, lon: float,
+               max_m: float = 9000.0) -> dict | None:
+    """Оставить линии берега, которые могут стоять в метре от воды участка (E-046).
+
+    Широкий круг 15 км для прилива избыточен: вода не бывает дальше `radius_m` (8 км) от
+    участка, а приливной объект — ближе километра к берегу. Берег дальше 9 км от участка
+    такой объект не сделает приливным, а его геометрия дорого стоит: у Гонконга 594 линии
+    вместо 197, и счёт `<объект × линия × точка>` растягивал прогон вдвое.
+    """
+    if payload is None:
+        return None
+    kept = []
+    for el in payload.get("elements") or []:
+        geom = [(float(p["lon"]), float(p["lat"])) for p in (el.get("geometry") or [])
+                if p.get("lon") is not None]
+        if len(geom) < 2:
+            # геометрию не отдали (`out body` без geom) — обрезать нечем, оставляем как есть
+            kept.append(el)
+            continue
+        step = max(1, len(geom) // 40)
+        dist = min(geo.haversine_m(lat, lon, clat, clon) for clon, clat in geom[::step])
+        if dist <= max_m:
+            kept.append(el)
+    return {"elements": kept}
 
 
 def nearest_coast_m(payload: dict | None, lat: float, lon: float) -> float | None:

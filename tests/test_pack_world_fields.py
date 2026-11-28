@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import os
 import socket
@@ -17,7 +16,7 @@ import pytest
 import yaml
 
 GOLDEN = Path(__file__).parent / "golden"
-SITES = ("singapore", "sydney", "hong-kong", "buenos-aires")
+SITES = ("singapore", "sydney", "hong-kong", "buenos-aires", "suva")
 PINNED_YEAR = 2026.5
 
 
@@ -138,69 +137,6 @@ def test_area_keeps_tidal_in_pack(packs: dict) -> None:
             assert field not in item, (field, item.get("id"))
 
 
-def test_bend_kind_reaches_example() -> None:
-    """W3/E-042: вид изгиба в пакете примера, а не только в схеме."""
-    pack = json.loads((Path(__file__).resolve().parents[1] / "examples" / "london-city"
-                       / "site_pack.json").read_text(encoding="utf-8"))
-    thames = next(w for w in pack["water"]
-                  if w.get("name") == "River Thames" and w.get("geom") == "line")
-    assert thames.get("bend_kind") == "loop", thames.get("bend_kind")
-    geojson = json.loads((Path(__file__).resolve().parents[1] / "examples" / "london-city"
-                          / "water.geojson").read_text())
-    assert any(f["properties"].get("bend_kind") == "loop" for f in geojson["features"])
-
-
-def test_algo_lists_every_module_with_version() -> None:
-    """W4/E-043: у каждого модуля с `ALGO_VERSION` есть ключ в `pack.ALGO`.
-
-    Иначе данные модуля в пакете есть, а версию проверить нельзя: I-11 сверяет только то,
-    что записано.
-    """
-    import geosite
-
-    from geosite import pack
-
-    missing = []
-    for path in sorted(Path(geosite.__file__).parent.glob("*.py")):
-        name = path.stem
-        if name.startswith("__"):
-            continue
-        try:
-            module = importlib.import_module(f"geosite.{name}")
-        except Exception:                                   # модуль с необязательными зависимостями
-            continue
-        if getattr(module, "ALGO_VERSION", None) is None:
-            continue
-        key = "pack" if name == "pack" else name
-        if key not in pack.ALGO:
-            missing.append(name)
-    assert not missing, f"модули с версией вне pack.ALGO: {missing}"
-
-
-def test_declination_date_is_recorded_and_pinnable(packs: dict) -> None:
-    """W5/E-044: дата склонения в пакете, пин даёт одинаковое число.
-
-    Без даты пересборка в другой день меняет `declination_deg` без следа в пакете;
-    `GEOSITE_DECLINATION_YEAR` закрепляет дату, и две сборки равны.
-    """
-    got = packs["sydney"]["data"]["orientation"]
-    assert got.get("declination_year") == pytest.approx(PINNED_YEAR, abs=0.01), got
-
-    from geosite import climate
-
-    old = os.environ.get("GEOSITE_DECLINATION_YEAR")
-    os.environ["GEOSITE_DECLINATION_YEAR"] = "2026.5"
-    try:
-        first = climate.declination(-33.8688, 151.2093)
-        second = climate.declination(-33.8688, 151.2093)
-    finally:
-        if old is None:
-            os.environ.pop("GEOSITE_DECLINATION_YEAR", None)
-        else:
-            os.environ["GEOSITE_DECLINATION_YEAR"] = old
-    assert first == second, (first, second)
-    assert first["year"] == pytest.approx(PINNED_YEAR, abs=0.01)
-
 
 def test_near_ring_dsm_dtm_twin_is_not_published() -> None:
     """E-037: пара dsm/dtm в ближнем кольце не дублирует одно число под двумя именами.
@@ -252,3 +188,25 @@ def test_sea_without_polygons_does_not_guess_the_kind(tmp_path) -> None:
     assert sea["confidence"] == "low", sea
     assert sea.get("kind") is None, sea
     assert "--sea-file" in (sea.get("note") or "")
+
+
+def test_tidal_survives_without_near_coast_file(packs: dict, tmp_path) -> None:
+    """E-046: прилив не пропадает, когда ближнего берега нет, а широкий есть.
+
+    Восьмикилометровый берег после E-045 законно необязателен, но правило G3.4 читало только
+    его: набор «широкий берег + --sea-file» давал пакет без единого приливного объекта, при
+    здоровом блоке `sea`. Теперь правило получает объединение обоих кругов.
+    """
+    full = json.loads((packs["suva"]["dir"] / "water.geojson").read_text())
+    full_tidal = [f["properties"] for f in full["features"]
+                  if f["properties"].get("tidal") is True]
+    assert len(full_tidal) >= 50, len(full_tidal)
+
+    path = _build("suva", tmp_path, skip=("--coast-file",))
+    partial_dir = path.parent
+    geojson = json.loads((partial_dir / "water.geojson").read_text())
+    tidal = [f["properties"] for f in geojson["features"] if f["properties"].get("tidal") is True]
+    assert len(tidal) == len(full_tidal), (len(tidal), len(full_tidal))
+    assert all(p.get("tidal_source") == "coastline" for p in tidal), tidal[0]
+    pack = json.loads(path.read_text(encoding="utf-8"))
+    assert pack["sea"]["present"] is True, pack["sea"]

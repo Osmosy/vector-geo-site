@@ -287,9 +287,18 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
             ") — ответ будет неполным: «не смотрели» не равно «моря нет» (W2/E-041, E-045)")
     sea_polygons = sea.payload_polygons(sea_payload, r.lat, r.lon, radius_km=8.0)
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
+    # E-046: правило прилива (G3.4) получает берег из обоих кругов: пятнадцатикилометровый
+    # надмножество, и без него забытый `--coast-file` (законно необязательный после E-045)
+    # гасил прилив у всех объектов молча.
+    # Ближняя выборка — основной источник; широкий круг подменяет её только когда ближней
+    # нет вовсе (иначе числа прилива поменялись бы у эталонов с берегом в полосе 8–9 км, а
+    # эталоны подгонять запрещено). Полоса 8–9 км остаётся известным пробелом правила.
+    coast_for_tidal = (coast_payload if water.coast_lines(coast_payload)
+                       else water.clip_coast(wide_coast, r.lat, r.lon,
+                                             8000.0 + water.COAST_MAX_M))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
                                   radius_m=8000, payload=payload, wide_payload=wide_payload,
-                                  coast_payload=coast_payload,
+                                  coast_payload=coast_for_tidal,
                                   allow_network=payload is None and not getattr(args, "offline", False))
     # Порядок реки и расход — HydroRIVERS: без них «ручей» и «Волга» в пакете неотличимы.
     # Источник необязателен: без shapefile пакет собирается, поле остаётся None с предупреждением.
