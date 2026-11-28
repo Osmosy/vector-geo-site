@@ -135,19 +135,32 @@ def main(names: list[str] | None = None, *, osm_only: bool = False) -> int:
         import gzip
         with gzip.open(target / "fixtures" / "osm-water.json.gz", "wt", encoding="utf-8") as fh:
             json.dump(payload, fh)
-        # берег — такой же вход, как вода (E-028): без него офлайн-пакет не знает про море
+        # берег — такой же вход, как вода (E-028): без него офлайн-пакет не знает про море.
+        # W2/E-041: входов у правила моря три, и все три сохраняются, даже пустыми: пустой ответ
+        # «берега нет» — это измерение, отсутствие файла — «не смотрели».
+        from geosite import sea as _sea
         from geosite import water as _w
-        try:
-            coast = _w.fetch_coast(site["lat"], site["lon"], 8000, allow_network=True)
-        except Exception as exc:
-            coast = None
-            print(f"{name}: берег не получен ({exc})")
-        if coast and coast.get("elements"):
-            import gzip
-            with gzip.open(target / "fixtures" / "coast.json.gz", "wt", encoding="utf-8") as fh:
+        for radius_m, fname in ((8000, "coast.json.gz"), (15000, "coast-wide.json.gz")):
+            try:
+                coast = _w.fetch_coast(site["lat"], site["lon"], radius_m, allow_network=True)
+            except Exception as exc:
+                coast = None
+                print(f"{name}: берег {radius_m} м не получен ({exc})")
+            if coast is None:
+                print(f"{name}: берег {radius_m} м не запрошен")
+                continue
+            with gzip.open(target / "fixtures" / fname, "wt", encoding="utf-8") as fh:
                 json.dump(coast, fh)
-        else:
-            print(f"{name}: береговой линии в 8 км нет")
+            if not coast.get("elements"):
+                print(f"{name}: береговой линии в {radius_m / 1000:g} км нет")
+        try:
+            tokens = _sea.fetch_payload(site["lat"], site["lon"], 8000, allow_network=True)
+        except Exception as exc:
+            tokens = None
+            print(f"{name}: признаки моря не получены ({exc})")
+        if tokens is not None:
+            with gzip.open(target / "fixtures" / "sea.json.gz", "wt", encoding="utf-8") as fh:
+                json.dump(tokens, fh)
         # широкая выгрузка нужна только там, где граница прилива дальше 8 км (Темза, Парраматта);
         # для остальных это 2 МБ в репозитории без пользы
         if site.get("wide", name not in WORLD_SITES):

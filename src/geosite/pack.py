@@ -7,12 +7,12 @@ from pathlib import Path
 
 import hashlib
 
-from . import calibrate, climate, dem, dtm, figures, geo, geocode, landcover, sun
+from . import calibrate, climate, dem, dtm, figures, geo, geocode, gsw, hydro, landcover, sea, sun
 from . import terrain, water, worldnames
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.13.0"      # версия сборки пакета
+ALGO_VERSION = "2.14.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".
@@ -27,6 +27,11 @@ ALGO = {
     "calibrate": calibrate.ALGO_VERSION,
     "dtm": dtm.ALGO_VERSION,
     "worldnames": worldnames.ALGO_VERSION,
+    # W4/E-043: модули, добавленные позже, в ALGO не попадали — их данные в пакете были,
+    # а версии проверить было нельзя (I-11 сверяет только записанное)
+    "sea": sea.ALGO_VERSION,
+    "gsw": gsw.ALGO_VERSION,
+    "hydro": hydro.ALGO_VERSION,
     "pack": ALGO_VERSION,
 }
 
@@ -41,8 +46,10 @@ OTHER_KEEP_M = 1000.0       # водоёмы и скрытая вода — до
 WATERBODY_KEEP_M = 2000.0   # док и бассейн: именованная вода у самого участка (E-018)
 
 
+# `present` — ответ моря (W2/E-041): null значит «не смотрели или не знаю», и выбрасывать его
+# из файла значит выдать отсутствие ключа за «моря нет» (П1)
 KEEP_NULL = {"closure_index", "closure_reason", "tidal", "dem_reason", "flow_dem_dir",
-             "water_share", "outflow_visible", "confidence", "source", "exit"}
+             "water_share", "outflow_visible", "confidence", "source", "exit", "present"}
 
 
 def _dump_pack(payload: dict) -> str:
@@ -120,10 +127,13 @@ def water_summary(all_objects: list, kept: list) -> dict:
 # у него нет устья, изгиба и петли. Не null, а именно отсутствуют — null означал бы «считали,
 # но не вышло» (E-018).
 AREA_DROP = (
+    # W1/E-040: прилив — свойство воды, а не русла. Береговая линия в километре делает приливной
+    # любую воду, включая лагуну и залив, и море (S2) считает приливные объекты своим признаком.
+    # Пока `tidal` выбрасывался у контуров, Ла-Плата в Буэнос-Айресе молчала о приливе.
     "in_mountain", "out_mountain", "bend", "bend_kind", "curvature_radius_m", "straight_at_site",
     "loop", "site_position", "flow_osm_dir", "flow_dem_dir", "flow_chosen", "flow_rule",
     "flow_confidence", "flow_agree", "flow_ways_share", "dem_slope_m_per_km", "dem_slope_snr",
-    "dem_reason", "water_mouth", "outflow_visible", "tidal", "tidal_source", "tidal_reason",
+    "dem_reason", "water_mouth", "outflow_visible",
     "crossings_2km", "crossing_angle_deg", "between_branches", "order", "discharge_m3s",
     "hydro_distance_m", "pieces", "confluences",
 )

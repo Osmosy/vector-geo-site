@@ -71,7 +71,8 @@ def _polygon_kind(item: dict) -> str | None:
 def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | None,
            coast_wide_m: float | None = None, wc_share: float | None = None,
            gsw_share: float | None = None, sea_polygons: list[dict] | None = None,
-           osm_water_share: float | None = None) -> dict:
+           osm_water_share: float | None = None,
+           evidence_available: bool = True) -> dict:
     """Свести признаки моря в одно поле `sea` с доказательствами и уверенностью."""
     evidence: list[dict] = []
     near_m = radius_km * 1000.0
@@ -200,9 +201,17 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
         confidence = "low"
         note = "нет ни OSM-признаков, ни снимка — море не подтверждено и не опровергнуто"
     else:
-        present = False
-        confidence = "medium"
-        note = None
+        # W2/E-041: если входы правила моря не запрашивались (офлайн без файлов), ответ
+        # «моря нет» был бы выдумкой: у Сингапура океан в 9 км, а пакет говорил `false`.
+        if evidence_available:
+            present = False
+            confidence = "medium"
+            note = None
+        else:
+            present = None
+            confidence = "low"
+            note = ("признаки моря не получены (нет запроса и нет файла): «не смотрели», "
+                    "а не «моря нет»")
 
     sectors = sorted({s for s in (item.get("nearest_mountain") for item in (water or [])
                                   if item.get("kind") == "sea") if s})

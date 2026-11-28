@@ -241,25 +241,44 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
     # S2/E-038: море определяется не одной береговой линией. В расширенном круге до 15 км берег
     # ищется отдельно: Сува и Сидней давали «моря нет» только потому, что natural=coastline
     # в 8 км не попадал в выборку, а залив нарисован полигонами.
+    # W2/E-041: широкий берег нужен и тогда, когда восьмикилометрового нет вовсе (Сингапур:
+    # океан в 9 км, файла `coast.json` у эталона нет по определению) — раньше условие
+    # требовало непустой восьмикилометровый ответ и гасило ровно этот случай.
     coat_wide_m = None
-    if coast_payload is not None and (coast_m is None or coast_m > 8000.0):
+    wide_coast = _load_osm_file(getattr(args, "coast_wide_file", None))
+    if wide_coast is None and (coast_m is None or coast_m > 8000.0) and not from_file \
+            and not getattr(args, "offline", False):
         try:
-            wide_coast = water.fetch_coast(
-                r.lat, r.lon, 15000,
-                allow_network=not from_file and not getattr(args, "offline", False))
-            coat_wide_m = water.nearest_coast_m(wide_coast, r.lat, r.lon)
+            wide_coast = water.fetch_coast(r.lat, r.lon, 15000, allow_network=True)
         except Exception as exc:
             result.setdefault("water_warnings", []).append(f"берег 15 км: {exc}")
+    if wide_coast is not None and (coast_m is None or coast_m > 8000.0):
+        coat_wide_m = water.nearest_coast_m(wide_coast, r.lat, r.lon)
+        if coat_wide_m is None:
+            result.setdefault("water_warnings", []).append(
+                "берег 15 км: ответ есть, но береговой линии в нём нет — расстояние не измерено")
     result["coast_wide_distance_m"] = None if coat_wide_m is None else round(coat_wide_m, 1)
     # S2: признаки моря отдельным запросом — заливы и гавани помечены не как natural=water,
     # и в слое воды их нет (Порт-Джексон в Сиднее — natural=bay)
-    sea_payload = None
-    try:
-        sea_payload = sea.fetch_payload(
-            r.lat, r.lon, 8000,
-            allow_network=not from_file and not getattr(args, "offline", False))
-    except Exception as exc:
-        result.setdefault("water_warnings", []).append(f"море: запрос признаков ({exc})")
+    sea_payload = _load_osm_file(getattr(args, "sea_file", None))
+    if sea_payload is None:
+        try:
+            sea_payload = sea.fetch_payload(
+                r.lat, r.lon, 8000,
+                allow_network=not from_file and not getattr(args, "offline", False))
+        except Exception as exc:
+            result.setdefault("water_warnings", []).append(f"море: запрос признаков ({exc})")
+    # W2: «признаки не получены» — это «не смотрели», а не «моря нет». Пакет обязан сказать,
+    # что входы правила моря отсутствовали, иначе молчаливый `false` выдаёт себя за измерение.
+    evidence_available = (coast_payload is not None or wide_coast is not None) and \
+        sea_payload is not None
+    if not evidence_available:
+        missing = [name for name, value in (
+            ("--coast-file / --coast-wide-file", coast_payload is not None or wide_coast is not None),
+            ("--sea-file", sea_payload is not None)) if not value]
+        result.setdefault("water_warnings", []).append(
+            "море: признаки не получены (нет " + ", ".join(missing) +
+            ") — поле оставлено неопределённым, «не смотрели» не равно «моря нет» (W2/E-041)")
     sea_polygons = sea.payload_polygons(sea_payload, r.lat, r.lon, radius_km=8.0)
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
@@ -458,7 +477,8 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
                                    coast_m=coast_m, coast_wide_m=coat_wide_m,
                                    wc_share=None if wc_share is None else float(wc_share),
                                    gsw_share=gsw_share, sea_polygons=sea_polygons,
-                                   osm_water_share=None if osm_share is None else float(osm_share))
+                                   osm_water_share=None if osm_share is None else float(osm_share),
+                                   evidence_available=evidence_available)
         result["sea_in_ring"] = result["sea"]["deprecated_sea_in_ring"]
         warning = sea.conflict_warning(result["sea"])
         if warning:
@@ -633,6 +653,7 @@ def cmd_pack(args) -> int:
     orientation = {
         "facing_true_deg": None if facing is None else round(facing, 1),
         "declination_deg": None if decl is None else decl["deg"],
+        "declination_year": None if decl is None else decl.get("year"),
         "declination_horizontal_nt": None if decl is None else decl.get("horizontal_nt"),
         "declination_confidence": None if decl is None else decl.get("confidence"),
         "facing_mag_deg": None if (decl is None or facing is None)
@@ -765,6 +786,14 @@ def main(argv: list[str] | None = None) -> int:
         # E-028 (`sea_in_ring`), а живой и офлайн-прогон дали бы разные пакеты из одних данных
         p.add_argument("--coast-file", default=None,
                        help="сохранённый ответ Overpass с natural=coastline; подменяет загрузку")
+        # W2/E-041: у правила моря три входа (берег 8 км, берег 15 км, признаки natural=bay).
+        # Без флагов для двух последних офлайн-пакет противоречил expect.yaml того же эталона:
+        # Сингапур получал «моря нет», Сидней и Гонконг теряли «залив».
+        p.add_argument("--coast-wide-file", default=None,
+                       help="ответ Overpass с natural=coastline радиусом 15 км; подменяет загрузку")
+        p.add_argument("--sea-file", default=None,
+                       help="ответ Overpass с признаками моря (natural=bay, water=bay|harbour, "
+                            "place=sea); подменяет загрузку")
 
     p_res = sub.add_parser("resolve", help="ввод → точка, тип, точность")
     p_res.add_argument("place")

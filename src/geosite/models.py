@@ -50,6 +50,9 @@ class Orientation(BaseModel):
     # E-029: ось может быть не определена (точка в воде, рельеф пуст) — тогда null и причина
     facing_true_deg: float | None = None
     declination_deg: float | None = None
+    # W5/E-044: склонение считается на дату сборки; без даты в пакете нельзя узнать, на какой
+    # год оно посчитано, и пересборка в другой день даёт другое число без объяснения
+    declination_year: float | None = None
     declination_horizontal_nt: float | None = None
     declination_confidence: Confidence | None = None
     facing_mag_deg: float | None = None

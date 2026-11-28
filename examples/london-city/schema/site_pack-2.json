@@ -804,6 +804,18 @@
           "default": null,
           "title": "Declination Deg"
         },
+        "declination_year": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declination Year"
+        },
         "declination_horizontal_nt": {
           "anyOf": [
             {
