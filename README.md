@@ -6,7 +6,7 @@
 
 [![Ecosystem: Vector](https://img.shields.io/badge/Ecosystem-Vector-blue.svg)](https://osmosy.github.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 27/27](https://img.shields.io/badge/Tests-27%2F27-green.svg)](#тесты)
+[![Tests: 393/393](https://img.shields.io/badge/Tests-393%2F393-green.svg)](#тесты)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-4f8ff7.svg)](#установка)
 [![Schema: site_pack/1](https://img.shields.io/badge/Schema-site__pack%2F2-blueviolet.svg)](schema/site_pack-2.json)
 [![Data: DEM + OSM](https://img.shields.io/badge/Data-Copernicus%20DEM%20%2B%20OSM-orange.svg)](#атрибуция)
