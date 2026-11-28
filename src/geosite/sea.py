@@ -29,7 +29,7 @@
 
 from __future__ import annotations
 
-ALGO_VERSION = "1.0.0"
+ALGO_VERSION = "1.1.0"
 
 NEAR_KM = 8.0              # кольцо участка
 WIDE_KM = 15.0             # расширенный круг для береговой линии
@@ -72,7 +72,9 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
            coast_wide_m: float | None = None, wc_share: float | None = None,
            gsw_share: float | None = None, sea_polygons: list[dict] | None = None,
            osm_water_share: float | None = None,
-           evidence_available: bool = True) -> dict:
+           evidence_available: bool = True,
+           missing_evidence: list[str] | tuple[str, ...] | None = None,
+           polygons_available: bool = True) -> dict:
     """Свести признаки моря в одно поле `sea` с доказательствами и уверенностью."""
     evidence: list[dict] = []
     near_m = radius_km * 1000.0
@@ -98,7 +100,9 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
             continue
         # приливная вода — только если она связана с берегом: иначе приливная река в глубине
         # материка давала бы «море» без моря
-        near_coast = coast_m is not None and coast_m <= WIDE_KM * 1000.0
+        # E-045: широкий берег тоже годится — у городов без берега в 8 км он единственный
+        near_coast = ((coast_m is not None and coast_m <= WIDE_KM * 1000.0)
+                      or (coast_wide_m is not None and coast_wide_m <= WIDE_KM * 1000.0))
         if item.get("tidal") is True and near_coast and (distance is None or distance <= near_m):
             tidal.append({"name": item.get("name"), "kind": item.get("kind"),
                           "distance_m": None if distance is None else round(distance, 1)})
@@ -215,6 +219,23 @@ def detect(*, water: list[dict], radius_km: float = NEAR_KM, coast_m: float | No
 
     sectors = sorted({s for s in (item.get("nearest_mountain") for item in (water or [])
                                   if item.get("kind") == "sea") if s})
+    # W2/E-045: частичный набор входов — это не полное измерение. Молчание одного источника
+    # не превращается ни в отсутствие моря (забытый `--coast-wide-file` — океан в 9 км), ни в
+    # уверенный вид (без признаков `natural=bay` залив неотличим от океана).
+    if not evidence_available:
+        gaps = ", ".join(missing_evidence or ["часть входов"])
+        if present is True:
+            confidence = "low"
+            note = ("признаки моря получены не полностью (нет %s): море подтверждено тем, "
+                    "что есть, вид и расстояние могут быть другими" % gaps)
+        else:
+            present, confidence = None, "low"
+            note = ("признаки моря не получены (нет %s): «не смотрели» не равно «моря нет»"
+                    % gaps)
+    if not polygons_available and not polygons:
+        # вид моря держится на тегах площади; без них «океан» был бы догадкой
+        kind = None
+
     return {
         "present": present,
         "kind": kind,
