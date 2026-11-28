@@ -688,7 +688,7 @@ def cmd_run(args) -> int:
     args.place = args.place
     rc = cmd_pack(args)
     print(f"→ interpret: следующий шаг — навык vector-fengshui-bazi "
-          f"(landform 24 горы + feixing карта звёзд), этап 3/4 геомодуля не готовы", file=sys.stderr)
+          f"(landform 24 горы + feixing карта звёзд)", file=sys.stderr)
     return rc
 
 
