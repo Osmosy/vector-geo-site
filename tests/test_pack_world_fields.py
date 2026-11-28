@@ -25,7 +25,8 @@ def _no_network(self, address):  # noqa: ANN001
     raise AssertionError(f"офлайн-сборка полезла в сеть: {address}")
 
 
-def _build(name: str, target: Path, *, with_sea_inputs: bool = True) -> Path:
+def _build(name: str, target: Path, *, with_sea_inputs: bool = True,
+           skip: tuple[str, ...] = ()) -> Path:
     """Собрать пакет эталона из фикстур: тот же набор флагов, что у `geosite pack`."""
     from geosite import cli
 
@@ -41,6 +42,8 @@ def _build(name: str, target: Path, *, with_sea_inputs: bool = True) -> Path:
                             ("--coast-wide-file", "coast-wide.json.gz"),
                             ("--sea-file", "sea.json.gz"),
                             ("--osm-file-wide", "osm-water-wide.json.gz")):
+            if flag in skip:
+                continue
             if (fx / fname).exists():
                 args += [flag, str(fx / fname)]
     original = socket.socket.connect
@@ -219,3 +222,33 @@ def test_near_ring_dsm_dtm_twin_is_not_published() -> None:
     pair = pack._near_ring_layers(measured, "子", 0)
     assert set(pair) == {"dsm", "dtm"}, pair
     assert pair["dsm"]["max_rel_elev_m"] == pair["dtm"]["max_rel_elev_m"] == 5.0
+
+
+def test_sea_without_wide_coast_is_not_an_absence(tmp_path) -> None:
+    """E-045: забытый `--coast-wide-file` не должен давать молчаливое «моря нет».
+
+    У Сингапура океан в 8.97 км: в ближнем кольце берега нет, и без широкого входа правило
+    видело «брега не было» там, где его не спрашивали.
+    """
+    path = _build("singapore", tmp_path, skip=("--coast-wide-file",))
+    pack = json.loads(path.read_text(encoding="utf-8"))
+    assert pack["sea"]["present"] is None, pack["sea"]
+    assert pack["sea"]["confidence"] == "low"
+    assert "--coast-wide-file" in (pack["sea"].get("note") or "")
+    warnings = " ".join(pack["quality"]["warnings"])
+    assert "--coast-wide-file" in warnings, warnings
+
+
+def test_sea_without_polygons_does_not_guess_the_kind(tmp_path) -> None:
+    """E-045: без `--sea-file` вид моря — догадка, а не измерение.
+
+    Берег в 8 км есть, а признаков `natural=bay` нет: Сидней получал `kind: ocean` с
+    уверенностью `high`, хотя залив Порт-Джексон нарисован именно полигоном.
+    """
+    path = _build("sydney", tmp_path, skip=("--sea-file",))
+    pack = json.loads(path.read_text(encoding="utf-8"))
+    sea = pack["sea"]
+    assert sea["present"] is True, sea
+    assert sea["confidence"] == "low", sea
+    assert sea.get("kind") is None, sea
+    assert "--sea-file" in (sea.get("note") or "")

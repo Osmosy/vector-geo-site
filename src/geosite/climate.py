@@ -18,7 +18,7 @@ import json
 import math
 from pathlib import Path
 
-ALGO_VERSION = "1.2.0"
+ALGO_VERSION = "1.3.0"
 
 SOURCE_MAG = "WMM (NOAA), pygeomag"
 SOURCE_WIND = "ERA5 через Open-Meteo archive API (суточные, 10 м)"

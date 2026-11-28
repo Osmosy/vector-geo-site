@@ -246,8 +246,11 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
     # требовало непустой восьмикилометровый ответ и гасило ровно этот случай.
     coat_wide_m = None
     wide_coast = _load_osm_file(getattr(args, "coast_wide_file", None))
-    if wide_coast is None and (coast_m is None or coast_m > 8000.0) and not from_file \
-            and not getattr(args, "offline", False):
+    # W2/E-045: широкий берег — не запасной вариант, а один из трёх входов правила моря.
+    # Пока он запрашивался только при пустом ближнем, забытый `--coast-wide-file` давал
+    # молчаливое «моря нет» там, где океан в 9 км (Сингапур). Теперь спрашиваем всегда,
+    # когда сеть разрешена, и считаем отсутствие входа отсутствием доказательства.
+    if wide_coast is None and not from_file and not getattr(args, "offline", False):
         try:
             wide_coast = water.fetch_coast(r.lat, r.lon, 15000, allow_network=True)
         except Exception as exc:
@@ -270,15 +273,18 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
             result.setdefault("water_warnings", []).append(f"море: запрос признаков ({exc})")
     # W2: «признаки не получены» — это «не смотрели», а не «моря нет». Пакет обязан сказать,
     # что входы правила моря отсутствовали, иначе молчаливый `false` выдаёт себя за измерение.
-    evidence_available = (coast_payload is not None or wide_coast is not None) and \
-        sea_payload is not None
+    # Восьмикилометровый берег — не обязательный вход: его ответ целиком содержится в
+    # пятнадцатикилометровом (E-045), и у городов вдали от моря он законно пуст. Обязательны
+    # широкий берег и признаки `natural=bay`: без них правило моря не может отличить «нет
+    # моря» от «не смотрели».
+    missing_evidence = [name for name, value in (
+        ("--coast-wide-file", wide_coast is not None),
+        ("--sea-file", sea_payload is not None)) if not value]
+    evidence_available = not missing_evidence
     if not evidence_available:
-        missing = [name for name, value in (
-            ("--coast-file / --coast-wide-file", coast_payload is not None or wide_coast is not None),
-            ("--sea-file", sea_payload is not None)) if not value]
         result.setdefault("water_warnings", []).append(
-            "море: признаки не получены (нет " + ", ".join(missing) +
-            ") — поле оставлено неопределённым, «не смотрели» не равно «моря нет» (W2/E-041)")
+            "море: признаки не получены полностью (нет " + ", ".join(missing_evidence) +
+            ") — ответ будет неполным: «не смотрели» не равно «моря нет» (W2/E-041, E-045)")
     sea_polygons = sea.payload_polygons(sea_payload, r.lat, r.lon, radius_km=8.0)
     wide_payload = _load_osm_file(getattr(args, "osm_file_wide", None))
     metrics = water.measure_water(r.lat, r.lon, crs=crs, grid=grid, site_xy=site_xy,
@@ -478,7 +484,9 @@ def _measure_water(r, measured: dict, crs: int | str, payload: dict | None = Non
                                    wc_share=None if wc_share is None else float(wc_share),
                                    gsw_share=gsw_share, sea_polygons=sea_polygons,
                                    osm_water_share=None if osm_share is None else float(osm_share),
-                                   evidence_available=evidence_available)
+                                   evidence_available=evidence_available,
+                                   missing_evidence=missing_evidence,
+                                   polygons_available=sea_payload is not None)
         result["sea_in_ring"] = result["sea"]["deprecated_sea_in_ring"]
         warning = sea.conflict_warning(result["sea"])
         if warning:
