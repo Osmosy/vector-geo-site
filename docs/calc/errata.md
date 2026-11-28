@@ -35,12 +35,17 @@
 - Нашёл: ревью ТЗ (W4). Исправлено: `fbeaf18`.
 - Тест: эталон `london-city` (flow_chosen downstream_toward_end, out 辰).
 
+**Тесты:** `tests/test_water.py::test_tidal_tag_reaches_flow_rule`
+
 ## E-005 — приливность не определялась
 
 - Место: `water[].tidal`. Было: `null` у Темзы. Ожидалось: `true` ниже Теддингтона.
 - Доказательство: порт Лондона, граница прилива — шлюз Теддингтон.
 - Нашёл: ревью ТЗ (W5). Исправлено: `fbeaf18`.
 - Тест: эталоны `london-city`, `london-isle-of-dogs`; `data/tidal_limits.json`.
+
+**Тесты:** `tests/test_water.py::test_tidal_null_has_reason_when_wide_payload_absent`,
+  `tests/test_cli_offline.py::test_tidal_resolved_from_wide_payload`
 
 ## E-006 — ориентация примера выдана за замер
 
@@ -49,11 +54,15 @@
 - Нашёл: ревью ТЗ (W6). Исправлено: `5df3ecd`.
 - Тест: `examples/README.md` + `london-city` (model/low), `london-city-compass` (пометка «демо»).
 
+**Тесты:** `tests/test_examples_fields.py::test_example_orientation_is_model_not_measurement`
+
 ## E-007 — пакет 20 858 строк
 
 - Место: `site_pack.json`. Было: 799 объектов и 20 858 строк. Ожидалось: ≤ 3000 строк.
 - Исправлено: `5df3ecd` — 1 299 строк, полный набор в `water.geojson`.
 - Тест: проверка в CI (`geosite validate`) и размер пакета в примерах.
+
+**Тесты:** `tests/test_examples_fields.py::test_example_pack_is_one_water_object_per_line`
 
 ## E-008 — слияние Волги и Оки не находится
 
@@ -744,4 +753,20 @@
 - Тесты: `tests/test_pack_world_fields.py::test_sea_without_wide_coast_is_not_an_absence`,
   `test_sea_without_polygons_does_not_guess_the_kind`, `test_sea_unknown_without_evidence`.
 - Нашёл: независимая проверка PR #57 (ZCode).
+
+## E-046. Без ближнего берега прилив пропадал молча
+
+- Где: `cli._measure_water`, `water.measure_water` (правило G3.4), `tests/test_golden_world.facts`.
+- Было: PR #58 объявил восьмикилометровый берег необязательным для правила моря, но правило
+  прилива продолжало читать только его: набор «широкий берег + `--sea-file`» давал пакет без
+  единого приливного объекта — Сува 59 → 0, Буэнос-Айрес 53 → 0, Рейкьявик 263 → 0. Блок
+  `sea` при этом выглядел здоровым, предупреждений не было.
+- Стало: когда ближней выборки нет, правило прилива берёт широкий берег, обрезанный до 9 км
+  (`water.clip_coast`); когда ближняя есть — она, как и раньше. Слой метрик эталонов использует
+  тот же выбор, иначе пути расходятся. Полоса 8–9 км остаётся известным пробелом правила:
+  её закрытие поменяло бы числа прилива у Гонконга (473 → 476), а эталоны подгонять нельзя.
+- Доказательство: полный и частичный наборы дают 59 / 53 / 263, источник `coastline`;
+  у Лондона числа не изменились — берег передан в обоих кругах.
+- Тесты: `tests/test_pack_world_fields.py::test_tidal_survives_without_near_coast_file`.
+- Нашёл: независимая проверка `2c4a5a5` (ZCode), N1.
 

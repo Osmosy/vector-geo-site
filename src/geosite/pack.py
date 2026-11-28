@@ -12,7 +12,7 @@ from . import terrain, water, worldnames
 from . import validate as validate_mod
 from .models import SCHEMA_ID, SitePack, json_schema
 
-ALGO_VERSION = "2.15.0"      # версия сборки пакета
+ALGO_VERSION = "2.16.0"      # версия сборки пакета
 
 # P0: единственный источник версий — константы модулей. Ручные строки здесь разъезжались с
 # кодом: ALGO_VERSION стоял 1.6.0, а в ALGO было "pack": "1.9.0".

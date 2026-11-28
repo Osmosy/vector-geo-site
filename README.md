@@ -6,7 +6,7 @@
 
 [![Ecosystem: Vector](https://img.shields.io/badge/Ecosystem-Vector-blue.svg)](https://osmosy.github.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 405/405](https://img.shields.io/badge/Tests-405%2F405-green.svg)](#тесты)
+[![Tests: 408/408](https://img.shields.io/badge/Tests-408%2F408-green.svg)](#тесты)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-4f8ff7.svg)](#установка)
 [![Schema: site_pack/2](https://img.shields.io/badge/Schema-site__pack%2F2-blueviolet.svg)](schema/site_pack-2.json)
 [![Data: DEM + OSM](https://img.shields.io/badge/Data-Copernicus%20DEM%20%2B%20OSM-orange.svg)](#атрибуция)
@@ -59,7 +59,7 @@ geosite run "51.5138, -0.0984" --facing 180 --year 2018 --out examples/london-ci
 | 5 | Сборка и схемы | работает частично (роза, горизонт, отмывка; схемы по воде — нет) |
 | 6 | Команда `landform` в навыке | сделана в `vector-fengshui-bazi` |
 | 7 | `geosite run` одной командой | работает |
-| — | Тесты | 405 проходят офлайн: шесть европейских эталонов и семнадцать мировых |
+| — | Тесты | 408 проходят офлайн: шесть европейских эталонов и семнадцать мировых |
 
 Незакрытые этапы перечислены в `quality.warnings` каждого пакета — пакет не притворяется
 полным.
@@ -162,7 +162,7 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 | Излучина | минимальный разрыв между двумя частями русла, разнесёнными по длине ≥1.5 км; петля не зависит от участка, положение участка — отдельным полем `site_position` |
 | Направление течения | уклон рельефа регрессией по длине (±2 км) с `dem_slope_snr`; пять правил выбора, в пакете `flow_chosen`, `flow_rule`, `flow_confidence` (приливная река — решает OSM, при расхождении пишется предупреждение `flow_conflict`) |
 
-Лондон, Сити (пакет `examples/london-city`, `water 8.5.0`, `pack 2.15.0`): 810 объектов воды в
+Лондон, Сити (пакет `examples/london-city`, `water 8.6.0`, `pack 2.16.0`): 810 объектов воды в
 `water.geojson` — 595 контуров и 215 линий (526 озёр и прудов, 68 доков, 25 рек, 74 ручья,
 70 каналов, 47 труб), из них 47 в трубе и потому невидимы (`kind: culvert`,
 `visible: false`); в пакет попадают 47 значимых. Темза — 463.5 м, вход 申, выход 辰, участок
@@ -217,9 +217,11 @@ Fleet — 404.2 м, `hidden_share 0.93`, `visible: false` (暗水), 7 куско
 ## Тесты
 
 ```bash
-python -m pytest -q          # 405 passed, сеть не нужна
-# `tests/test_pack_world_fields.py` собирает четыре мировых пакета (~2 мин):
-# быстрый прогон — `python -m pytest -q --deselect tests/test_pack_world_fields.py`
+python -m pytest -q          # 408 passed, сеть не нужна
+# `tests/test_pack_world_fields.py` собирает мировые эталоны (~3 мин) — только он:
+# быстрый прогон `--deselect tests/test_pack_world_fields.py` оставляет проверки полей
+# примеров (tests/test_examples_fields.py), но снимает весь путь пакета.
+# Полный прогон обязателен перед пересборкой примеров и перед PR.
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)

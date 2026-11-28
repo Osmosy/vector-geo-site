@@ -91,6 +91,15 @@ def facts(name: str) -> dict:
 
         wide = _load_osm_file(str(wide_file))
 
+    wide_coast = None
+    if (fixtures / "coast-wide.json.gz").exists():
+        from geosite.cli import _load_osm_file
+
+        wide_coast = _load_osm_file(str(fixtures / "coast-wide.json.gz"))
+    # E-046: тот же источник, что у пути пакета, иначе слой метрик и файл разъедутся
+    if not water.coast_lines(coast):
+        coast = water.clip_coast(wide_coast, lat, lon, 8000.0 + water.COAST_MAX_M)
+
     metrics = []
     if payload is not None:
         metrics = water.measure_water(lat, lon, crs=grid["crs"], grid=raster, site_xy=site_xy,
