@@ -30,6 +30,9 @@ def to_objects(metrics: list[WaterMetrics]) -> list[WaterObject]:
             hydro_distance_m=None if area else m.hydro_distance_m,
             in_mountain=m.in_mountain, out_mountain=m.out_mountain,
             nearest_m=m.nearest_m, bend=m.bend, straight_at_site=m.straight_at_site,
+            # W3/E-042: вид изгиба считается на слое метрик, но в объект не передавался —
+            # поле было в схеме и пустым во всех артефактах
+            bend_kind=(m.bend_kind if m.bend_kind in {"bend", "loop", "straight"} else None),
             nearest_azimuth_deg=m.nearest_azimuth_deg, nearest_mountain=m.nearest_mountain,
             area_m2=m.area_m2, site_inside=m.site_inside, riverbank_of=m.riverbank_of,
             dock_channel_of=m.dock_channel_of,

@@ -51,9 +51,17 @@ def declination(lat: float, lon: float, year: float | None = None) -> dict:
     стрелка не стоит на север, а дрожит — при H < 2000 нТл направление по компасу не измерить,
     и об этом нужно сказать прямо, а не выдавать градусы с видом точности.
     """
+    import os
+
     import pygeomag
 
-    when = decimal_year() if year is None else float(year)
+    # W5/E-044: пересборка в другой день даёт другое склонение. Дата идёт в пакет, а закрепить
+    # её можно переменной GEOSITE_DECLINATION_YEAR — тогда две сборки равны побитово.
+    pinned = os.environ.get("GEOSITE_DECLINATION_YEAR")
+    if year is None and pinned:
+        when = float(pinned)
+    else:
+        when = decimal_year() if year is None else float(year)
     model = pygeomag.GeoMag()
     result = model.calculate(glat=lat, glon=lon, alt=0.0, time=when)
     horizontal = float(getattr(result, "h", float("nan")))

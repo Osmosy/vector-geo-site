@@ -126,6 +126,12 @@ def built(tmp_path_factory) -> dict[str, Path]:
                     "--out", str(target)]
             if (fixtures / "coast.json.gz").exists():
                 args += ["--coast-file", str(fixtures / "coast.json.gz")]
+            # W2: у правила моря ещё два входа; без них офлайн-пакет расходился с expect.yaml
+            # того же эталона (Сингапур «моря нет», Сидней и Гонконг теряли «залив»)
+            if (fixtures / "coast-wide.json.gz").exists():
+                args += ["--coast-wide-file", str(fixtures / "coast-wide.json.gz")]
+            if (fixtures / "sea.json.gz").exists():
+                args += ["--sea-file", str(fixtures / "sea.json.gz")]
             if (fixtures / "osm-water-wide.json.gz").exists():
                 args += ["--osm-file-wide", str(fixtures / "osm-water-wide.json.gz")]
             if site.get("facing") is not None:

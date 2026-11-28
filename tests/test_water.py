@@ -821,9 +821,13 @@ def test_area_gets_only_waterbody_fields():
     assert area.kind in {"lake", "dock"}, area.kind
     for field in ("in_mountain", "out_mountain", "bend", "bend_kind", "loop", "site_position",
                   "flow_chosen", "flow_rule", "flow_confidence", "flow_agree", "flow_ways_share",
-                  "water_mouth", "outflow_visible", "tidal", "tidal_source",
+                  "water_mouth", "outflow_visible",
                   "crossing_angle_deg", "between_branches"):
         assert getattr(area, field) is None, (field, getattr(area, field))
+    # W1/E-040: `tidal` из списка убран осознанно — прилив это свойство воды, а не русла.
+    # Здесь он None не потому, что «контуру нельзя», а потому что в этой выборке нет береговой
+    # линии: правило G3.4 получает `coast_payload=None`. Тест на обратное —
+    # `test_area_keeps_tidal_in_pack` в tests/test_pack_world_fields.py.
     assert area.crossings_2km == 0                       # у водоёма пересечений с кругом нет
 
     # поля водоёма есть

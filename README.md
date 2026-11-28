@@ -6,9 +6,9 @@
 
 [![Ecosystem: Vector](https://img.shields.io/badge/Ecosystem-Vector-blue.svg)](https://osmosy.github.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 393/393](https://img.shields.io/badge/Tests-393%2F393-green.svg)](#тесты)
+[![Tests: 403/403](https://img.shields.io/badge/Tests-403%2F403-green.svg)](#тесты)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-4f8ff7.svg)](#установка)
-[![Schema: site_pack/1](https://img.shields.io/badge/Schema-site__pack%2F2-blueviolet.svg)](schema/site_pack-2.json)
+[![Schema: site_pack/2](https://img.shields.io/badge/Schema-site__pack%2F2-blueviolet.svg)](schema/site_pack-2.json)
 [![Data: DEM + OSM](https://img.shields.io/badge/Data-Copernicus%20DEM%20%2B%20OSM-orange.svg)](#атрибуция)
 
 **Геоданные местности для фэншуй-интерпретации: рельеф, вода, ориентация — измерение без оценок**
@@ -26,7 +26,7 @@
 ## Что делает
 
 Вход: координаты, адрес или населённый пункт (+ по желанию азимут фасада и год постройки).
-Выход: каталог участка с `site_pack.json` (схема `site_pack/1`) и схемами в `figures/`:
+Выход: каталог участка с `site_pack.json` (схема `site_pack/2`) и схемами в `figures/`:
 отмывка рельефа, роза 24 гор, профиль горизонта.
 
 ## Результат на реальных данных: Лондон, Сити
@@ -52,14 +52,14 @@ geosite run "51.5138, -0.0984" --facing 180 --year 2018 --out examples/london-ci
 
 | Этап | Что | Состояние |
 |---|---|---|
-| 1 | Каркас, схема `site_pack/1`, геокодер (Nominatim, ≤1 запрос/с, кеш) | работает |
+| 1 | Каркас, схема `site_pack/2`, геокодер (Nominatim, ≤1 запрос/с, кеш) | работает |
 | 2 | Рельеф: тайлы Copernicus GLO-30 (запасной — SRTM 1″), мозаика, UTM, уклоны, 24 горы, горизонт, четыре духа, драконья жила | работает |
 | 3 | Вода: OSM (Overpass), русло из отношений, изгибы и петли, слияния, водные врата, приливность, видимость, скрытая вода, доля воды по секторам, порядок и расход (HydroRIVERS) | работает |
 | 4 | Склонение (WMM) и ветер (ERA5), повторяемость по секторам | работает |
 | 5 | Сборка и схемы | работает частично (роза, горизонт, отмывка; схемы по воде — нет) |
 | 6 | Команда `landform` в навыке | сделана в `vector-fengshui-bazi` |
 | 7 | `geosite run` одной командой | работает |
-| — | Тесты | 113 проходят офлайн, включая шесть эталонных мест |
+| — | Тесты | 403 проходят офлайн: шесть европейских эталонов и семнадцать мировых |
 
 Незакрытые этапы перечислены в `quality.warnings` каждого пакета — пакет не притворяется
 полным.
@@ -162,20 +162,22 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 | Излучина | минимальный разрыв между двумя частями русла, разнесёнными по длине ≥1.5 км; петля не зависит от участка, положение участка — отдельным полем `site_position` |
 | Направление течения | уклон рельефа регрессией по длине (±2 км) с `dem_slope_snr`; пять правил выбора, в пакете `flow_chosen`, `flow_rule`, `flow_confidence` (приливная река — решает OSM, при расхождении пишется предупреждение `flow_conflict`) |
 
-Лондон, Сити (пакет `examples/london-city`, `water 7.4.0`, `pack 2.0.0`): 750 объектов воды в
-`water.geojson` (471 контур, 25 рек, 74 ручья, 70 каналов, 63 дока, 47 труб), из них 47 в трубе
-и потому невидимы (`kind: culvert`, `visible: false`); в пакет попадают 44
-значимых. Темза — 463.6 м, вход 坤, выход 辰, участок снаружи изгиба (`bend: outer`) и на
-вогнутой стороне петли Айл-оф-Догс (`bend_kind: loop`, `site_position: outside_concave`),
-приливная (`tidal: true`, граница — Теддингтон, источник `osm_tag`), направление выбрано
-правилом 2 (приливная река: решает OSM, уверенность `medium`). Fleet — 404.3 м,
-`hidden_share 0.93`, `visible: false` (暗水), 7 кусков. Слияний в пакете — 47 (только между
-руслами, контуры водоёмов в них не участвуют — E-017), в том числе Флит × Темза в 603.1 м;
-вход русла в водоём пишется отдельно, в `waterbody_links` (9 записей: Regent's Canal входит
-в четыре бассейна, `#5122307` — в Kingsland Basin и др.). Темза у Лондона склеена в 5 линий: главное русло плюс русла вокруг
-островов — это разные водные пути, и в пакете они видны как `pieces`.
-Роль рельефа: у Темзы в городе уклон по DSM не читается (`dem_reason: no_dem_values`), и это
-записано, а не выдано за измерение.
+Лондон, Сити (пакет `examples/london-city`, `water 8.5.0`, `pack 2.14.0`): 810 объектов воды в
+`water.geojson` — 595 контуров и 215 линий (526 озёр и прудов, 68 доков, 25 рек, 74 ручья,
+70 каналов, 47 труб), из них 47 в трубе и потому невидимы (`kind: culvert`,
+`visible: false`); в пакет попадают 47 значимых. Темза — 463.5 м, вход 申, выход 辰, участок
+снаружи изгиба (`bend: outer`, `bend_kind: loop`) и на вогнутой стороне петли Айл-оф-Догс
+(`site_position: outside_concave`), приливная (`tidal: true`, граница — Теддингтон, источник
+`osm_tag`), направление выбрано правилом 2 (приливная река: решает OSM, уверенность `medium`).
+Fleet — 404.2 м, `hidden_share 0.93`, `visible: false` (暗水), 7 кусков. Слияний в пакете — 47
+(только между руслами, контуры водоёмов в них не участвуют — E-017), в том числе Флит × Темза
+в 603.0 м; вход русла в водоём пишется отдельно, в `waterbody_links` (23 записи: Regent's Canal
+входит в четыре бассейна, `#5122307` — в Kingsland Basin и др.). Темза у Лондона склеена в
+5 линий: главное русло плюс русла вокруг островов — это разные водные пути, и в пакете они
+видны как `pieces`.
+Роль рельефа: уклон по DSM у Темзы читается (`flow_dem_dir` заполнен, `dem_reason` пуст), но
+с направлением по OSM он расходится у `osm-#7833362-river` — расхождение записано в
+`quality.warnings` (`flow_conflict`), а не выдано за согласие.
 
 **Чего пока нет и почему:**
 
@@ -196,7 +198,8 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 
 ## Защита от неверных расчётов
 
-- `geosite validate` — 12 инвариантов пакета (`quality.violations`), запускается в конце `pack`.
+- `geosite validate` — правила I-01…I-15 (16 проверок, включая I-07a/I-07b) в `quality.violations`,
+  запускаются в конце `pack`.
 - Эталоны `tests/golden/` — шесть европейских мест (Лондон-Сити, Айл-оф-Догс, Кингстон —
   граница прилива, Нижний Новгород — слияние Оки и Волги, Москва — Москва-река и Неглинная
   в трубе, Санкт-Гоар — ущелье Рейна) и семнадцать мировых (сетка, полдень, море, письменность,
@@ -214,17 +217,23 @@ geosite pack  "51.5138, -0.0984" --facing 180 --year 2018
 ## Тесты
 
 ```bash
-python -m pytest -q          # 393 passed, сеть не нужна
+python -m pytest -q          # 403 passed, сеть не нужна
 # офлайн-пересборка пакета из сохранённого ответа Overpass: эта команда на фикстуре эталона
 # даёт пакет, побитово совпадающий с examples/london-city (фикстура включает членов отношений,
 # иначе часть воды в офлайн-сборке отсутствовала бы)
+GEOSITE_DECLINATION_YEAR=2026.91 \
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
   --osm-file tests/golden/london-city/fixtures/osm-water.json.gz \
+  --coast-file tests/golden/london-city/fixtures/coast.json.gz \
+  --coast-wide-file tests/golden/london-city/fixtures/coast-wide.json.gz \
+  --sea-file tests/golden/london-city/fixtures/sea.json.gz \
   --worldcover-file tests/golden/london-city/fixtures/worldcover.tif --out /tmp/pack
 # тот же путь для мирового эталона: DEM из выреза, DTM не подключается, сеть не нужна
 geosite pack "-33.8688, 151.2093" --offline --dem-file tests/golden/sydney/fixtures/dem.tif \
   --osm-file tests/golden/sydney/fixtures/osm-water.json.gz \
   --coast-file tests/golden/sydney/fixtures/coast.json.gz \
+  --coast-wide-file tests/golden/sydney/fixtures/coast-wide.json.gz \
+  --sea-file tests/golden/sydney/fixtures/sea.json.gz \
   --worldcover-file tests/golden/sydney/fixtures/worldcover.tif --out /tmp/pack-sydney
 # приливность по руслу: широкая выгрузка (файлы бывают сжатыми — gzip определяется по магии)
 geosite pack "51.5138, -0.0984" --year 2018 --offline \
@@ -236,7 +245,7 @@ geosite pack "51.5138, -0.0984" --year 2018 --offline \
 переход к неоднозначности, уклон и экспозиция на синтетических сетках, выбор горы с одиноким
 холмом, четыре духа от оси (а не от сторон света), жила на конусе и на плоской равнине,
 воспроизводимость секторов на реальном DEM Лондона, контрольные высоты (Сити / Темза /
-Хампстед), валидация `site_pack/1` и сборка схем.
+Хампстед), валидация `site_pack/2` и сборка схем.
 
 Интеграционные тесты используют кеш тайлов Copernicus DEM и пропускаются, если его нет —
 обычный прогон не тянет 60 МБ.

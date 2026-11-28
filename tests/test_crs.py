@@ -15,6 +15,23 @@ SYDNEY = (-33.85, 151.21)
 SUVA = (-18.14, 178.44)
 
 
+def test_wkt_and_proj_strings_pass_through():
+    """E-035: WKT от rasterio — не код EPSG.
+
+    `crs_str` приписывал `EPSG:` к любому не-PROJ тексту, и `offset_for_grid` падал
+    с `CRSError` на WKT-строке, которую отдаёт rasterio.
+    """
+    from geosite import geo
+
+    wkt = ('PROJCS["WGS 84 / UTM zone 30N",GEOGCS["WGS 84",DATUM["WGS_1984",'
+           'SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],'
+           'UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"]]')
+    assert geo.crs_str(wkt) == wkt
+    assert geo.crs_str('+proj=aeqd +lat_0=51.5 +lon_0=-0.1 +datum=WGS84') .startswith("+proj=aeqd")
+    assert geo.crs_str("32630") == "EPSG:32630"
+    assert geo.crs_str(32630) == "EPSG:32630"
+
+
 def test_small_site_stays_in_utm():
     """8 км внутри зоны — UTM: он привычен и не мешает сравнивать с внешними данными."""
     choice = geo.grid_crs(*SYDNEY, radius_km=8.0)
