@@ -11,7 +11,7 @@
 | `sankt-goar-rhine` | река `Rhein` у самого берега, течение на север, ущелье: `closure_index ≥ 0.5` | проходит (DEM с Copernicus, тайл N50/E007) |
 | `nizhny-novgorod-strelka` | слияние Волги и Оки у Стрелки | проходит: слияние 1280.7 м (E-008 закрыта, `water 6.1.0+`) |
 | `moscow-kremlin` | Москва-река (петля Балчуга), скрытая Неглинная (`visible: false`) | проходит (выгрузка с зеркала maps.mail.ru) |
-| **13 мировых** (`sydney`, `rio-de-janeiro`, `suva`, `singapore`, `cairo`, `hong-kong`, `reykjavik`, `beijing`, `istanbul`, `buenos-aires`, `dubai`, `taveuni`, `arctic-ocean`) | выбор сетки (UTM/азимутальная), сторона полуденного солнца, море в кольце, письменность имён, прилив без тега, пустота DEM — подробно в `docs/calc/world_coverage.md` | проходит (фикстуры 26.11.2026) |
+| **17 мировых** (`sydney`, `rio-de-janeiro`, `suva`, `singapore`, `cairo`, `hong-kong`, `reykjavik`, `beijing`, `istanbul`, `buenos-aires`, `dubai`, `taveuni`, `arctic-ocean`, `amsterdam`, `hangzhou-west-lake`, `kyoto-imperial-palace`, `chongqing-jiefangbei`) | выбор сетки (UTM/азимутальная), сторона полуденного солнца, море в кольце, письменность имён, прилив без тега, пустота DEM, высоты ниже нуля, рельеф классических мест по карте — подробно в `docs/calc/world_coverage.md` | проходит (фикстуры 26–27.11.2026) |
 | плоская равнина | все рельефные поля `null`/`low` | покрыто синтетикой `tests/test_water.py::test_mouth_flat_plane_is_null` |
 
 ## Мировые эталоны
@@ -20,6 +20,20 @@
 полуденного солнца, наличие моря в кольце, письменность имён, прилив без тега, пустоту DEM.
 Фикстуры тех же видов, плюс `coast.json.gz` — сохранённый ответ `natural=coastline` (без него
 офлайн-эталон не может проверить `sea_in_ring`).
+
+У классических мест (`hangzhou-west-lake`, `kyoto-imperial-palace`, `chongqing-jiefangbei`)
+ожидание рельефа взято с карты: блок `world.terrain.ring_max` называет вершину OSM
+(`natural=peak`, 27.11.2026) — имя, высоту, расстояние и азимут, — а тест сверяет максимум
+кольца в её горе. Значение, списанное с вывода кода, такой эталон не прошло бы (ТЗ Б4).
+
+## Сквозной прогон навыка
+
+`tests/test_skill_e2e.py` собирает пакеты пяти южных эталонов и Пекина офлайн из этих же
+фикстур (`geosite pack --dem-file …`) и прогоняет `landform` навыка `vector-fengshui-bazi`,
+закреплённого коммитом: у южных — две интерпретации и раздел расхождений, у северного — одна.
+Отдельного workflow нет: тест идёт в задаче `test`. Локально без сети навык берётся из
+`LANDFORM_REPO` (или соседнего каталога `../vector-fengshui-bazi`), в CI — клонируется по
+закреплённому коммиту.
 
 ```bash
 python scripts/make_golden.py sydney cairo hong-kong     # по именам из WORLD_SITES
@@ -60,6 +74,7 @@ DEM вырезается из кеша тайлов Copernicus (`~/.cache/vector
 | nizhny-novgorod-strelka | 23.11.2026, Overpass + отношения OSM | — (без DEM) |
 | moscow-kremlin | 23.11.2026, maps.mail.ru:Overpass | 23.11.2026, Copernicus GLO-30 |
 | sankt-goar-rhine | 23.11.2026, Overpass | 23.11.2026, Copernicus GLO-30 N50/E007 |
+| amsterdam, hangzhou-west-lake, kyoto-imperial-palace, chongqing-jiefangbei | 27.11.2026, Overpass (`out body geom`); Ханчжоу, Киото и Чунцин — с членами отношений | 27.11.2026, Copernicus GLO-30 в сетке пакета (Ханчжоу — aeqd) |
 
 ## Зеркала Overpass
 
